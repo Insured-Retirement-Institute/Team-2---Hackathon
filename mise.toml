@@ -1,6 +1,21 @@
+[tools]
+"github:pgschema/pgschema" = "1.7.2"
+
 [tasks.generate-models]
 description = "Generate Pydantic models from sureify.json OpenAPI spec"
 run = "uv run datamodel-codegen --input sureify.json > api/src/api/sureify_models.py"
+
+# =============================================================================
+# pgschema Tasks
+# =============================================================================
+
+[tasks."pgschema:plan"]
+description = "Plan schema changes for hackathon database"
+run = "pgschema plan --schema hackathon --file database/main.sql"
+
+[tasks."pgschema:apply"]
+description = "Apply schema changes for hackathon database"
+run = "pgschema apply --schema hackathon --file database/main.sql"
 
 # =============================================================================
 # EKS Cluster Management
