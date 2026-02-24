@@ -1,0 +1,3 @@
+[tasks.generate-models]
+description = "Generate Pydantic models from sureify.json OpenAPI spec"
+run = "uv run datamodel-codegen --input sureify.json > api/src/api/sureify_models.py"
