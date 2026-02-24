@@ -50,7 +50,7 @@ interface ClientAlertGroup {
 export function GroupedAlertsTable({
   alerts,
   onSelectAlert,
-  onSelectClientAlerts,
+  onSelectClientAlerts: _onSelectClientAlerts,
   onSnooze,
   onDismiss,
   onAssign,
@@ -379,19 +379,7 @@ export function GroupedAlertsTable({
 
                     <TableCell className="py-3">
                       <div className="flex items-center justify-end gap-2">
-                        {totalAlerts > 1 && onSelectClientAlerts ? (
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSelectClientAlerts(group.clientName, group.alerts);
-                            }}
-                            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white h-9 w-[120px] font-semibold shadow-md text-xs"
-                          >
-                            <ArrowRight className="h-4 w-4 mr-1.5" />
-                            Review
-                          </Button>
-                        ) : totalAlerts === 1 ? (
+                        {totalAlerts === 1 ? (
                           <Button
                             size="sm"
                             onClick={(e) => {
@@ -404,7 +392,7 @@ export function GroupedAlertsTable({
                             Review
                           </Button>
                         ) : (
-                          <span className="text-xs text-slate-500">Click to expand</span>
+                          <span className="text-xs text-slate-500">{totalAlerts} alerts — expand to review</span>
                         )}
                       </div>
                     </TableCell>

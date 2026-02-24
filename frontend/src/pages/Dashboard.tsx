@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { StatsCards } from "@/components/StatsCards";
@@ -8,13 +9,9 @@ import { fetchAlerts, fetchDashboardStats } from "@/api/alerts";
 import { Toaster, toast } from "sonner";
 
 export function Dashboard() {
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<RenewalAlert[]>([]);
-  const [stats, setStats] = useState<DashboardStats>({
-    total: 0,
-    high: 0,
-    urgent: 0,
-    totalValue: 0,
-  });
+  const [stats, setStats] = useState<DashboardStats>({ total: 0, high: 0, urgent: 0, totalValue: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,30 +21,22 @@ export function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [alertsData, statsData] = await Promise.all([
-        fetchAlerts(),
-        fetchDashboardStats(),
-      ]);
+      const [alertsData, statsData] = await Promise.all([fetchAlerts(), fetchDashboardStats()]);
       setAlerts(alertsData);
       setStats(statsData);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load dashboard data");
-      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSelectAlert = (alert: RenewalAlert) => {
-    // TODO: Open alert detail modal
-    toast.info(`Selected alert for ${alert.clientName}`, {
-      description: alert.alertDescription,
-    });
+    navigate(`/alerts/${alert.id}`);
   };
 
-  const handleSelectClientAlerts = (_clientName: string, _alerts: RenewalAlert[]) => {
-    // TODO: Open client alerts review
-    toast.info(`Review alerts for ${_clientName}`);
+  const handleSelectClientAlerts = (_clientName: string, alerts: RenewalAlert[]) => {
+    navigate(`/alerts/${alerts[0].id}`);
   };
 
   const handleSnooze = (alert: RenewalAlert) => {
@@ -68,7 +57,6 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Header */}
       <div className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-8 py-6">
           <div className="flex items-center gap-3">
@@ -85,13 +73,10 @@ export function Dashboard() {
 
       <Separator />
 
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
         <div>
           <h2 className="text-3xl font-bold text-slate-900">My Dashboard</h2>
-          <p className="text-base text-slate-600 mt-2">
-            Key portfolio metrics and alerts at a glance
-          </p>
+          <p className="text-base text-slate-600 mt-2">Key portfolio metrics and alerts at a glance</p>
         </div>
 
         <StatsCards stats={stats} />
