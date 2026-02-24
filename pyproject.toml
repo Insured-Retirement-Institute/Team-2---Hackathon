@@ -14,4 +14,5 @@ members = [
 [dependency-groups]
 dev = [
     "datamodel-code-generator>=0.54.0",
+    "pytest>=9.0.2",
 ]
