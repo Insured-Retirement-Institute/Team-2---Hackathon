@@ -1,0 +1,351 @@
+openapi: 3.0.3
+info:
+  title: IRI Annuity Renewal Intelligence API
+  description: API specification for the IRI Dashboard backend services
+  version: 1.0.0
+  contact:
+    name: IRI Team 2
+    
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://api.iri-hackathon.com/api
+    description: Production server
+
+paths:
+  /alerts:
+    get:
+      summary: Get all renewal alerts
+      description: Retrieves all active renewal alerts for the advisor's portfolio
+      operationId: getAlerts
+      tags:
+        - Alerts
+      parameters:
+        - name: status
+          in: query
+          description: Filter by alert status
+          schema:
+            type: string
+            enum: [pending, reviewed, snoozed, dismissed]
+        - name: priority
+          in: query
+          description: Filter by priority level
+          schema:
+            type: string
+            enum: [high, medium, low]
+        - name: carrier
+          in: query
+          description: Filter by carrier name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RenewalAlert'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /alerts/{alertId}:
+    get:
+      summary: Get alert by ID
+      description: Retrieves a specific renewal alert by its ID
+      operationId: getAlertById
+      tags:
+        - Alerts
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          description: The alert ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RenewalAlert'
+        '404':
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /alerts/{alertId}/snooze:
+    post:
+      summary: Snooze an alert
+      description: Snoozes an alert for a specified number of days
+      operationId: snoozeAlert
+      tags:
+        - Alerts
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          description: The alert ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - snoozeDays
+              properties:
+                snoozeDays:
+                  type: integer
+                  minimum: 1
+                  maximum: 90
+                  description: Number of days to snooze the alert
+                reason:
+                  type: string
+                  description: Optional reason for snoozing
+      responses:
+        '200':
+          description: Alert snoozed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  snoozeUntil:
+                    type: string
+                    format: date-time
+        '404':
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /alerts/{alertId}/dismiss:
+    post:
+      summary: Dismiss an alert
+      description: Permanently dismisses an alert with a reason
+      operationId: dismissAlert
+      tags:
+        - Alerts
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          description: The alert ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  description: Reason for dismissing the alert
+      responses:
+        '200':
+          description: Alert dismissed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '404':
+          description: Alert not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /dashboard/stats:
+    get:
+      summary: Get dashboard statistics
+      description: Retrieves aggregated statistics for the dashboard
+      operationId: getDashboardStats
+      tags:
+        - Dashboard
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    AlertType:
+      type: string
+      enum:
+        - replacement_recommended
+        - replacement_opportunity
+        - missing_info
+        - suitability_review
+        - income_planning
+      description: Type of alert
+
+    RenewalAlert:
+      type: object
+      required:
+        - id
+        - policyId
+        - clientName
+        - carrier
+        - renewalDate
+        - daysUntilRenewal
+        - currentRate
+        - renewalRate
+        - currentValue
+        - isMinRate
+        - priority
+        - hasDataException
+        - status
+        - alertType
+        - alertDescription
+      properties:
+        id:
+          type: string
+          description: Unique alert identifier
+          example: "alert-ANN-2020-5621-renewal"
+        policyId:
+          type: string
+          description: Policy identifier
+          example: "ANN-2020-5621"
+        clientName:
+          type: string
+          description: Client full name
+          example: "Maria Rodriguez"
+        carrier:
+          type: string
+          description: Insurance carrier name
+          example: "Athene"
+        renewalDate:
+          type: string
+          description: Human-readable renewal timeline or "N/A" if not applicable
+          example: "15 Days"
+        daysUntilRenewal:
+          type: integer
+          description: Number of days until renewal
+          example: 15
+        currentRate:
+          type: string
+          description: Current interest rate (formatted with %)
+          example: "3.8%"
+        renewalRate:
+          type: string
+          description: Renewal interest rate (formatted with %)
+          example: "1.5%"
+        currentValue:
+          type: string
+          description: Current policy value (formatted with $ and commas)
+          example: "$180,000"
+        isMinRate:
+          type: boolean
+          description: Whether renewal is at minimum guaranteed rate
+          example: true
+        priority:
+          type: string
+          enum: [high, medium, low]
+          description: Alert priority level
+          example: "high"
+        hasDataException:
+          type: boolean
+          description: Whether alert has data quality issues
+          example: false
+        missingFields:
+          type: array
+          items:
+            type: string
+          description: List of missing data fields (present when hasDataException is true)
+          example: ["Contact phone update needed"]
+        status:
+          type: string
+          enum: [pending, reviewed, snoozed, dismissed]
+          description: Current alert status
+          example: "pending"
+        alertType:
+          $ref: '#/components/schemas/AlertType'
+        alertTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertType'
+          description: All applicable alert types for this client/policy
+          example: ["replacement_recommended", "suitability_review", "missing_info"]
+        alertDescription:
+          type: string
+          description: Human-readable alert description
+          example: "Renewal at minimum rate - replacement analysis recommended"
+
+    DashboardStats:
+      type: object
+      required:
+        - total
+        - high
+        - urgent
+        - totalValue
+      properties:
+        total:
+          type: integer
+          description: Total number of active alerts
+          example: 10
+        high:
+          type: integer
+          description: Number of high priority alerts
+          example: 3
+        urgent:
+          type: integer
+          description: Number of alerts where daysUntilRenewal <= 30
+          example: 4
+        totalValue:
+          type: number
+          format: double
+          description: Sum of all currentValue amounts in dollars (numeric, not formatted)
+          example: 1839000
+
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type
+          example: "NOT_FOUND"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "Alert not found"
+        details:
+          type: object
+          description: Additional error details
+          additionalProperties: true
