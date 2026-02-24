@@ -3,7 +3,7 @@
 
 [tasks.generate-models]
 description = "Generate Pydantic models from sureify.json OpenAPI spec"
-run = "uv run datamodel-codegen --input sureify.json > api/src/api/sureify_models.py"
+run = "uv run datamodel-codegen --input sureify.json --output-model-type pydantic_v2.BaseModel --output api/src/api/sureify_models.py"
 
 # =============================================================================
 # pgschema Tasks
@@ -16,6 +16,79 @@ run = "pgschema plan --schema hackathon --file database/main.sql"
 [tasks."pgschema:apply"]
 description = "Apply schema changes for hackathon database"
 run = "pgschema apply --schema hackathon --file database/main.sql"
+
+# =============================================================================
+# ECR Build & Push
+# =============================================================================
+
+[tasks."ecr:login"]
+description = "Login to ECR"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+aws ecr get-login-password --region "$AWS_REGION" | \
+  docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+"""
+
+[tasks."ecr:create"]
+description = "Create ECR repository for sds-api"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+
+aws ecr create-repository \
+  --repository-name "$REPO_NAME" \
+  --region "$AWS_REGION" \
+  --image-scanning-configuration scanOnPush=true \
+  --encryption-configuration encryptionType=AES256 \
+  2>/dev/null || echo "Repository $REPO_NAME already exists"
+
+echo "ECR repository ready: $REPO_NAME"
+"""
+
+[tasks."ecr:build"]
+description = "Build API Docker image for ECR"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Building $REPO_NAME:$TAG..."
+docker build -t "$REPO_NAME:$TAG" -f api/Dockerfile .
+docker tag "$REPO_NAME:$TAG" "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image built and tagged: $REGISTRY/$REPO_NAME:$TAG"
+"""
+
+[tasks."ecr:push"]
+description = "Push API Docker image to ECR"
+depends = ["ecr:login"]
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Pushing $REGISTRY/$REPO_NAME:$TAG..."
+docker push "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image pushed successfully!"
+"""
+
+[tasks."ecr:build-push"]
+description = "Build and push API Docker image to ECR"
+depends = ["ecr:build", "ecr:push"]
 
 # =============================================================================
 # EKS Cluster Management

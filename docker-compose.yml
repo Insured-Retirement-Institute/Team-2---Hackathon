@@ -17,8 +17,8 @@ services:
 
   api:
     build:
-      context: ./api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api/Dockerfile
       args:
         build_version: "dev"
     ports:

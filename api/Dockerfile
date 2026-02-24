@@ -1,21 +1,22 @@
-FROM symetra.jfrog.io/bddbrn-docker-virtual/python:3.13-slim-trixie AS builder
+FROM python:3.13-slim-trixie AS builder
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Copy files needed for build
-COPY pyproject.toml uv.lock ./
-COPY src/ src/
+# Copy workspace files needed for build
+COPY uv.lock pyproject.toml ./
+COPY api/pyproject.toml api/
+COPY api/src/ api/src/
 
-# Create venv and install dependencies
+# Create venv and install the api package
 RUN uv venv /.venv
 ENV PATH="/.venv/bin:$PATH"
-RUN uv pip install .
+RUN uv pip install ./api
 
 # Build wheels
-RUN mkdir -p /wheels && uv build -o /wheels
+RUN mkdir -p /wheels && cd api && uv build -o /wheels
 
-FROM symetra.jfrog.io/bddbrn-docker-virtual/python:3.13-slim-trixie AS app
+FROM python:3.13-slim-trixie AS app
 
 WORKDIR /app
 
@@ -29,7 +30,7 @@ COPY --from=builder /wheels /wheels
 RUN /bin/uv pip install --system /wheels/*.whl
 
 # Copy queries directory
-COPY queries/ /app/queries/
+COPY api/queries/ /app/queries/
 
 ENV PYTHONPATH=/app
 ENV PORT=8000
