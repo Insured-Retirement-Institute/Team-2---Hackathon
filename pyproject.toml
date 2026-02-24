@@ -1,0 +1,14 @@
+[project]
+name = "team-2-hackathon"
+version = "0.1.0"
+description = "Team 2 Hackathon monorepo"
+requires-python = ">=3.13"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["api"]
+
+[dependency-groups]
+dev = [
+    "datamodel-code-generator>=0.54.0",
+]
