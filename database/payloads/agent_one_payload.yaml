@@ -1,0 +1,86 @@
+# AgentOne (Book of Business) — output payload
+# Source: agents/schemas.py (BookOfBusinessOutput, PolicyOutput, PolicyNotification)
+# Consumed by: frontend, ETL, or staging tables
+
+description: |
+  Single JSON object returned by get_book_of_business_with_notifications_and_flags
+  and by the AgentOne Strands agent. Contains all policies for a customer with
+  notifications and business-logic flags (replacement, data quality, income activation, schedule meeting).
+
+payload_name: BookOfBusinessOutput
+content_type: application/json
+source: agents/main.py (agentOne)
+
+root:
+  type: object
+  required: [customer_identifier, policies]
+  properties:
+    customer_identifier:
+      type: string
+      description: Customer or advisor identifier (e.g. "Marty McFly")
+      example: "Marty McFly"
+    policies:
+      type: array
+      description: All policies with notifications and flags
+      items:
+        $ref: "#/PolicyOutput"
+
+# --- PolicyOutput (each element of policies[]) ---
+PolicyOutput:
+  type: object
+  required: [policy, notifications]
+  properties:
+    policy:
+      type: object
+      description: Raw policy dict (Sureify Policy/Annuity/Life); structure from api sureify_models. Use JSONB in DB.
+    notifications:
+      type: array
+      items:
+        $ref: "#/PolicyNotification"
+    replacement_opportunity:
+      type: boolean
+      default: false
+      description: True if a replacement opportunity exists
+    replacement_reason:
+      type: string
+      nullable: true
+    data_quality_issues:
+      type: array
+      items: string
+      default: []
+    data_quality_severity:
+      type: string
+      nullable: true
+    income_activation_eligible:
+      type: boolean
+      default: false
+    income_activation_reason:
+      type: string
+      nullable: true
+    schedule_meeting:
+      type: boolean
+      default: false
+    schedule_meeting_reason:
+      type: string
+      nullable: true
+
+PolicyNotification:
+  type: object
+  required: [notification_type, message]
+  properties:
+    notification_type:
+      type: string
+      example: "premium_due"
+    message:
+      type: string
+    policy_id:
+      type: string
+      nullable: true
+    severity:
+      type: string
+      nullable: true
+      example: "warning"
+
+# --- DBA notes ---
+# - To persist: store root as one row per customer_identifier (e.g. book_of_business table with customer_identifier PK, payload JSONB).
+# - Or normalize: policies[] -> policy_staging with (customer_identifier, policy_id, policy JSONB, notifications JSONB, replacement_opportunity, ...).

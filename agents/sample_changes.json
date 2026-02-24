@@ -1,0 +1,16 @@
+{
+  "suitability": {
+    "riskTolerance": "moderate",
+    "timeHorizon": "7-10 years",
+    "liquidityNeeds": "10% annual withdrawal"
+  },
+  "clientGoals": {
+    "financialObjectives": "Guaranteed income in retirement",
+    "expectedHoldingPeriod": "7 years"
+  },
+  "clientProfile": {
+    "grossIncome": "85000",
+    "householdNetWorth": "650000",
+    "taxBracket": "22%"
+  }
+}

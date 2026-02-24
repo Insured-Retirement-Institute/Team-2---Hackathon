@@ -51,7 +51,7 @@ SUREIFY_AGENT_IRI_ONLY=1 PYTHONPATH=. python -m agents.main
 
 ## Config
 
-- **SUREIFY_BASE_URL** / **SUREIFY_API_KEY**: When set, the client calls the real Sureify API instead of mock data.
+- **Sureify (book of business):** AgentOne uses the same client as the API ([api.sureify_client](../api/src/api/sureify_client.py)). Set **SUREIFY_BASE_URL**, **SUREIFY_CLIENT_ID**, and **SUREIFY_CLIENT_SECRET** to call `get_policies` and `get_notes`; when unset, the agent uses mock data for Marty McFly.
 - **IRI_API_BASE_URL**: When set, all IRI tools (alerts, alert detail, snooze, dismiss, dashboard, compare, client profile, suitability, disclosures, transaction) call the live API (OpenAPI 1.1.0).
 - **SUREIFY_AGENT_TOOL_ONLY**: Set to `1` to skip the LLM and only run the composite tool (see above).
 - **SUREIFY_AGENT_IRI_ONLY**: Set to `1` to print IRI alerts + dashboardStats for Marty McFly and exit (no Bedrock).
@@ -60,10 +60,64 @@ SUREIFY_AGENT_IRI_ONLY=1 PYTHONPATH=. python -m agents.main
 
 See [.env.example](../.env.example) for placeholders.
 
+## AgentTwo (DB + changes → product recommendations)
+
+**AgentTwo** reads the database for current information (clients, suitability profiles, contracts, products), accepts JSON from the front-end with **changes to suitability, client goals, or client profile**, and generates **new product recommendations**.
+
+```bash
+# Tool-only (no LLM): dump DB context, then recommendations if --changes provided
+PYTHONPATH=. python -m agents.agent_two --tool-only --client-id "Marty McFly"
+PYTHONPATH=. python -m agents.agent_two --tool-only --changes changes.json --client-id "Marty McFly"
+
+# Full agent (Strands + LLM)
+PYTHONPATH=. python -m agents.agent_two
+PYTHONPATH=. python -m agents.agent_two --changes changes.json --client-id "Marty McFly" --alert-id "alert-123"
+```
+
+- **Database:** Set `DATABASE_URL` or `RDSHOST` + `RDS_USER` + `RDS_PASSWORD` (optional `RDS_DB`). AgentTwo uses sync reads via `agents/db_reader.py`.
+- **Changes JSON:** Optional keys `suitability`, `clientGoals`, `clientProfile` (each with optional fields). Only include what changed; agentTwo merges with DB state.
+- **IRI:** If `IRI_API_BASE_URL` and `--alert-id` are set, agentTwo can save profile/suitability to IRI and run comparison, then include that in the result.
+
+See `agents/agent_two_schemas.py` for `ProfileChangesInput` and `ProductRecommendationsOutput` shapes.
+
+### How to test agentTwo
+
+**1. Install and set env (from repo root)**
+
+```bash
+uv sync
+# Optional: copy .env.example to .env and set DB (for real data):
+# DATABASE_URL=postgresql://user:pass@host/dbname
+# or RDSHOST, RDS_USER, RDS_PASSWORD
+```
+
+**2. Tool-only (no LLM, no Bedrock)** — good for quick checks
+
+```bash
+# Dump current DB context (clients, suitability profiles, contracts, products)
+PYTHONPATH=. python -m agents.agent_two --tool-only --client-id "Marty McFly"
+
+# Same + run recommendations using sample changes
+PYTHONPATH=. python -m agents.agent_two --tool-only --changes agents/sample_changes.json --client-id "Marty McFly"
+```
+
+If the DB isn’t configured, `clients` / `client_suitability_profiles` / `contract_summary` / `products` will be empty and recommendations will be empty. Set `DATABASE_URL` or RDS vars and ensure the tables exist to see data.
+
+**3. Full agent (Strands + LLM)** — needs Bedrock/AWS credentials in `.env`
+
+```bash
+PYTHONPATH=. python -m agents.agent_two --client-id "Marty McFly"
+PYTHONPATH=. python -m agents.agent_two --changes agents/sample_changes.json --client-id "Marty McFly"
+```
+
 ## Layout
 
-- `main.py` – Strands agent, system prompt, and tools (book of business, JSON schema, IRI alerts and API).
-- `sureify_client.py` – Sureify API client (mock when `SUREIFY_BASE_URL` is unset).
+- `main.py` – Strands agent (agentOne), system prompt, and tools (book of business, JSON schema, IRI alerts and API).
+- `agent_two.py` – AgentTwo: DB context + front-end changes JSON → product recommendations.
+- `db_reader.py` – Sync DB reader for agentTwo (clients, client_suitability_profiles, contract_summary, products).
+- `agent_two_schemas.py` – `ProfileChangesInput`, `ProductRecommendation`, `ProductRecommendationsOutput`.
+- `recommendations.py` – Merge DB + changes and recommend products from the products table.
+- `sureify_client.py` – Delegates to [api.sureify_client](../api/src/api/sureify_client.py) when configured (`SUREIFY_BASE_URL` + `SUREIFY_CLIENT_ID` + `SUREIFY_CLIENT_SECRET`); otherwise mock data for Marty McFly. Exposes `get_book_of_business` (→ get_policies) and `get_notifications_for_policies` (→ get_notes).
 - `logic.py` – Business rules: replacement opportunity, data quality, income activation, schedule meeting.
 - `schemas.py` – `PolicyOutput`, `BookOfBusinessOutput` (Pydantic) for the frontend.
 - `iri_api_spec.yaml` – **OpenAPI 3.0.3** (source of truth for IRI API and DB schema).

@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-def main():
-    print("Hello from agents!")
-=======
 """
 Strands agent: Sureify book of business for Marty McFly.
 
@@ -115,7 +111,7 @@ def get_book_of_business_with_notifications_and_flags(customer_identifier: str) 
 
     policy_ids = [p.get("ID") or p.get("policyNumber") or "" for p in policies]
     policy_ids = [x for x in policy_ids if x]
-    notif_by_policy = fetch_notifications(policy_ids)
+    notif_by_policy = fetch_notifications(policy_ids, customer_identifier)
 
     outputs: list[PolicyOutput] = []
     for p in policies:
@@ -410,7 +406,6 @@ def main() -> None:
     user_message = "Produce the book of business for Marty McFly. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
     result = agent(user_message)
     print(result.get("output", result) if isinstance(result, dict) else result)
->>>>>>> 0cdd862 (agentbuild)
 
 
 if __name__ == "__main__":
