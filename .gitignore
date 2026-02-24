@@ -399,6 +399,13 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 
+<<<<<<< HEAD
 # mise local files
 mise.local.toml
 *local.toml
+=======
+# Environment and secrets (AWS tokens, etc.)
+.env
+.env.local
+.env.*.local
+>>>>>>> 0cdd862 (agentbuild)

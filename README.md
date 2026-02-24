@@ -21,7 +21,43 @@ Managing in-force annuities is fragmented, manual, and compliance-heavy.
 
 ---
 
+## AWS Hackathon sandbox
+
+- **Workshop dashboard:** [AWS Workshop Studio](https://catalog.us-east-1.prod.workshops.aws/event/dashboard/en-US)
+- **Bedrock (temp account):** Set the bearer token in your environment so it’s never committed:
+
+  ```bash
+  export AWS_BEARER_TOKEN_BEDROCK=<your-token>
+  ```
+
+  Or copy `.env.example` to `.env`, add your token there, and load it (e.g. `source .env` or use a dotenv loader). The repo ignores `.env`.
+
+- **RDS PostgreSQL:** Host is in `.env` as `RDSHOST`. To connect:
+  1. Add your DB password to `.env` as `RDS_PASSWORD=` (get it from the workshop dashboard).
+  2. Run `./connect-db.sh` from the repo root (uses `certs/global-bundle.pem` for SSL).
+
+  Or connect manually:
+  ```bash
+  source .env
+  psql "host=$RDSHOST port=5432 dbname=postgres user=app_user sslmode=verify-full sslrootcert=$(pwd)/certs/global-bundle.pem"
+  ```
+  (You’ll be prompted for the password if `RDS_PASSWORD` isn’t set.)
+
+- **Database in Cursor:** Install the **SQLTools** and **SQLTools PostgreSQL/Cockroach Driver** extensions. A connection “Team 2 RDS (PostgreSQL)” is in `.vscode/settings.json`. Open the SQLTools sidebar, connect, and enter your DB password when prompted. You can then browse tables and run queries from the editor.
+
 ## Get started
+
+### Agents (Sureify book of business)
+
+The **agents** package provides a Strands-based agent that produces the book of business for a customer (e.g. Marty McFly): policies as JSON (using [api/src/api/sureify_models.py](api/src/api/sureify_models.py)), notifications, and flags for replacements, data quality, income activation, and scheduled meetings. Run without an LLM (tool-only, mock data):
+
+```bash
+SUREIFY_AGENT_TOOL_ONLY=1 PYTHONPATH=. python -m agents.main
+```
+
+See [agents/README.md](agents/README.md) for full agent (Bedrock) and config (Sureify API URL/key).
+
+---
 
 This repository supports the **AI Inforce Management** initiative. We are currently in the process of standing up [SwaggerHub](https://wwww.swaggerhub.com) to host OpenAPI definitions for unified advisor dashboards, carrier data integration, and opportunity identification. More to come.
 

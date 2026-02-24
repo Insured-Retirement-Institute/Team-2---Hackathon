@@ -1,0 +1,19 @@
+{
+  "sqltools.connections": [
+    {
+      "name": "Team 2 RDS (PostgreSQL)",
+      "driver": "PostgreSQL",
+      "server": "team2-postgresql-db.ca5og0yikblq.us-east-1.rds.amazonaws.com",
+      "port": 5432,
+      "database": "postgres",
+      "username": "app_user",
+      "askForPassword": true,
+      "pgOptions": {
+        "ssl": {
+          "rejectUnauthorized": true,
+          "ca": "${workspaceFolder}/certs/global-bundle.pem"
+        }
+      }
+    }
+  ]
+}
