@@ -1,3 +1,131 @@
 [tasks.generate-models]
 description = "Generate Pydantic models from sureify.json OpenAPI spec"
 run = "uv run datamodel-codegen --input sureify.json > api/src/api/sureify_models.py"
+
+# =============================================================================
+# EKS Cluster Management
+# =============================================================================
+
+[tasks."eks:create"]
+description = "Create EKS cluster with Auto Mode"
+run = """
+#!/bin/bash
+set -euo pipefail
+echo "Creating EKS cluster with Auto Mode..."
+eksctl create cluster -f k8s/eksctl-cluster.yaml
+echo "Cluster created successfully!"
+"""
+
+[tasks."eks:delete"]
+description = "Delete EKS cluster"
+run = """
+#!/bin/bash
+set -euo pipefail
+echo "Deleting EKS cluster..."
+eksctl delete cluster -f k8s/eksctl-cluster.yaml --wait
+echo "Cluster deleted."
+"""
+
+[tasks."eks:status"]
+description = "Check EKS cluster status"
+run = """
+#!/bin/bash
+set -euo pipefail
+eksctl get cluster -f k8s/eksctl-cluster.yaml 2>/dev/null || echo "Cluster not found"
+echo ""
+echo "Nodes:"
+kubectl get nodes 2>/dev/null || echo "Cannot connect to cluster"
+"""
+
+[tasks."eks:kubeconfig"]
+description = "Update kubeconfig for EKS cluster"
+run = """
+#!/bin/bash
+set -euo pipefail
+CLUSTER_NAME=$(grep -A2 'metadata:' k8s/eksctl-cluster.yaml | grep 'name:' | awk '{print $2}')
+REGION=$(grep -A2 'metadata:' k8s/eksctl-cluster.yaml | grep 'region:' | awk '{print $2}')
+aws eks update-kubeconfig --name "$CLUSTER_NAME" --region "$REGION"
+echo "Kubeconfig updated. Current context:"
+kubectl config current-context
+"""
+
+# =============================================================================
+# EKS Deploy Tasks
+# =============================================================================
+
+[tasks."eks:deploy"]
+description = "Deploy everything to EKS (CNPG + DB + App)"
+depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app"]
+
+[tasks."eks:deploy:cnpg"]
+description = "Install CloudNativePG operator"
+run = """
+#!/bin/bash
+set -euo pipefail
+CNPG_VERSION="${CNPG_VERSION:-1.28.1}"
+
+echo "Installing CloudNativePG v${CNPG_VERSION}..."
+kubectl apply --server-side -f \
+  "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.28/releases/cnpg-${CNPG_VERSION}.yaml"
+
+echo "Waiting for CNPG operator..."
+kubectl wait --for=condition=Available deployment/cnpg-controller-manager \
+  -n cnpg-system --timeout=300s
+
+echo "CNPG operator ready!"
+"""
+
+[tasks."eks:deploy:db"]
+description = "Deploy PostgreSQL cluster"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Creating pgschema password secret..."
+kubectl create secret generic pgschema-password \
+  --from-literal=username=pgschema \
+  --from-literal=password="$(openssl rand -base64 24)" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+echo "Deploying PostgreSQL cluster..."
+kubectl apply -f k8s/dev-cluster.yaml
+
+echo "Waiting for PostgreSQL cluster to be ready..."
+kubectl wait --for=condition=Ready cluster/sds-dev --timeout=600s
+
+echo "PostgreSQL cluster ready!"
+kubectl get cluster sds-dev
+"""
+
+[tasks."eks:deploy:app"]
+description = "Deploy SDS API"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Deploying SDS API..."
+kubectl apply -f k8s/api.yaml
+
+echo "Waiting for deployment..."
+kubectl rollout status deployment/sds-api --timeout=120s
+
+echo "SDS API deployed!"
+kubectl get pods -l app=sds-api
+"""
+
+[tasks."eks:deploy:schema"]
+description = "Deploy schema configmaps and run migrations"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Creating schema configmaps..."
+kubectl create configmap pgschema-raw --from-file=sql/raw/ --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap pgschema-domain --from-file=sql/domain/ --dry-run=client -o yaml | kubectl apply -f -
+kubectl create configmap pgschema-grants --from-file=sql/grants/ --dry-run=client -o yaml | kubectl apply -f -
+
+echo "Running schema migrations (plan mode)..."
+kubectl create -f k8s/pgschema-update.yaml
+
+echo "Check logs with: kubectl logs -l app=pgschema-update --tail=100"
+"""

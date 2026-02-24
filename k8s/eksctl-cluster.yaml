@@ -1,0 +1,34 @@
+# EKS Cluster with Auto Mode
+# Creates a fully managed EKS cluster with automatic compute, storage, and networking
+#
+# Usage: eksctl create cluster -f k8s/eksctl-cluster.yaml
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: sds-cluster
+  region: us-east-1
+  version: "1.31"
+  tags:
+    Project: sds
+    Environment: dev
+
+autoModeConfig:
+  enabled: true
+  # Default node pools created automatically:
+  # - general-purpose: For regular workloads
+  # - system: For system components
+  #
+  # To customize node pools, set nodePools: [] and define your own
+
+iam:
+  withOIDC: true
+
+cloudWatch:
+  clusterLogging:
+    enableTypes:
+      - api
+      - audit
+      - authenticator
+      - controllerManager
+      - scheduler

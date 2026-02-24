@@ -1,0 +1,53 @@
+# CloudNativePG PostgreSQL Cluster for development
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: sds-dev
+spec:
+  instances: 1
+
+  imageName: ghcr.io/cloudnative-pg/postgresql:17
+
+  enableSuperuserAccess: true
+
+  postgresql:
+    parameters:
+      shared_buffers: 256MB
+
+  storage:
+    size: 1Gi
+
+  bootstrap:
+    initdb:
+      database: main
+      owner: app
+
+  managed:
+    roles:
+      - name: app
+        ensure: present
+        login: true
+        createdb: true
+      - name: pgschema
+        ensure: present
+        login: true
+        superuser: true
+        passwordSecret:
+          name: pgschema-password
+
+  schemas:
+    - name: raw
+      owner: app
+    - name: domain
+      owner: app
+---
+# Database resource (optional - for explicit database management)
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: sds-db-main
+spec:
+  cluster:
+    name: sds-dev
+  name: main
+  owner: app

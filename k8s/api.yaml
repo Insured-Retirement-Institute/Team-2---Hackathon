@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sds-api
+  labels:
+    app: sds-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sds-api
+  template:
+    metadata:
+      labels:
+        app: sds-api
+    spec:
+      containers:
+        - name: api
+          image: sds-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            # Uses standard PG* env vars (PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE)
+            # Connection string: postgres:// (libpq will use PG* vars automatically)
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /docs
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sds-api
+  labels:
+    app: sds-api
+spec:
+  selector:
+    app: sds-api
+  ports:
+    - port: 80
+      targetPort: 8000
