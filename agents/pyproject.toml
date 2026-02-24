@@ -19,6 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "datamodel-code-generator[http]>=0.25",
 ]
 
 [tool.uv]

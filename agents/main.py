@@ -41,6 +41,20 @@ _os.environ.pop("AWS_BEARER_TOKEN_BEDROCK", None)
 
 from strands import Agent, tool
 
+from agents.iri_client import (
+    dismiss_iri_alert as iri_dismiss,
+    get_iri_alert_by_id as iri_get_alert,
+    get_iri_alerts as iri_get_alerts,
+    get_iri_client_profile as iri_get_client_profile,
+    get_iri_dashboard_stats as iri_get_stats,
+    map_book_of_business_to_iri_alerts,
+    run_iri_comparison as iri_run_comparison,
+    save_iri_client_profile as iri_save_client_profile,
+    save_iri_disclosures as iri_save_disclosures,
+    save_iri_suitability as iri_save_suitability,
+    submit_iri_transaction as iri_submit_transaction,
+    snooze_iri_alert as iri_snooze,
+)
 from agents.logic import apply_business_logic
 from agents.schemas import BookOfBusinessOutput, PolicyNotification, PolicyOutput
 from agents.sureify_client import get_book_of_business as fetch_policies
@@ -149,6 +163,181 @@ def get_book_of_business_json_schema() -> str:
 
 
 # ---------------------------------------------------------------------------
+# IRI API tools (OpenAPI spec: agents/iri_api_spec.yaml)
+# ---------------------------------------------------------------------------
+
+
+@tool
+def get_book_of_business_as_iri_alerts(customer_identifier: str) -> str:
+    """
+    Get the book of business for a customer in IRI API format: RenewalAlert list + DashboardStats.
+
+    Use this when the user wants renewal alerts or dashboard data for the IRI Annuity Renewal Intelligence API.
+    Returns JSON with "alerts" (array of RenewalAlert) and "dashboardStats" (total, high, urgent, totalValue)
+    matching the IRI OpenAPI spec. Data is derived from Sureify book of business + agent business logic.
+    """
+    raw = get_book_of_business_with_notifications_and_flags(customer_identifier)
+    book = BookOfBusinessOutput.model_validate_json(raw)
+    alerts, stats = map_book_of_business_to_iri_alerts(book)
+    return json.dumps(
+        {
+            "alerts": [a.model_dump(mode="json", exclude_none=True) for a in alerts],
+            "dashboardStats": stats.model_dump(mode="json"),
+        },
+        indent=2,
+    )
+
+
+@tool
+def get_iri_alerts(status: str = "", priority: str = "", carrier: str = "") -> str:
+    """
+    Get renewal alerts from the IRI API (GET /alerts). Optional filters: status, priority, carrier.
+
+    Use when the user asks to list or filter alerts from the IRI dashboard backend.
+    Requires IRI_API_BASE_URL to be set. Returns JSON array of RenewalAlert or error.
+    """
+    result = iri_get_alerts(
+        status=status or None,
+        priority=priority or None,
+        carrier=carrier or None,
+    )
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def get_iri_alert_by_id(alert_id: str) -> str:
+    """
+    Get full alert detail from the IRI API (GET /alerts/{alertId} - getAlertDetail).
+
+    Returns AlertDetail: alert, clientAlerts, policyData, aiSuitabilityScore, suitabilityData, disclosureItems, transactionOptions, auditLog.
+    Use when the user asks for full details of a specific alert. Requires IRI_API_BASE_URL.
+    """
+    result = iri_get_alert(alert_id)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def snooze_iri_alert(alert_id: str, snooze_days: int, reason: str = "") -> str:
+    """
+    Snooze an IRI alert for a number of days (POST /alerts/{alertId}/snooze).
+
+    snooze_days must be between 1 and 90. Use when the user wants to snooze an alert.
+    Requires IRI_API_BASE_URL.
+    """
+    result = iri_snooze(alert_id, snooze_days, reason or None)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def dismiss_iri_alert(alert_id: str, reason: str) -> str:
+    """
+    Dismiss an IRI alert with a reason (POST /alerts/{alertId}/dismiss).
+
+    Use when the user wants to permanently dismiss an alert. Requires IRI_API_BASE_URL.
+    """
+    result = iri_dismiss(alert_id, reason)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def get_iri_dashboard_stats() -> str:
+    """
+    Get dashboard statistics from the IRI API (GET /dashboard/stats).
+
+    Returns total alerts, high-priority count, urgent count (daysUntilRenewal <= 30), and totalValue.
+    Requires IRI_API_BASE_URL.
+    """
+    result = iri_get_stats()
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def run_iri_comparison(alert_id: str) -> str:
+    """
+    Run comparison analysis for an alert (POST /alerts/{alertId}/compare - runComparison).
+
+    Returns current product vs alternatives (rates, features). Use when the user wants to compare products for an alert.
+    Requires IRI_API_BASE_URL.
+    """
+    result = iri_run_comparison(alert_id)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def get_iri_client_profile(client_id: str) -> str:
+    """
+    Get client profile from the IRI API (GET /clients/{clientId}/profile - getClientProfile).
+
+    Returns client comparison parameters (profile, suitability, goals) for the Compare tab.
+    Requires IRI_API_BASE_URL.
+    """
+    result = iri_get_client_profile(client_id)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def save_iri_client_profile(client_id: str, parameters_json: str) -> str:
+    """
+    Save client profile (PUT /clients/{clientId}/profile - saveClientProfile).
+
+    parameters_json: JSON object of ComparisonParameters (e.g. grossIncome, financialObjectives, etc.).
+    Use when the user wants to save or update the client's comparison parameters. Requires IRI_API_BASE_URL.
+    """
+    try:
+        params = json.loads(parameters_json)
+    except json.JSONDecodeError:
+        return json.dumps({"error": "Invalid JSON", "message": "parameters_json must be valid JSON"})
+    result = iri_save_client_profile(client_id, params)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def save_iri_suitability(alert_id: str, suitability_json: str) -> str:
+    """
+    Save suitability data for an alert (PUT /alerts/{alertId}/suitability - saveSuitability).
+
+    suitability_json: JSON object with SuitabilityData fields (clientObjectives, riskTolerance, score, etc.).
+    Requires IRI_API_BASE_URL.
+    """
+    try:
+        data = json.loads(suitability_json)
+    except json.JSONDecodeError:
+        return json.dumps({"error": "Invalid JSON", "message": "suitability_json must be valid JSON"})
+    result = iri_save_suitability(alert_id, data)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def save_iri_disclosures(alert_id: str, acknowledged_ids_json: str) -> str:
+    """
+    Save disclosure acknowledgments (PUT /alerts/{alertId}/disclosures - saveDisclosures).
+
+    acknowledged_ids_json: JSON array of disclosure item IDs, e.g. ["d1", "d2", "d3"].
+    Requires IRI_API_BASE_URL.
+    """
+    try:
+        ids = json.loads(acknowledged_ids_json)
+    except json.JSONDecodeError:
+        return json.dumps({"error": "Invalid JSON", "message": "acknowledged_ids_json must be a JSON array"})
+    if not isinstance(ids, list):
+        return json.dumps({"error": "Invalid input", "message": "acknowledged_ids must be an array"})
+    result = iri_save_disclosures(alert_id, ids)
+    return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def submit_iri_transaction(alert_id: str, transaction_type: str, rationale: str, client_statement: str) -> str:
+    """
+    Submit transaction for an alert (POST /alerts/{alertId}/transaction - submitTransaction).
+
+    transaction_type: "renew" or "replace". rationale: advisor's rationale. client_statement: client's acknowledgment.
+    Use when the user wants to submit the final renew/replace decision. Requires IRI_API_BASE_URL.
+    """
+    result = iri_submit_transaction(alert_id, transaction_type, rationale, client_statement)
+    return json.dumps(result, default=str, indent=2)
+
+
+# ---------------------------------------------------------------------------
 # System prompt and agent
 # ---------------------------------------------------------------------------
 
@@ -170,6 +359,10 @@ Your task is to produce the book of business for **Marty McFly** (or the custome
 Output format: Provide the full JSON object with key "customer_identifier" and "policies" array. Each policy in "policies" must include the raw policy fields plus: notifications, replacement_opportunity, replacement_reason, data_quality_issues, data_quality_severity, income_activation_eligible, income_activation_reason, schedule_meeting, schedule_meeting_reason. The frontend will consume this JSON as-is.
 
 When the user asks for a JSON schema to share with their database admin team (to build tables), call get_book_of_business_json_schema and provide that schema in your response so they can use it for table design.
+
+**IRI Annuity Renewal Intelligence API:** The agent can also produce and interact with data in IRI API format (renewal alerts and dashboard stats per the OpenAPI spec).
+- For renewal alerts or dashboard-style output (alerts + dashboardStats), use `get_book_of_business_as_iri_alerts` with the customer identifier. This returns JSON with "alerts" (RenewalAlert[]) and "dashboardStats" (total, high, urgent, totalValue) suitable for the IRI dashboard.
+- When the user wants to list, filter, or manage alerts from the IRI backend, use: `get_iri_alerts`, `get_iri_alert_by_id` (full AlertDetail), `snooze_iri_alert`, `dismiss_iri_alert`, `get_iri_dashboard_stats`. For Compare tab: `run_iri_comparison`, `get_iri_client_profile`, `save_iri_client_profile`. For Action tab: `save_iri_suitability`, `save_iri_disclosures`, `submit_iri_transaction`. These call the live IRI API when IRI_API_BASE_URL is set.
 """
 
 
@@ -181,6 +374,18 @@ def create_agent() -> Agent:
             get_notifications_for_policies,
             get_book_of_business_with_notifications_and_flags,
             get_book_of_business_json_schema,
+            get_book_of_business_as_iri_alerts,
+            get_iri_alerts,
+            get_iri_alert_by_id,
+            snooze_iri_alert,
+            dismiss_iri_alert,
+            get_iri_dashboard_stats,
+            run_iri_comparison,
+            get_iri_client_profile,
+            save_iri_client_profile,
+            save_iri_suitability,
+            save_iri_disclosures,
+            submit_iri_transaction,
         ],
         system_prompt=BOOK_OF_BUSINESS_SYSTEM_PROMPT,
     )
@@ -196,6 +401,10 @@ def main() -> None:
     if os.environ.get("SUREIFY_AGENT_TOOL_ONLY"):
         json_out = get_book_of_business_with_notifications_and_flags("Marty McFly")
         print(json_out)
+        return
+    # If SUREIFY_AGENT_IRI_ONLY=1, output book of business as IRI alerts + dashboardStats (no LLM)
+    if os.environ.get("SUREIFY_AGENT_IRI_ONLY"):
+        print(get_book_of_business_as_iri_alerts("Marty McFly"))
         return
     agent = create_agent()
     user_message = "Produce the book of business for Marty McFly. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
