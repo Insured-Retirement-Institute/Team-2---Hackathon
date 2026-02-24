@@ -1,0 +1,174 @@
+{
+  "$defs": {
+    "PolicyNotification": {
+      "description": "A single notification applicable to a policy.",
+      "properties": {
+        "notification_type": {
+          "description": "Type of notification (e.g. premium_due, lapse_risk)",
+          "title": "Notification Type",
+          "type": "string"
+        },
+        "message": {
+          "description": "Short description for the user",
+          "title": "Message",
+          "type": "string"
+        },
+        "policy_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Policy ID this notification applies to",
+          "title": "Policy Id"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "e.g. info, warning, urgent",
+          "title": "Severity"
+        }
+      },
+      "required": [
+        "notification_type",
+        "message"
+      ],
+      "title": "PolicyNotification",
+      "type": "object"
+    },
+    "PolicyOutput": {
+      "description": "Policy record with agent-derived fields for the book-of-business dashboard.\n\nThe `policy` field holds the raw policy (dict form of Policy/Annuity/Life from\nsureify_models). The remaining fields are added by the agent/tools layer.",
+      "properties": {
+        "policy": {
+          "additionalProperties": true,
+          "description": "Policy data (JSON-serializable dict from sureify_models Policy/Annuity/Life)",
+          "title": "Policy",
+          "type": "object"
+        },
+        "notifications": {
+          "description": "Notifications applicable to this policy",
+          "items": {
+            "$ref": "#/$defs/PolicyNotification"
+          },
+          "title": "Notifications",
+          "type": "array"
+        },
+        "replacement_opportunity": {
+          "default": false,
+          "description": "True if a replacement opportunity exists for this policy",
+          "title": "Replacement Opportunity",
+          "type": "boolean"
+        },
+        "replacement_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Short reason for replacement opportunity, if any",
+          "title": "Replacement Reason"
+        },
+        "data_quality_issues": {
+          "description": "List of data quality issues (e.g. missing SSN, address)",
+          "items": {
+            "type": "string"
+          },
+          "title": "Data Quality Issues",
+          "type": "array"
+        },
+        "data_quality_severity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Overall severity of data quality issues if any",
+          "title": "Data Quality Severity"
+        },
+        "income_activation_eligible": {
+          "default": false,
+          "description": "True if policy is eligible for income activation",
+          "title": "Income Activation Eligible",
+          "type": "boolean"
+        },
+        "income_activation_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Short reason for income activation eligibility, if any",
+          "title": "Income Activation Reason"
+        },
+        "schedule_meeting": {
+          "default": false,
+          "description": "True if a scheduled meeting with the customer is recommended",
+          "title": "Schedule Meeting",
+          "type": "boolean"
+        },
+        "schedule_meeting_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reason(s) to schedule a meeting (e.g. replacement; data quality; income activation)",
+          "title": "Schedule Meeting Reason"
+        }
+      },
+      "required": [
+        "policy"
+      ],
+      "title": "PolicyOutput",
+      "type": "object"
+    }
+  },
+  "description": "Full book-of-business response: list of policies with notifications and flags.",
+  "properties": {
+    "customer_identifier": {
+      "description": "Customer or advisor identifier (e.g. Marty McFly)",
+      "title": "Customer Identifier",
+      "type": "string"
+    },
+    "policies": {
+      "description": "All policies with notifications and business-logic flags",
+      "items": {
+        "$ref": "#/$defs/PolicyOutput"
+      },
+      "title": "Policies",
+      "type": "array"
+    }
+  },
+  "required": [
+    "customer_identifier"
+  ],
+  "title": "BookOfBusinessOutput",
+  "type": "object"
+}
