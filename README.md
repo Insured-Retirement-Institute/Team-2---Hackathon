@@ -2,7 +2,7 @@
 
 ## Topic
 
-**AI Inforce Management**
+**AI Inforce Management - Team 2**
 
 ## Issue
 
