@@ -4,9 +4,8 @@ import { mockAlerts } from "./mock/alerts";
 /**
  * API Service Layer
  * Currently returns mock data - ready to be replaced with real API calls
+ * When switching to real APIs, use: const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
  */
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
  * Fetch all renewal alerts
@@ -52,7 +51,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
  * Snooze an alert
  * POST /api/alerts/{alertId}/snooze
  */
-export async function snoozeAlert(alertId: string, snoozeDays: number): Promise<void> {
+export async function snoozeAlert(_alertId: string, _snoozeDays: number): Promise<void> {
   // TODO: Replace with real API call
   // await fetch(`${API_BASE_URL}/alerts/${alertId}/snooze`, {
   //   method: 'POST',
@@ -68,7 +67,7 @@ export async function snoozeAlert(alertId: string, snoozeDays: number): Promise<
  * Dismiss an alert
  * POST /api/alerts/{alertId}/dismiss
  */
-export async function dismissAlert(alertId: string, reason: string): Promise<void> {
+export async function dismissAlert(_alertId: string, _reason: string): Promise<void> {
   // TODO: Replace with real API call
   // await fetch(`${API_BASE_URL}/alerts/${alertId}/dismiss`, {
   //   method: 'POST',

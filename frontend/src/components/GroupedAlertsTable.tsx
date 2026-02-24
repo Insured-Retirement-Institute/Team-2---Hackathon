@@ -148,8 +148,6 @@ export function GroupedAlertsTable({
         return { label: "Missing Info", color: "bg-red-50 text-red-700 border-red-300" };
       case "suitability_review":
         return { label: "Suitability", color: "bg-purple-50 text-purple-700 border-purple-300" };
-      case "rate_change":
-        return { label: "Rate Change", color: "bg-amber-50 text-amber-700 border-amber-300" };
       case "income_planning":
         return { label: "Income", color: "bg-amber-50 text-amber-700 border-amber-300" };
       case "replacement_opportunity":
