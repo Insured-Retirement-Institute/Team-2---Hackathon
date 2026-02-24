@@ -4,9 +4,15 @@ requires-python = ">=3.13"
 
 [manifest]
 members = [
+    "agents",
     "api",
     "team-2-hackathon",
 ]
+
+[[package]]
+name = "agents"
+version = "0.1.0"
+source = { virtual = "agents" }
 
 [[package]]
 name = "annotated-doc"
