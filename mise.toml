@@ -33,12 +33,12 @@ aws ecr get-login-password --region "$AWS_REGION" | \
 """
 
 [tasks."ecr:create"]
-description = "Create ECR repository for sds-api"
+description = "Create ECR repository for hack2future"
 run = """
 #!/bin/bash
 set -euo pipefail
 AWS_REGION="${AWS_REGION:-us-east-1}"
-REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+REPO_NAME="${ECR_REPO_NAME:-hack2future}"
 
 aws ecr create-repository \
   --repository-name "$REPO_NAME" \
@@ -57,12 +57,12 @@ run = """
 set -euo pipefail
 AWS_REGION="${AWS_REGION:-us-east-1}"
 AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
-REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+REPO_NAME="${ECR_REPO_NAME:-hack2future}"
 TAG="${IMAGE_TAG:-latest}"
 REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-echo "Building $REPO_NAME:$TAG..."
-docker build -t "$REPO_NAME:$TAG" -f api/Dockerfile .
+echo "Building $REPO_NAME:$TAG for linux/amd64..."
+docker build --platform linux/amd64 -t "$REPO_NAME:$TAG" -f api/Dockerfile .
 docker tag "$REPO_NAME:$TAG" "$REGISTRY/$REPO_NAME:$TAG"
 
 echo "Image built and tagged: $REGISTRY/$REPO_NAME:$TAG"
@@ -76,7 +76,7 @@ run = """
 set -euo pipefail
 AWS_REGION="${AWS_REGION:-us-east-1}"
 AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
-REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+REPO_NAME="${ECR_REPO_NAME:-hack2future}"
 TAG="${IMAGE_TAG:-latest}"
 REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
@@ -179,41 +179,89 @@ echo "Deploying PostgreSQL cluster..."
 kubectl apply -f k8s/dev-cluster.yaml
 
 echo "Waiting for PostgreSQL cluster to be ready..."
-kubectl wait --for=condition=Ready cluster/sds-dev --timeout=600s
+kubectl wait --for=condition=Ready cluster/hackdb --timeout=600s
 
 echo "PostgreSQL cluster ready!"
-kubectl get cluster sds-dev
+kubectl get cluster hackdb
 """
 
 [tasks."eks:deploy:app"]
-description = "Deploy SDS API"
+description = "Deploy API"
 run = """
 #!/bin/bash
 set -euo pipefail
 
-echo "Deploying SDS API..."
+echo "Deploying API..."
 kubectl apply -f k8s/api.yaml
 
 echo "Waiting for deployment..."
-kubectl rollout status deployment/sds-api --timeout=120s
+kubectl rollout status deployment/hack2future --timeout=120s
 
-echo "SDS API deployed!"
-kubectl get pods -l app=sds-api
+echo  "API deployed!"
+kubectl get pods -l app=hack2future
 """
 
-[tasks."eks:deploy:schema"]
-description = "Deploy schema configmaps and run migrations"
+[tasks."eks:deploy:ack-iam"]
+description = "Install ACK IAM Controller v1.6.1"
 run = """
 #!/bin/bash
 set -euo pipefail
+ACK_IAM_VERSION="${ACK_IAM_VERSION:-v1.6.1}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
 
-echo "Creating schema configmaps..."
-kubectl create configmap pgschema-raw --from-file=sql/raw/ --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap pgschema-domain --from-file=sql/domain/ --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap pgschema-grants --from-file=sql/grants/ --dry-run=client -o yaml | kubectl apply -f -
+echo "Installing ACK IAM Controller ${ACK_IAM_VERSION}..."
+helm install ack-iam-controller \
+  oci://public.ecr.aws/aws-controllers-k8s/iam-chart \
+  --version "$ACK_IAM_VERSION" \
+  --namespace ack-system \
+  --create-namespace \
+  --set aws.region="$AWS_REGION" \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=ack-iam-controller
 
-echo "Running schema migrations (plan mode)..."
-kubectl create -f k8s/pgschema-update.yaml
+echo "Waiting for ACK IAM controller..."
+kubectl wait --for=condition=Available deployment/ack-iam-controller \
+  -n ack-system --timeout=120s
 
-echo "Check logs with: kubectl logs -l app=pgschema-update --tail=100"
+echo "ACK IAM Controller ready!"
+kubectl get pods -n ack-system
+"""
+
+[tasks."pgschema:sync-configmap"]
+description = "Sync database schema files to k8s configmap"
+run = """
+#!/bin/bash
+set -euo pipefail
+CONFIGMAP_ARGS="--from-file=main.sql=database/main.sql"
+while IFS= read -r f; do
+  key="${f#database/}"
+  CONFIGMAP_ARGS="$CONFIGMAP_ARGS --from-file=$key=$f"
+done < <(fd -e sql . database -E main.sql)
+kubectl create configmap pgschema-database $CONFIGMAP_ARGS \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "Configmap pgschema-database updated"
+"""
+
+[tasks."pgschema:plan-k8s"]
+description = "Preview schema changes (k8s)"
+depends = ["pgschema:sync-configmap"]
+run = """
+#!/bin/bash
+set -euo pipefail
+JOB_NAME=$(kubectl create -f k8s/pgschema-update.yaml -o name)
+echo "Created $JOB_NAME"
+kubectl wait --for=condition=Complete --timeout=60s $JOB_NAME || true
+kubectl logs $JOB_NAME
+"""
+
+[tasks."pgschema:apply-k8s"]
+description = "Apply schema changes (k8s)"
+depends = ["pgschema:sync-configmap"]
+run = """
+#!/bin/bash
+set -euo pipefail
+JOB_NAME=$(sed 's/value: plan/value: apply/' k8s/pgschema-update.yaml | kubectl create -f - -o name)
+echo "Created $JOB_NAME"
+kubectl wait --for=condition=Complete --timeout=60s $JOB_NAME || true
+kubectl logs $JOB_NAME
 """
