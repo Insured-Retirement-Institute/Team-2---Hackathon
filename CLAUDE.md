@@ -25,14 +25,19 @@ cd api && uv run uvicorn api.main:app --reload
 # http://localhost:8000
 ```
 
-**Agents (tool-only mode, no LLM):**
+**Agents (organized in agent_one/, agent_two/, agent_three/):**
 ```bash
-SUREIFY_AGENT_TOOL_ONLY=1 PYTHONPATH=. python -m agents.main
-```
+# AgentOne: book of business (tool-only, no LLM)
+SUREIFY_AGENT_TOOL_ONLY=1 PYTHONPATH=. python -m agents.agent_one
+# AgentOne with Bedrock LLM
+PYTHONPATH=. python -m agents.agent_one
 
-**Agents (with Bedrock LLM):**
-```bash
-PYTHONPATH=. python -m agents.main
+# AgentTwo: DB + changes → product recommendations
+PYTHONPATH=. python -m agents.agent_two --tool-only --client-id "Marty McFly"
+PYTHONPATH=. python -m agents.agent_two --changes agents/sample_changes.json --client-id "Marty McFly"
+
+# AgentThree: chatbot (screen state, delegates to agentTwo)
+PYTHONPATH=. python -m agents.agent_three --screen product_comparison --message "Why did you recommend this?"
 ```
 
 **Docker Compose:**

@@ -11,6 +11,7 @@ This folder contains YAML definitions of **payloads** produced and consumed by t
 | **agent_one_payload.yaml** | Book-of-business output (AgentOne): customer identifier + policies with notifications and flags |
 | **agent_two_payloads.yaml** | AgentTwo: DB context payload, profile-changes input, product-recommendations output |
 | **agent_two_storable_payload.yaml** | AgentTwo **storable payload**: run_id, created_at, client_id, **explanation** (choices), recommendations; use for table design to persist recommendation runs |
+| **agent_three_chat_payloads.yaml** | AgentThree (chatbot): ChatRequest (screen_state, user_message, client_id, changes_json, alert_id) and ChatResponse (reply, screen_state, agent_two_invoked, storable_payload) |
 
 **Related:**
 

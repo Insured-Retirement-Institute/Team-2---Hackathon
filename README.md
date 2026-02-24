@@ -52,7 +52,7 @@ Managing in-force annuities is fragmented, manual, and compliance-heavy.
 The **agents** package provides a Strands-based agent that produces the book of business for a customer (e.g. Marty McFly): policies as JSON (using [api/src/api/sureify_models.py](api/src/api/sureify_models.py)), notifications, and flags for replacements, data quality, income activation, and scheduled meetings. Run without an LLM (tool-only, mock data):
 
 ```bash
-SUREIFY_AGENT_TOOL_ONLY=1 PYTHONPATH=. python -m agents.main
+SUREIFY_AGENT_TOOL_ONLY=1 PYTHONPATH=. python -m agents.agent_one
 ```
 
 See [agents/README.md](agents/README.md) for full agent (Bedrock) and config (Sureify API URL/key).

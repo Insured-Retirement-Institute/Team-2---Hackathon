@@ -2,10 +2,7 @@
 AgentTwo: reads the database for current information, accepts JSON changes from the front-end
 (suitability, client goals, client profile), and generates new product recommendations.
 
-Run from repo root:
-  PYTHONPATH=. uv run python -m agents.agent_two
-Or with a changes JSON file:
-  PYTHONPATH=. uv run python -m agents.agent_two --changes changes.json --client-id "Marty McFly"
+Run from repo root: PYTHONPATH=. uv run python -m agents.agent_two
 """
 
 from __future__ import annotations
@@ -17,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-_repo_root = Path(__file__).resolve().parent.parent
+_repo_root = Path(__file__).resolve().parent.parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
@@ -39,11 +36,6 @@ from agents.sureify_client import get_notifications_for_policies as fetch_sureif
 from agents.sureify_client import get_products as fetch_sureify_products
 
 
-# ---------------------------------------------------------------------------
-# Tools
-# ---------------------------------------------------------------------------
-
-
 def _get_sureify_context(customer_identifier: str) -> dict:
     """Fetch book of business, notifications, and products from Sureify (or mock when not configured)."""
     policies = fetch_sureify_policies(customer_identifier)
@@ -63,8 +55,7 @@ def get_current_database_context(client_id: str = "") -> str:
     """
     Read all current information: from the database (clients, suitability profiles,
     contract_summary, products) and from Sureify (book of business / policies and notifications).
-    client_id: optional; used for DB contract_summary filter and as Sureify customer_identifier
-               (e.g. "Marty McFly"). If empty, Sureify uses "Marty McFly" for mock data.
+    client_id: optional; used for DB contract_summary filter and as Sureify customer_identifier.
     Returns JSON with keys: clients, client_suitability_profiles, contract_summary, products,
     sureify_policies, sureify_notifications_by_policy, sureify_products.
     """
@@ -86,12 +77,9 @@ def generate_product_recommendations(
     """
     Take JSON from the front-end with changes to suitability, client goals, and/or client profile;
     merge with current DB state; and generate new product recommendations.
-    changes_json: JSON object with optional keys "suitability", "clientGoals", "clientProfile"
-                  (each optional; only include changed fields).
-    client_id: client identifier (e.g. client_account_number or client name).
-    alert_id: optional; if provided and IRI_API_BASE_URL is set, save profile/suitability to IRI
-              and run comparison for this alert, then include IRI comparison in the result.
-    Returns JSON: ProductRecommendationsOutput (client_id, merged_profile_summary, recommendations, explanation, storable_payload for DB, iri_comparison_result).
+    changes_json: JSON object with optional keys "suitability", "clientGoals", "clientProfile".
+    client_id: client identifier. alert_id: optional IRI alert ID.
+    Returns JSON: ProductRecommendationsOutput (recommendations, explanation, storable_payload, ...).
     """
     try:
         payload = json.loads(changes_json)
@@ -114,12 +102,10 @@ def generate_product_recommendations(
     if alert_id and os.environ.get("IRI_API_BASE_URL"):
         try:
             from agents.iri_client import (
-                get_iri_client_profile,
                 run_iri_comparison,
                 save_iri_client_profile,
                 save_iri_suitability,
             )
-            # Optionally push changes to IRI and run comparison
             if changes.client_profile:
                 params = changes.client_profile.model_dump(exclude_none=True)
                 save_iri_client_profile(client_id, params)
@@ -128,7 +114,7 @@ def generate_product_recommendations(
                 save_iri_suitability(alert_id, suit)
             iri_result = run_iri_comparison(alert_id)
         except Exception:
-            pass  # continue with local recommendations even if IRI fails
+            pass
 
     out = generate_recommendations(
         client_id=client_id,
@@ -137,7 +123,6 @@ def generate_product_recommendations(
         alert_id=alert_id or None,
         iri_comparison_result=iri_result,
     )
-    # Build storable payload for database (run_id, created_at, explanation, recommendations)
     input_summary = {
         "sections_present": [k for k in ("suitability", "clientGoals", "clientProfile") if payload.get(k)],
     }
@@ -155,10 +140,6 @@ def generate_product_recommendations(
         out.storable_payload = storable
     return out.model_dump_json(indent=2, exclude_none=True)
 
-
-# ---------------------------------------------------------------------------
-# System prompt and agent
-# ---------------------------------------------------------------------------
 
 AGENT_TWO_SYSTEM_PROMPT = """You are agentTwo: you read the database for all current information (clients, suitability profiles, contracts, products) and use JSON changes from the front-end to generate new product recommendations.
 
@@ -189,7 +170,7 @@ def main() -> None:
     parser.add_argument("--changes", type=str, help="Path to JSON file with suitability/clientGoals/clientProfile changes")
     parser.add_argument("--client-id", type=str, default="Marty McFly", help="Client identifier")
     parser.add_argument("--alert-id", type=str, default="", help="Optional IRI alert ID for comparison")
-    parser.add_argument("--tool-only", action="store_true", help="Run tools only (no LLM): DB context then recommendations if --changes given")
+    parser.add_argument("--tool-only", action="store_true", help="Run tools only (no LLM)")
     args = parser.parse_args()
 
     if args.tool_only:
