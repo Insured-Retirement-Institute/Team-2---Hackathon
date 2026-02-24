@@ -84,7 +84,7 @@ With Auto Mode, the AWS Load Balancer Controller is automatically managed.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: sds-api-ingress
+  name: hack2future-ingress
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
@@ -97,14 +97,14 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: sds-api
+                name: hack2future
                 port:
                   number: 80
 ```
 
 ```bash
 kubectl apply -f k8s/ingress.yaml
-kubectl get ingress sds-api-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl get ingress hack2future-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
 ## Directory Structure

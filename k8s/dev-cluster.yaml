@@ -2,7 +2,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: sds-dev
+  name: hackdb
 spec:
   instances: 1
 
@@ -16,10 +16,11 @@ spec:
 
   storage:
     size: 1Gi
+    storageClass: gp3
 
   bootstrap:
     initdb:
-      database: main
+      database: hackathon
       owner: app
 
   managed:
@@ -34,20 +35,18 @@ spec:
         superuser: true
         passwordSecret:
           name: pgschema-password
-
-  schemas:
-    - name: raw
-      owner: app
-    - name: domain
-      owner: app
 ---
-# Database resource (optional - for explicit database management)
+# Database with managed schema
 apiVersion: postgresql.cnpg.io/v1
 kind: Database
 metadata:
-  name: sds-db-main
+  name: hackathon-db
 spec:
-  cluster:
-    name: sds-dev
-  name: main
+  name: hackathon
   owner: app
+  cluster:
+    name: hackdb
+  schemas:
+    - name: hackathon
+      owner: app
+      ensure: present

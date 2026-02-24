@@ -1,0 +1,15 @@
+# Storage Classes for EKS Auto Mode
+# IMPORTANT: EKS Auto Mode uses ebs.csi.eks.amazonaws.com (NOT ebs.csi.aws.com)
+#
+# Usage: kubectl apply -f k8s/storage-classes.yaml
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+provisioner: ebs.csi.eks.amazonaws.com
+parameters:
+  type: gp3
+  fsType: ext4
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
