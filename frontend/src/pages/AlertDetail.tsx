@@ -114,8 +114,9 @@ export function AlertDetailPage() {
       {/* Header */}
       <div className="h-20 px-8 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 shrink-0">
         <div className="flex items-center gap-4 flex-1">
-          <Button variant="ghost" size="sm" onClick={goBack} className="h-10 w-10 p-0">
-            <ArrowLeft className="h-5 w-5" />
+          <Button variant="outline" size="sm" onClick={goBack} className="h-10 px-3 gap-2 text-slate-700 hover:text-slate-900 border-slate-300">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="text-sm font-medium">Dashboard</span>
           </Button>
           <div>
             <h3 className="text-2xl font-bold text-slate-900 mb-1">
@@ -247,7 +248,7 @@ export function AlertDetailPage() {
       </div>
 
       {/* Footer */}
-      <div className="h-16 px-8 border-t border-slate-200 flex items-center justify-between bg-gradient-to-r from-slate-50 to-slate-100 shrink-0">
+      <div className="h-16 px-8 border-t border-slate-200 flex items-center bg-gradient-to-r from-slate-50 to-slate-100 shrink-0">
         <div className="flex items-center gap-3">
           {suitabilityData?.score === 100 && disclosuresAcknowledged ? (
             <>
@@ -261,9 +262,6 @@ export function AlertDetailPage() {
             </>
           )}
         </div>
-        <Button onClick={goBack} className="bg-blue-600 hover:bg-blue-700 h-10 px-6 font-semibold">
-          Back to Dashboard
-        </Button>
       </div>
     </div>
   );
