@@ -2,22 +2,12 @@
 Action tab endpoints - disclosures and transaction submission.
 """
 import json
-import sys
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from api.database import pool
-
-# Add agents directory to path to import agent_two
-_repo_root = Path(__file__).resolve().parent.parent.parent.parent
-agents_dir = _repo_root / "agents"
-if str(agents_dir) not in sys.path:
-    sys.path.insert(0, str(agents_dir))
-
-# Import agent_two for transaction generation
-from agent_two.main import generate_product_recommendations
+from agents.agent_two.main import generate_product_recommendations
 
 router = APIRouter(prefix="/api/alerts", tags=["Action"])
 
