@@ -16,3 +16,8 @@ dev = [
     "datamodel-code-generator>=0.54.0",
     "pytest>=9.0.2",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["agents/tests", "api/tests"]
+pythonpath = [".", "api/src"]
+filterwarnings = ["ignore::DeprecationWarning"]

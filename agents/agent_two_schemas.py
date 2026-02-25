@@ -122,6 +122,21 @@ class ChoiceExplanation(BaseModel):
     )
 
 
+# ---- Electronic application: submission-ready JSON for e-apply ----
+class ElectronicApplicationPayload(BaseModel):
+    """Submission-ready payload for electronic application (run_id, client, merged profile, selected products)."""
+    run_id: str = Field(..., description="Unique id for this recommendation run")
+    client_id: str = Field(..., description="Client identifier")
+    merged_profile: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Merged suitability + goals/profile used for submission",
+    )
+    selected_products: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Products selected for submission (id, name, carrier, key attributes)",
+    )
+
+
 # ---- Storable payload: full JSON to persist in the database ----
 class AgentTwoStorablePayload(BaseModel):
     """
@@ -155,6 +170,10 @@ class AgentTwoStorablePayload(BaseModel):
         None,
         description="If IRI compare was run, the ComparisonResult (optional)",
     )
+    electronic_application_payload: ElectronicApplicationPayload | None = Field(
+        None,
+        description="Submission-ready JSON for electronic application (e-apply)",
+    )
 
 
 # ---- Full response for generate_product_recommendations ----
@@ -179,4 +198,8 @@ class ProductRecommendationsOutput(BaseModel):
     )
     iri_comparison_result: dict[str, Any] | None = Field(
         None, description="If IRI compare was run, the ComparisonResult"
+    )
+    electronic_application_payload: ElectronicApplicationPayload | None = Field(
+        None,
+        description="Submission-ready JSON for electronic application (e-apply)",
     )
