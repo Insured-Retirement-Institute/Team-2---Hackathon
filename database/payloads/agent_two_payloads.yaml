@@ -80,7 +80,10 @@ db_context_payload:
 # Only changed fields are sent; AgentTwo merges with DB state. All sections optional.
 
 profile_changes_input:
-  description: JSON from front-end with changes to suitability, client goals, and/or client profile.
+  description: |
+    JSON from front-end with changes to suitability, client goals, and/or client profile.
+    When clientProfile or suitability is sent, agentTwo persists (upserts) the updated
+    profile to client_suitability_profiles so the database stays in sync.
   payload_name: ProfileChangesInput
   content_type: application/json
   source: Front-end POST / agentTwo tool generate_product_recommendations(changes_json, ...)
@@ -182,5 +185,9 @@ product_recommendations_output:
         type: object
         nullable: true
         description: If IRI compare was run (alert_id + IRI_API_BASE_URL), the ComparisonResult from IRI API
+      electronic_application_payload:
+        type: object
+        nullable: true
+        description: Submission-ready JSON for electronic application (run_id, client_id, merged_profile, selected_products).
 
   # DBA notes: To persist recommendations, consider table product_recommendations(client_id, product_id, payload JSONB, created_at).

@@ -29,7 +29,18 @@ from agents.logging_config import get_logger
 logger = get_logger(__name__)
 
 from agents.agent_two_schemas import AgentTwoStorablePayload, ProductRecommendationsOutput, ProfileChangesInput
-from agents.audit_writer import persist_agent_two_payload, persist_event
+from agents.agent_two_schemas import (
+    AgentTwoStorablePayload,
+    ElectronicApplicationPayload,
+    ProductRecommendationsOutput,
+    ProfileChangesInput,
+)
+from agents.audit_writer import (
+    build_profile_row_from_changes,
+    persist_agent_two_payload,
+    persist_event,
+    upsert_client_suitability_profile,
+)
 from agents.db_reader import get_current_database_context as fetch_db_context
 from agents.recommendations import generate_recommendations
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
@@ -139,6 +150,29 @@ def generate_product_recommendations(
     db_context["sureify_notifications_by_policy"] = sureify["sureify_notifications_by_policy"]
     db_context["sureify_products"] = sureify["sureify_products"]
 
+    # Persist front-end client profile when new or as update (upsert)
+    if changes.client_profile or changes.suitability:
+        clients = db_context.get("clients") or []
+        profiles = db_context.get("client_suitability_profiles") or []
+        client_row = None
+        for c in clients:
+            acct = (c.get("client_account_number") or "").strip()
+            name = (c.get("client_name") or "").lower()
+            if acct == client_id or (client_id and (client_id.lower() in name or client_id in acct)):
+                client_row = c
+                break
+        if not client_row and clients:
+            client_row = clients[0]
+        acct = (client_row or {}).get("client_account_number")
+        if acct:
+            existing = next(
+                (p for p in profiles if p.get("client_account_number") == acct),
+                None,
+            )
+            profile_row = build_profile_row_from_changes(acct, changes, existing)
+            if len(profile_row) > 1:  # more than just client_account_number
+                upsert_client_suitability_profile(acct, profile_row)
+
     iri_result: dict | None = None
     if alert_id and os.environ.get("IRI_API_BASE_URL"):
         try:
@@ -172,6 +206,18 @@ def generate_product_recommendations(
         logger.exception("generate_product_recommendations: recommendation generation failed for client_id=%s", client_id)
         _emit_event(input_summary, False, error_message=str(e), input_validation_passed=True)
         raise
+
+    # Build submission-ready e-apply payload (merged profile + selected products)
+    merged = out.merged_profile_summary or {}
+    selected = [r.model_dump(mode="json") for r in out.recommendations]
+    e_apply = ElectronicApplicationPayload(
+        run_id=run_id,
+        client_id=client_id,
+        merged_profile=merged,
+        selected_products=selected,
+    )
+    out.electronic_application_payload = e_apply
+
     if out.explanation:
         storable = AgentTwoStorablePayload(
             run_id=run_id,
@@ -183,6 +229,7 @@ def generate_product_recommendations(
             reasons_to_switch=out.reasons_to_switch,
             merged_profile_summary=out.merged_profile_summary,
             iri_comparison_result=out.iri_comparison_result,
+            electronic_application_payload=e_apply,
         )
         out.storable_payload = storable
         payload_ref_id = persist_agent_two_payload(
