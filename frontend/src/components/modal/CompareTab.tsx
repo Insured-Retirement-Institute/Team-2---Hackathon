@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 import { useState, useEffect } from "react";
-=======
-import { useState } from "react";
->>>>>>> main
 import type { ComparisonParameters, ComparisonData, ProductOption } from "@/types/alert-detail";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
