@@ -1,5 +1,7 @@
 // In dev, use /api-backend so Vite proxies to the API without conflicting with the SPA route /admin/responsible-ai
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "/api-backend" : "");
+const API_BASE =
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? "/api-backend" : "");
 
 export interface AgentRunEventRow {
   id: number;
@@ -54,7 +56,8 @@ export async function fetchResponsibleAIEvents(params: {
   if (params.from_date != null) sp.set("from_date", params.from_date);
   if (params.to_date != null) sp.set("to_date", params.to_date);
   if (params.success != null) sp.set("success", String(params.success));
-  if (params.client_id_scope != null) sp.set("client_id_scope", params.client_id_scope);
+  if (params.client_id_scope != null)
+    sp.set("client_id_scope", params.client_id_scope);
   if (params.limit != null) sp.set("limit", String(params.limit));
   if (params.offset != null) sp.set("offset", String(params.offset));
   const url = `${API_BASE}/admin/responsible-ai/events?${sp.toString()}`;
@@ -76,7 +79,9 @@ export async function fetchResponsibleAIStats(params: {
   return res.json();
 }
 
-export async function fetchResponsibleAIEventById(eventId: string): Promise<AgentRunEventRow> {
+export async function fetchResponsibleAIEventById(
+  eventId: string,
+): Promise<AgentRunEventRow> {
   const url = `${API_BASE}/admin/responsible-ai/events/${encodeURIComponent(eventId)}`;
   const res = await fetch(url);
   if (!res.ok) {

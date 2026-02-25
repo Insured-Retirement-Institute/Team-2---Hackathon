@@ -14,8 +14,19 @@ export type RenewalAlert = {
   hasDataException: boolean;
   missingFields?: string[];
   status: "pending" | "reviewed" | "snoozed" | "dismissed";
-  alertType: "replacement_recommended" | "replacement_opportunity" | "missing_info" | "suitability_review" | "income_planning";
-  alertTypes?: ("replacement_recommended" | "replacement_opportunity" | "missing_info" | "suitability_review" | "income_planning")[];
+  alertType:
+    | "replacement_recommended"
+    | "replacement_opportunity"
+    | "missing_info"
+    | "suitability_review"
+    | "income_planning";
+  alertTypes?: (
+    | "replacement_recommended"
+    | "replacement_opportunity"
+    | "missing_info"
+    | "suitability_review"
+    | "income_planning"
+  )[];
   alertDescription: string;
 };
 

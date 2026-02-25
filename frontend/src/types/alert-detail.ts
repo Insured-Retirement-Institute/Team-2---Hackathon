@@ -11,9 +11,19 @@ export type VisualizationProduct = {
   growthScore: number;
   liquidityScore: number;
   protectionScore: number;
-  projectedRates: { year: number; conservativeRate: number; expectedRate: number; optimisticRate: number }[];
+  projectedRates: {
+    year: number;
+    conservativeRate: number;
+    expectedRate: number;
+    optimisticRate: number;
+  }[];
   performanceData: { year: number; value: number; income?: number }[];
-  features: { name: string; startYear: number; endYear: number; category: "surrender" | "bonus" | "rider" | "guarantee" }[];
+  features: {
+    name: string;
+    startYear: number;
+    endYear: number;
+    category: "surrender" | "bonus" | "rider" | "guarantee";
+  }[];
 };
 
 export type PolicyFeature = {
