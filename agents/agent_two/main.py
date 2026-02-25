@@ -29,8 +29,10 @@ if _env_file.exists():
 from strands import Agent, tool
 
 from agents.agent_two_schemas import AgentTwoStorablePayload, ProductRecommendationsOutput, ProfileChangesInput
+from agents.audit_writer import persist_agent_two_payload, persist_event
 from agents.db_reader import get_current_database_context as fetch_db_context
 from agents.recommendations import generate_recommendations
+from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.sureify_client import get_book_of_business as fetch_sureify_policies
 from agents.sureify_client import get_notifications_for_policies as fetch_sureify_notifications
 from agents.sureify_client import get_products as fetch_sureify_products
@@ -81,14 +83,51 @@ def generate_product_recommendations(
     client_id: client identifier. alert_id: optional IRI alert ID.
     Returns JSON: ProductRecommendationsOutput (recommendations, explanation, storable_payload, ...).
     """
+    run_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    event_id = str(uuid.uuid4())
+    client_id_scope = client_id
+
+    def _emit_event(
+        input_summary: dict,
+        success: bool,
+        error_message: str | None = None,
+        explanation_summary: str | None = None,
+        data_sources_used: list[str] | None = None,
+        choice_criteria: list[str] | None = None,
+        input_validation_passed: bool | None = None,
+        payload_ref: str | None = None,
+    ) -> None:
+        event = AgentRunEvent(
+            event_id=event_id,
+            timestamp=created_at,
+            agent_id=AgentId.agent_two,
+            run_id=run_id,
+            client_id_scope=client_id_scope,
+            input_summary=input_summary,
+            success=success,
+            error_message=error_message,
+            explanation_summary=explanation_summary,
+            data_sources_used=data_sources_used,
+            choice_criteria=choice_criteria,
+            input_validation_passed=input_validation_passed,
+            guardrail_triggered=None,
+            payload_ref=payload_ref,
+        )
+        persist_event(event)
+
     try:
         payload = json.loads(changes_json)
     except json.JSONDecodeError as e:
+        _emit_event({}, False, error_message=str(e), input_validation_passed=False)
         return json.dumps({"error": "Invalid JSON", "message": str(e)})
+
+    input_summary = {"sections_present": [k for k in ("suitability", "clientGoals", "clientProfile") if payload.get(k)]}
 
     try:
         changes = ProfileChangesInput.model_validate(payload)
     except Exception as e:
+        _emit_event(input_summary, False, error_message=str(e), input_validation_passed=False)
         return json.dumps({"error": "Invalid changes shape", "message": str(e)})
 
     db_context = fetch_db_context(client_id)
@@ -116,20 +155,21 @@ def generate_product_recommendations(
         except Exception:
             pass
 
-    out = generate_recommendations(
-        client_id=client_id,
-        db_context=db_context,
-        changes=changes,
-        alert_id=alert_id or None,
-        iri_comparison_result=iri_result,
-    )
-    input_summary = {
-        "sections_present": [k for k in ("suitability", "clientGoals", "clientProfile") if payload.get(k)],
-    }
+    try:
+        out = generate_recommendations(
+            client_id=client_id,
+            db_context=db_context,
+            changes=changes,
+            alert_id=alert_id or None,
+            iri_comparison_result=iri_result,
+        )
+    except Exception as e:
+        _emit_event(input_summary, False, error_message=str(e), input_validation_passed=True)
+        raise
     if out.explanation:
         storable = AgentTwoStorablePayload(
-            run_id=str(uuid.uuid4()),
-            created_at=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            created_at=created_at,
             client_id=client_id,
             input_summary=input_summary,
             explanation=out.explanation,
@@ -138,6 +178,23 @@ def generate_product_recommendations(
             iri_comparison_result=out.iri_comparison_result,
         )
         out.storable_payload = storable
+        payload_ref_id = persist_agent_two_payload(
+            run_id=run_id,
+            created_at=created_at,
+            client_id=client_id,
+            payload=storable.model_dump(mode="json"),
+        )
+        _emit_event(
+            input_summary,
+            True,
+            explanation_summary=out.explanation.summary,
+            data_sources_used=out.explanation.data_sources_used or None,
+            choice_criteria=out.explanation.choice_criteria or None,
+            input_validation_passed=True,
+            payload_ref=payload_ref_id,
+        )
+    else:
+        _emit_event(input_summary, True, input_validation_passed=True)
     return out.model_dump_json(indent=2, exclude_none=True)
 
 

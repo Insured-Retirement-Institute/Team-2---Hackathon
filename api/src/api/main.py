@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from api.database import close_db, init_db, pool
-from api.routers import passthrough, policies
+from api.routers import passthrough, policies, responsible_ai
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -51,3 +51,4 @@ async def readiness():
 
 app.include_router(passthrough.router)
 app.include_router(policies.router)
+app.include_router(responsible_ai.router)
