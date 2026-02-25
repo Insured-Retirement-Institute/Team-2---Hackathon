@@ -23,7 +23,9 @@ from agents.agent_two_schemas import (
 
 
 def _sureify_product_to_canonical(p: dict[str, Any]) -> dict[str, Any]:
-    """Normalize Sureify Product (from /puddle/products) to canonical shape for ProductRecommendation."""
+    """Normalize Sureify product to canonical shape for ProductRecommendation. Accepts Puddle ProductOption (from /puddle/productOption) already normalized by sureify_client, or legacy shape with attributes."""
+    if p.get("product_id"):
+        return p
     attrs = p.get("attributes") or []
     attr_map = {}
     for a in attrs:
@@ -46,6 +48,10 @@ def _sureify_product_to_canonical(p: dict[str, Any]) -> dict[str, Any]:
         "risk_profile": risk_profile,
         "attributes_map": attr_map,
         "states": p.get("states"),
+        "term": None,
+        "surrenderPeriod": None,
+        "freeWithdrawal": None,
+        "guaranteedMinRate": None,
     }
 
 
@@ -300,10 +306,10 @@ def generate_recommendations(
                     name=canon["name"],
                     carrier=canon["carrier"],
                     rate=rate_str,
-                    term=None,
-                    surrenderPeriod=None,
-                    freeWithdrawal=None,
-                    guaranteedMinRate=None,
+                    term=canon.get("term"),
+                    surrenderPeriod=canon.get("surrenderPeriod"),
+                    freeWithdrawal=canon.get("freeWithdrawal"),
+                    guaranteedMinRate=canon.get("guaranteedMinRate"),
                     risk_profile=canon.get("risk_profile"),
                     suitable_for=None,
                     key_benefits=None,
