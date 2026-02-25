@@ -204,8 +204,27 @@ kubectl config current-context
 # =============================================================================
 
 [tasks."eks:deploy"]
-description = "Deploy everything to EKS (CNPG + DB + App + Frontend + Gateway)"
-depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app", "eks:deploy:frontend", "eks:deploy:gateway"]
+description = "Deploy everything to EKS (CNPG + DB + App + Agents + Frontend + Gateway)"
+depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app", "eks:deploy:agents", "eks:deploy:frontend", "eks:deploy:gateway"]
+
+[tasks."eks:deploy:agents"]
+description = "Deploy agents"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Creating agents service account..."
+kubectl apply -f k8s/agents-rbac.yaml
+
+echo "Deploying agents..."
+kubectl apply -f k8s/agents.yaml
+
+echo "Waiting for agents deployment..."
+kubectl rollout status deployment/agents --timeout=120s
+
+echo "Agents deployed!"
+kubectl get pods -l app=agents
+"""
 
 [tasks."eks:deploy:cnpg"]
 description = "Install CloudNativePG operator"
@@ -459,4 +478,141 @@ JOB_NAME=$(sed 's/value: plan/value: apply/' k8s/pgschema-update.yaml | kubectl 
 echo "Created $JOB_NAME"
 kubectl wait --for=condition=Complete --timeout=60s $JOB_NAME || true
 kubectl logs $JOB_NAME
+"""
+
+# =============================================================================
+# Agents ECR Build & Push
+# =============================================================================
+
+[tasks."agents:ecr:create"]
+description = "Create ECR repository for agents"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+REPO_NAME="hack2future-agents"
+
+aws ecr create-repository \
+  --repository-name "$REPO_NAME" \
+  --region "$AWS_REGION" \
+  --image-scanning-configuration scanOnPush=true \
+  --encryption-configuration encryptionType=AES256 \
+  2>/dev/null || echo "Repository $REPO_NAME already exists"
+
+echo "ECR repository ready: $REPO_NAME"
+"""
+
+[tasks."agents:build"]
+description = "Build agents Docker image for ECR"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-agents"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Building $REPO_NAME:$TAG for linux/amd64..."
+docker build --platform linux/amd64 -t "$REPO_NAME:$TAG" -f agents/Dockerfile .
+docker tag "$REPO_NAME:$TAG" "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image built and tagged: $REGISTRY/$REPO_NAME:$TAG"
+"""
+
+[tasks."agents:push"]
+description = "Push agents Docker image to ECR"
+depends = ["ecr:login"]
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-agents"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Pushing $REGISTRY/$REPO_NAME:$TAG..."
+docker push "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image pushed successfully!"
+"""
+
+[tasks."agents:build-push"]
+description = "Build and push agents Docker image to ECR"
+depends = ["agents:build", "agents:push"]
+
+[tasks."agents:deploy"]
+description = "Deploy agents to EKS"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Creating agents service account..."
+kubectl apply -f k8s/agents-rbac.yaml
+
+echo "Deploying agents..."
+kubectl apply -f k8s/agents.yaml
+
+echo "Waiting for agents deployment..."
+kubectl rollout status deployment/agents --timeout=120s
+
+echo "Agents deployed!"
+kubectl get pods -l app=agents
+"""
+
+[tasks."agents:deploy:bedrock-policy"]
+description = "Create Bedrock IAM policy and Pod Identity association for agents"
+run = """
+#!/bin/bash
+set -euo pipefail
+CLUSTER_NAME="${CLUSTER_NAME:-hackathon}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+POLICY_NAME="AgentsBedrockPolicy"
+
+# Create IAM policy if it doesn't exist
+POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${POLICY_NAME}"
+if ! aws iam get-policy --policy-arn "$POLICY_ARN" &>/dev/null; then
+  echo "Creating IAM policy $POLICY_NAME..."
+  aws iam create-policy --policy-name "$POLICY_NAME" --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "BedrockInvoke",
+        "Effect": "Allow",
+        "Action": [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ],
+        "Resource": [
+          "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-*"
+        ]
+      }
+    ]
+  }'
+else
+  echo "IAM policy $POLICY_NAME already exists"
+fi
+
+# Create Pod Identity association
+echo "Creating Pod Identity association..."
+eksctl create podidentityassociation \
+  --cluster "$CLUSTER_NAME" \
+  --region "$AWS_REGION" \
+  --namespace default \
+  --service-account-name agents-sa \
+  --permission-policy-arns "$POLICY_ARN" \
+  2>/dev/null || echo "Pod Identity association may already exist"
+
+echo "Bedrock policy and Pod Identity configured!"
+"""
+
+[tasks."agents:logs"]
+description = "View logs from agents pod"
+run = """
+#!/bin/bash
+set -euo pipefail
+kubectl logs -l app=agents --tail=100 -f
 """

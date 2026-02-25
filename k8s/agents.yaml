@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agents
+  labels:
+    app: agents
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agents
+  template:
+    metadata:
+      labels:
+        app: agents
+    spec:
+      serviceAccountName: agents-sa
+      containers:
+        - name: agents
+          image: 992382684611.dkr.ecr.us-east-1.amazonaws.com/hack2future-agents:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            # Database connection (from CNPG hackdb-app secret)
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: hackdb-app
+                  key: host
+            - name: PGPORT
+              valueFrom:
+                secretKeyRef:
+                  name: hackdb-app
+                  key: port
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: hackdb-app
+                  key: username
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: hackdb-app
+                  key: password
+            - name: PGDATABASE
+              value: hackathon
+            # Sureify credentials (optional - uses mock if not set)
+            - name: SUREIFY_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sureify-credentials
+                  key: base_url
+                  optional: true
+            - name: SUREIFY_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: sureify-credentials
+                  key: client_id
+                  optional: true
+            - name: SUREIFY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: sureify-credentials
+                  key: client_secret
+                  optional: true
+            # IRI API credentials (optional)
+            - name: IRI_API_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: iri-credentials
+                  key: base_url
+                  optional: true
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            failureThreshold: 30
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agents
+  labels:
+    app: agents
+spec:
+  selector:
+    app: agents
+  ports:
+    - port: 80
+      targetPort: 8000
+      name: http
