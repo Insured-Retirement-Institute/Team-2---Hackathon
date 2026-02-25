@@ -1,34 +1,22 @@
 """
 Product comparison endpoints - triggers agent_two for product recommendations.
 """
-import json
-import sys
-from pathlib import Path
-from typing import Any
+import os
 
-from fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from api.database import pool
 from api.sureify_client import SureifyClient, SureifyAuthConfig
 
-# Import profile endpoint to ensure data exists before agent_two call
 import api.routers.profiles as profiles_module
 
-# Add agents directory to path to import agent_two
-_repo_root = Path(__file__).resolve().parent.parent.parent.parent
-agents_dir = _repo_root / "agents"
-if str(agents_dir) not in sys.path:
-    sys.path.insert(0, str(agents_dir))
-
-# Import agent_two modules
-from agent_two.main import generate_product_recommendations
-from agent_two_schemas import ProductRecommendation
+AGENTS_URL = os.environ.get("AGENTS_URL", "http://agents:8000")
 
 router = APIRouter(prefix="/api/alerts", tags=["Compare"])
 
 
-# Request/Response Models
 class ProductOption(BaseModel):
     """Product option for comparison"""
     name: str
@@ -66,18 +54,18 @@ class RecompareRequest(BaseModel):
     selectedProducts: list[ProductOption]
 
 
-def _convert_recommendation_to_product_option(rec: ProductRecommendation) -> ProductOption:
-    """Convert agent_two ProductRecommendation to UI ProductOption format"""
+def _convert_recommendation_to_product_option(rec: dict) -> ProductOption:
+    """Convert agent_two recommendation dict to UI ProductOption format"""
     return ProductOption(
-        name=rec.name,
-        carrier=rec.carrier,
-        rate=rec.rate,
-        term=rec.term,
-        surrenderPeriod=rec.surrenderPeriod,
-        freeWithdrawal=rec.freeWithdrawal,
-        guaranteedMinRate=rec.guaranteedMinRate,
-        deathBenefit=None,  # Not in agent_two schema
-        riders=None,  # Could parse from key_benefits
+        name=rec.get("name", "Unknown"),
+        carrier=rec.get("carrier", "Unknown"),
+        rate=rec.get("rate", "Unknown"),
+        term=rec.get("term"),
+        surrenderPeriod=rec.get("surrenderPeriod"),
+        freeWithdrawal=rec.get("freeWithdrawal"),
+        guaranteedMinRate=rec.get("guaranteedMinRate"),
+        deathBenefit=None,
+        riders=None,
         features=None,
         liquidity=None,
         mvaPenalty=None,
@@ -101,7 +89,6 @@ async def _get_alert_and_client(alert_id: str) -> tuple[dict, str]:
     if not alert_row:
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
 
-    # Extract clientId from alert_detail.policy.clientId
     alert_detail = alert_row.get('alert_detail')
     if not alert_detail:
         raise HTTPException(
@@ -129,32 +116,29 @@ async def run_comparison(alert_id: str):
     Triggers product comparison using the client's saved profile parameters.
     Returns current product vs top 3 alternatives with rates, features, and chart data.
     """
-    # 1. Get alert and client info
     alert_data, client_id = await _get_alert_and_client(alert_id)
 
-    # 2. Ensure profile data exists by calling profile endpoint
-    # This handles DB-first with Sureify fallback, ensuring data is available for agent_two
     config = SureifyAuthConfig()
     sureify = SureifyClient(config)
     await sureify.authenticate()
     try:
-        profile = await profiles_module.get_client_profile(client_id, sureify)
+        await profiles_module.get_client_profile(client_id, sureify)
     finally:
         await sureify.close()
 
-    # Profile data is now guaranteed to exist (either fetched from DB or Sureify)
-
-    # 3. Call agent_two with empty changes (using existing profile from DB)
-    changes_json = json.dumps({})
-
     try:
-        result_json = generate_product_recommendations(
-            changes_json=changes_json,
-            client_id=client_id,
-            alert_id=alert_id
-        )
-
-        result = json.loads(result_json)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{AGENTS_URL}/agent-two/recommendations",
+                json={
+                    "client_id": client_id,
+                    "changes_json": "{}",
+                    "alert_id": alert_id,
+                    "use_llm": False,
+                }
+            )
+            response.raise_for_status()
+            result = response.json().get("result", {})
 
         if "error" in result:
             raise HTTPException(
@@ -162,7 +146,6 @@ async def run_comparison(alert_id: str):
                 detail=f"Agent_two error: {result.get('message', 'Unknown error')}"
             )
 
-        # 4. Build current product from alert data
         current_product = ProductOption(
             name=f"Current Policy {alert_data['policy_id']}",
             carrier=alert_data['carrier'],
@@ -174,14 +157,12 @@ async def run_comparison(alert_id: str):
             guaranteedMinRate=None,
         )
 
-        # 5. Convert agent_two recommendations to alternatives
         alternatives: list[ProductOption] = []
         recommendations = result.get('recommendations', [])
 
-        for rec_dict in recommendations[:3]:  # Max 3 alternatives
+        for rec_dict in recommendations[:3]:
             try:
-                rec = ProductRecommendation(**rec_dict)
-                alternatives.append(_convert_recommendation_to_product_option(rec))
+                alternatives.append(_convert_recommendation_to_product_option(rec_dict))
             except Exception:
                 continue
 
@@ -193,6 +174,16 @@ async def run_comparison(alert_id: str):
             )
         )
 
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Agent service error: {e.response.status_code}"
+        )
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Agent service unavailable: {str(e)}"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -209,17 +200,14 @@ async def recompare_with_products(alert_id: str, request: RecompareRequest):
     advisor from the product shelf. Replaces the alternatives in the comparison while
     keeping the current policy.
     """
-    # 1. Get alert and client info
     alert_data, client_id = await _get_alert_and_client(alert_id)
 
-    # 2. Validate selected products
     if not request.selectedProducts or len(request.selectedProducts) > 3:
         raise HTTPException(
             status_code=400,
             detail="Must provide 1-3 selected products"
         )
 
-    # 3. Build current product from alert data
     current_product = ProductOption(
         name=f"Current Policy {alert_data['policy_id']}",
         carrier=alert_data['carrier'],
@@ -231,8 +219,6 @@ async def recompare_with_products(alert_id: str, request: RecompareRequest):
         guaranteedMinRate=None,
     )
 
-    # 4. Use selected products as alternatives
-    # No need to call agent_two here - advisor manually selected these
     return ComparisonResult(
         comparisonData=ComparisonData(
             current=current_product,

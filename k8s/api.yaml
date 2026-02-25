@@ -78,6 +78,9 @@ spec:
                   name: sureify-credentials
                   key: scope
                   optional: true
+            # Agents service URL (for product comparison)
+            - name: AGENTS_URL
+              value: "http://agents:80"
           resources:
             requests:
               memory: "128Mi"
