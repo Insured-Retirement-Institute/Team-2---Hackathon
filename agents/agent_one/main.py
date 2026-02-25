@@ -34,6 +34,7 @@ _os.environ.pop("AWS_BEARER_TOKEN_BEDROCK", None)
 from strands import Agent, tool
 
 from agents.iri_client import (
+    create_iri_alerts as iri_create_alerts,
     dismiss_iri_alert as iri_dismiss,
     get_iri_alert_by_id as iri_get_alert,
     get_iri_alerts as iri_get_alerts,
@@ -233,6 +234,25 @@ def submit_iri_transaction(alert_id: str, transaction_type: str, rationale: str,
     return json.dumps(result, default=str, indent=2)
 
 
+@tool
+def create_iri_alerts_from_book(customer_identifier: str) -> str:
+    """
+    Generate book of business and automatically create alerts in the IRI API database.
+
+    This tool:
+    1. Fetches policies and applies business logic
+    2. POSTs the BookOfBusinessOutput to the IRI API POST /alerts endpoint
+    3. Returns the API response with created alert count
+    """
+    # Get the full book of business with flags
+    raw = get_book_of_business_with_notifications_and_flags(customer_identifier)
+    book = BookOfBusinessOutput.model_validate_json(raw)
+
+    # Push to IRI API
+    result = iri_create_alerts(book)
+    return json.dumps(result, default=str, indent=2)
+
+
 BOOK_OF_BUSINESS_SYSTEM_PROMPT = """You are an assistant that scans Sureify APIs and produces the book of business for a given customer.
 
 Your task is to produce the book of business for **Marty McFly** (or the customer identifier you are given):
@@ -267,6 +287,7 @@ def create_agent() -> Agent:
             get_book_of_business_with_notifications_and_flags,
             get_book_of_business_json_schema,
             get_book_of_business_as_iri_alerts,
+            create_iri_alerts_from_book,
             get_iri_alerts,
             get_iri_alert_by_id,
             snooze_iri_alert,
