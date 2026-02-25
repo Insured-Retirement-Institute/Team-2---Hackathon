@@ -20,9 +20,10 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
 
 interface Props {
   products: VisualizationProduct[];
+  primaryGoal?: string;
 }
 
-export function InteractiveComparisonCharts({ products }: Props) {
+export function InteractiveComparisonCharts({ products, primaryGoal }: Props) {
   const [selected, setSelected] = useState<string[]>(
     products.slice(0, 4).map((p) => p.id),
   );
@@ -101,7 +102,7 @@ export function InteractiveComparisonCharts({ products }: Props) {
           Interactive Product Comparison
         </h3>
         <p className="text-sm text-slate-600 mb-4">
-          Select up to 4 products to compare
+          Select up to 4 products to compare • Primary Goal: <span className="font-medium text-slate-900 capitalize">{primaryGoal || "Not specified"}</span>
         </p>
         <div className="flex flex-wrap gap-2">
           {products.map((p) => {

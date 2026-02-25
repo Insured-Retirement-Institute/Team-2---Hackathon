@@ -10,7 +10,6 @@ import type {
   VisualizationProduct,
 } from "@/types/alert-detail";
 import { logRequest, logResponse } from "./logger";
-<<<<<<< HEAD
 import { mockAlerts } from "./mock/alerts";
 import {
   getMockPolicyData,
@@ -26,10 +25,6 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
-=======
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
->>>>>>> origin/main
 
 /**
  * Fetch alert detail with policy data
@@ -37,7 +32,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
  */
 export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
   logRequest("GET /api/alerts/{alertId}", { alertId });
-<<<<<<< HEAD
   
   if (USE_MOCKS) {
     return new Promise((resolve) => {
@@ -61,8 +55,6 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/alerts/${alertId}`);
   if (!res.ok)
     throw new Error(`Failed to fetch alert detail: ${res.statusText}`);
@@ -79,7 +71,6 @@ export async function fetchClientProfile(
   clientId: string,
 ): Promise<ClientProfile> {
   logRequest("GET /api/clients/{clientId}/profile", { clientId });
-<<<<<<< HEAD
   
   if (USE_MOCKS) {
     return new Promise((resolve) => {
@@ -95,8 +86,6 @@ export async function fetchClientProfile(
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`);
   if (!res.ok)
     throw new Error(`Failed to fetch client profile: ${res.statusText}`);
@@ -114,7 +103,6 @@ export async function saveClientProfile(
   parameters: ComparisonParameters,
 ): Promise<void> {
   logRequest("PUT /api/clients/{clientId}/profile", { clientId, parameters });
-<<<<<<< HEAD
   
   if (USE_MOCKS) {
     return new Promise((resolve) => {
@@ -125,8 +113,6 @@ export async function saveClientProfile(
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -197,7 +183,6 @@ export async function saveSuitability(
   data: SuitabilityData,
 ): Promise<void> {
   logRequest("PUT /api/alerts/{alertId}/suitability", { alertId, data });
-<<<<<<< HEAD
   
   if (USE_MOCKS) {
     return new Promise((resolve) => {
@@ -208,8 +193,6 @@ export async function saveSuitability(
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/suitability`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -320,10 +303,15 @@ export async function fetchVisualization(
   });
   return new Promise((resolve) => {
     setTimeout(() => {
-      // Mock: generate a visualization product based on the first alert's comparison data
+      // Mock: generate a visualization product based on productId
       const alert = mockAlerts[0];
       const comparison = getMockComparisonData(alert);
-      const product = comparison.alternatives[0] ?? comparison.current;
+      const allProducts = [comparison.current, ...comparison.alternatives];
+      
+      // Find the product by matching name or use index
+      const productIndex = allProducts.findIndex(p => p.name === _productId || p.id === _productId);
+      const product = productIndex >= 0 ? allProducts[productIndex] : allProducts[0];
+      
       const rate = parseFloat(product.rate?.replace("%", "") || "4.0");
       const minRate = parseFloat(
         product.guaranteedMinRate?.replace("%", "") || "2.0",
@@ -342,9 +330,9 @@ export async function fetchVisualization(
         surrenderYears,
         initialValue,
         premiumBonus: bonus,
-        incomeScore: 70,
-        growthScore: 75,
-        liquidityScore: 60,
+        incomeScore: 70 + (productIndex * 5),
+        growthScore: 75 + (productIndex * 3),
+        liquidityScore: 60 + (productIndex * 2),
         protectionScore: 80,
         projectedRates: Array.from({ length: 11 }, (_, i) => ({
           year: i,
@@ -406,7 +394,6 @@ export async function fetchVisualization(
  */
 export async function fetchProductShelf(): Promise<ProductOption[]> {
   logRequest("GET /passthrough/product-options");
-<<<<<<< HEAD
   
   if (USE_MOCKS) {
     return new Promise((resolve) => {
@@ -418,8 +405,6 @@ export async function fetchProductShelf(): Promise<ProductOption[]> {
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch("/passthrough/product-options");
   if (!res.ok)
     throw new Error(`Failed to fetch product shelf: ${res.statusText}`);

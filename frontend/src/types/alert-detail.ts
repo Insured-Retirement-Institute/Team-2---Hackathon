@@ -63,19 +63,20 @@ export type PolicyData = {
 };
 
 export type ProductOption = {
-  id: string;
+  id?: string;
   name: string;
   carrier: string;
   rate: string;
-  term: string;
+  term?: string;
   premiumBonus?: string;
-  surrenderPeriod: string;
+  surrenderPeriod?: string;
   surrenderCharge?: string;
-  freeWithdrawal: string;
-  deathBenefit: string;
-  guaranteedMinRate: string;
+  freeWithdrawal?: string;
+  deathBenefit?: string;
+  guaranteedMinRate?: string;
   riders?: string[];
   features?: string[];
+  cons?: string[];
   liquidity?: string;
   mvaPenalty?: string;
   licensingApproved?: boolean;

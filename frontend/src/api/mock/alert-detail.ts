@@ -375,6 +375,16 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
         "Free Annual Withdrawal (10%)",
         "Nursing Home Waiver",
       ],
+      features: [
+        "Established carrier relationship",
+        "Familiar product structure",
+        "No new underwriting required",
+      ],
+      cons: [
+        "Rate significantly below market",
+        "Higher MVA penalty exposure",
+        "Limited liquidity options",
+      ],
     },
     alternatives: [
       {
@@ -400,6 +410,16 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
           "Free Annual Withdrawal (10%)",
           "Nursing Home Waiver",
         ],
+        features: [
+          "Highest guaranteed rate (4.25%)",
+          "3% premium bonus on deposits",
+          "Enhanced death benefit included",
+        ],
+        cons: [
+          "Longer 7-year surrender period",
+          "New carrier relationship required",
+          "Higher initial surrender charges",
+        ],
       },
       {
         id: "prod-secureincome",
@@ -422,6 +442,16 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
           "Nursing Home Waiver",
           "Terminal Illness Waiver",
         ],
+        features: [
+          "Shortest surrender period (5 years)",
+          "Enhanced liquidity (15% free withdrawal)",
+          "Lower MVA penalty risk",
+        ],
+        cons: [
+          "Appointment and training required",
+          "Lower rate than top alternative",
+          "No premium bonus offered",
+        ],
       },
       {
         id: "prod-premiumshield",
@@ -443,6 +473,16 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
           "2% Premium Bonus",
           "Tax-Deferred Growth",
           "Free Annual Withdrawal (10%)",
+        ],
+        features: [
+          "Balanced rate and term (4.10%, 6 years)",
+          "2% premium bonus available",
+          "Moderate surrender period",
+        ],
+        cons: [
+          "Mid-tier rate compared to alternatives",
+          "MVA penalty still applies",
+          "Standard liquidity provisions only",
         ],
       },
     ],

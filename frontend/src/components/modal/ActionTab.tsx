@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import type {
   SuitabilityData,
   DisclosureItem,
@@ -6,6 +6,7 @@ import type {
 } from "@/types/alert-detail";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 import {
   CheckCircle2,
   ChevronDown,
@@ -82,8 +83,9 @@ export function ActionTab({
   onTransactionConfirm,
   transactionId,
 }: ActionTabProps) {
-  const [expandedStep, setExpandedStep] = useState<StepId | null>("suitability");
-  const [completedSteps, setCompletedSteps] = useState<Set<StepId>>(new Set());
+  const [expandedStep, setExpandedStep] = useState<StepId | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<Set<StepId>>(new Set(["suitability"]));
+  const [suitabilityEdited, setSuitabilityEdited] = useState(false);
   const [acknowledgedIds, setAcknowledgedIds] = useState<Set<string>>(
     new Set(),
   );
@@ -99,6 +101,12 @@ export function ActionTab({
     value: string | string[],
   ) => {
     onSuitabilityChange({ ...suitabilityData, [field]: value });
+    setSuitabilityEdited(true);
+    setCompletedSteps((prev) => {
+      const next = new Set(prev);
+      next.delete("suitability");
+      return next;
+    });
   };
 
   const toggleStep = (stepId: StepId) => {
@@ -107,6 +115,9 @@ export function ActionTab({
 
   const markStepComplete = (stepId: StepId) => {
     setCompletedSteps((prev) => new Set([...prev, stepId]));
+    if (stepId === "suitability") {
+      setSuitabilityEdited(false);
+    }
     const currentIndex = STEPS.findIndex((s) => s.id === stepId);
     if (currentIndex < STEPS.length - 1) {
       setExpandedStep(STEPS[currentIndex + 1].id);
@@ -135,7 +146,9 @@ export function ActionTab({
   };
 
   const handleExportPDF = () => {
-    alert("PDF export coming soon");
+    toast.warning("PDF export coming soon", {
+      description: "This feature is currently under development.",
+    });
   };
 
   const isAllComplete = completedSteps.size === STEPS.length;
@@ -243,7 +256,7 @@ export function ActionTab({
               {isExpanded && (
                 <div className="border-t border-slate-200 p-5 bg-white">
                   {step.id === "suitability" && (
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                       {/* Client Objectives */}
                       <div>
                         <label className="text-sm font-medium text-slate-700 block mb-2">
@@ -263,19 +276,24 @@ export function ActionTab({
                           Risk Tolerance
                         </label>
                         <div className="grid grid-cols-3 gap-3">
-                          {["Conservative", "Moderate", "Aggressive"].map((risk) => {
-                            const isSelected = suitabilityData.riskTolerance.toLowerCase() === risk.toLowerCase();
+                          {[
+                            { value: "conservative", label: "Conservative", desc: "Prioritize safety & guarantees" },
+                            { value: "moderate", label: "Moderate", desc: "Balance growth & protection" },
+                            { value: "aggressive", label: "Aggressive", desc: "Focus on growth potential" },
+                          ].map((risk) => {
+                            const isSelected = suitabilityData.riskTolerance.toLowerCase() === risk.value;
                             return (
                               <button
-                                key={risk}
-                                onClick={() => updateField("riskTolerance", risk)}
-                                className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                                key={risk.value}
+                                onClick={() => updateField("riskTolerance", risk.value)}
+                                className={`p-4 rounded-lg border-2 transition-all ${
                                   isSelected
-                                    ? "border-blue-500 bg-blue-50 text-blue-900"
-                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-slate-200 bg-white hover:border-slate-300"
                                 }`}
                               >
-                                {risk}
+                                <div className="text-sm font-semibold text-slate-900">{risk.label}</div>
+                                <div className="text-xs text-slate-600 mt-1">{risk.desc}</div>
                               </button>
                             );
                           })}
@@ -289,23 +307,23 @@ export function ActionTab({
                         </label>
                         <div className="grid grid-cols-3 gap-3">
                           {[
-                            { label: "Short", desc: "< 5 years" },
-                            { label: "Medium", desc: "5-10 years" },
-                            { label: "Long", desc: "10+ years" },
+                            { value: "short", label: "Short", desc: "< 5 years" },
+                            { value: "medium", label: "Medium", desc: "5-10 years" },
+                            { value: "long", label: "Long", desc: "10+ years" },
                           ].map((horizon) => {
-                            const isSelected = suitabilityData.timeHorizon.toLowerCase().includes(horizon.label.toLowerCase());
+                            const isSelected = suitabilityData.timeHorizon.toLowerCase().includes(horizon.value);
                             return (
                               <button
-                                key={horizon.label}
-                                onClick={() => updateField("timeHorizon", `${horizon.label} (${horizon.desc})`)}
-                                className={`p-3 rounded-lg border-2 transition-all ${
+                                key={horizon.value}
+                                onClick={() => updateField("timeHorizon", horizon.value)}
+                                className={`p-4 rounded-lg border-2 transition-all ${
                                   isSelected
                                     ? "border-blue-500 bg-blue-50"
                                     : "border-slate-200 bg-white hover:border-slate-300"
                                 }`}
                               >
-                                <div className="text-sm font-medium text-slate-900">{horizon.label}</div>
-                                <div className="text-xs text-slate-600">{horizon.desc}</div>
+                                <div className="text-sm font-semibold text-slate-900">{horizon.label}</div>
+                                <div className="text-xs text-slate-600 mt-1">{horizon.desc}</div>
                               </button>
                             );
                           })}
@@ -314,23 +332,134 @@ export function ActionTab({
 
                       {/* Liquidity Needs */}
                       <div>
-                        <label className="text-sm font-medium text-slate-700 block mb-2">
+                        <label className="text-sm font-medium text-slate-700 block mb-3">
                           Liquidity Needs
                         </label>
+                        <div className="space-y-4">
+                          <input
+                            type="range"
+                            min="1"
+                            max="5"
+                            value={
+                              suitabilityData.liquidityNeeds.includes("Minimal") ? 1 :
+                              suitabilityData.liquidityNeeds.includes("Low") ? 2 :
+                              suitabilityData.liquidityNeeds.includes("Moderate") ? 3 :
+                              suitabilityData.liquidityNeeds.includes("High") && !suitabilityData.liquidityNeeds.includes("Very") ? 4 : 5
+                            }
+                            onChange={(e) => {
+                              const level = parseInt(e.target.value);
+                              const labels = ["Minimal", "Low", "Moderate", "High", "Very High"];
+                              updateField("liquidityNeeds", labels[level - 1]);
+                            }}
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                          />
+                          <div className="flex justify-between text-xs">
+                            {[
+                              { label: "Minimal", desc: "Rarely need access" },
+                              { label: "Low", desc: "Occasional access" },
+                              { label: "Moderate", desc: "10-15% annually" },
+                              { label: "High", desc: "15-20% annually" },
+                              { label: "Very High", desc: "20%+ annually" },
+                            ].map((liquidity, idx) => {
+                              const isSelected = suitabilityData.liquidityNeeds.includes(liquidity.label);
+                              return (
+                                <div key={liquidity.label} className={`text-center ${idx === 0 ? 'text-left' : idx === 4 ? 'text-right' : ''}`}>
+                                  <div className={`font-semibold ${isSelected ? 'text-blue-600' : 'text-slate-600'}`}>
+                                    {liquidity.label}
+                                  </div>
+                                  <div className="text-slate-500 text-[10px]">{liquidity.desc}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Guaranteed Income Priority */}
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 block mb-2">
+                          Guaranteed Income Priority
+                        </label>
                         <div className="grid grid-cols-3 gap-3">
-                          {["Low", "Moderate", "High"].map((liquidity) => {
-                            const isSelected = suitabilityData.liquidityNeeds.toLowerCase().includes(liquidity.toLowerCase());
+                          {[
+                            { value: "not-required", label: "Not Required", desc: "Accumulation focus" },
+                            { value: "preferred", label: "Preferred", desc: "Desired but flexible" },
+                            { value: "required", label: "Required", desc: "Essential to strategy" },
+                          ].map((income) => {
+                            const isSelected = suitabilityData.guaranteedIncome.toLowerCase().includes(income.value);
                             return (
                               <button
-                                key={liquidity}
-                                onClick={() => updateField("liquidityNeeds", liquidity)}
-                                className={`p-3 rounded-lg border-2 transition-all text-sm font-medium ${
+                                key={income.value}
+                                onClick={() => updateField("guaranteedIncome", income.value)}
+                                className={`p-4 rounded-lg border-2 transition-all ${
                                   isSelected
-                                    ? "border-blue-500 bg-blue-50 text-blue-900"
-                                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-slate-200 bg-white hover:border-slate-300"
                                 }`}
                               >
-                                {liquidity}
+                                <div className="text-sm font-semibold text-slate-900">{income.label}</div>
+                                <div className="text-xs text-slate-600 mt-1">{income.desc}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Rate Expectations */}
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 block mb-2">
+                          Rate Expectations
+                        </label>
+                        <div className="grid grid-cols-3 gap-3">
+                          {[
+                            { value: "Market Average", desc: "Competitive baseline rates" },
+                            { value: "Above Average", desc: "Better than market rates" },
+                            { value: "Premium Rates", desc: "Top-tier rate expectations" },
+                          ].map((rate) => {
+                            const isSelected = suitabilityData.rateExpectations.includes(rate.value);
+                            return (
+                              <button
+                                key={rate.value}
+                                onClick={() => updateField("rateExpectations", rate.value)}
+                                className={`p-4 rounded-lg border-2 transition-all ${
+                                  isSelected
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-slate-200 bg-white hover:border-slate-300"
+                                }`}
+                              >
+                                <div className="text-sm font-semibold text-slate-900">{rate.value}</div>
+                                <div className="text-xs text-slate-600 mt-1">{rate.desc}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Surrender Timeline */}
+                      <div>
+                        <label className="text-sm font-medium text-slate-700 block mb-2">
+                          Surrender Timeline
+                        </label>
+                        <div className="grid grid-cols-4 gap-3">
+                          {[
+                            { value: "3-5", label: "3-5 Years", desc: "Short surrender period" },
+                            { value: "6-8", label: "6-8 Years", desc: "Medium surrender period" },
+                            { value: "9-10", label: "9-10 Years", desc: "Standard surrender period" },
+                            { value: "10-plus", label: "10+ Years", desc: "Extended surrender period" },
+                          ].map((timeline) => {
+                            const isSelected = suitabilityData.surrenderTimeline.includes(timeline.value);
+                            return (
+                              <button
+                                key={timeline.value}
+                                onClick={() => updateField("surrenderTimeline", timeline.value)}
+                                className={`p-4 rounded-lg border-2 transition-all ${
+                                  isSelected
+                                    ? "border-blue-500 bg-blue-50"
+                                    : "border-slate-200 bg-white hover:border-slate-300"
+                                }`}
+                              >
+                                <div className="text-sm font-semibold text-slate-900">{timeline.label}</div>
+                                <div className="text-xs text-slate-600 mt-1">{timeline.desc}</div>
                               </button>
                             );
                           })}
@@ -350,36 +479,6 @@ export function ActionTab({
                         />
                       </div>
 
-                      {/* Guaranteed Income */}
-                      <div>
-                        <label className="text-sm font-medium text-slate-700 block mb-2">
-                          Guaranteed Income Priority
-                        </label>
-                        <div className="grid grid-cols-3 gap-3">
-                          {[
-                            { label: "Not Required", desc: "Accumulation focus" },
-                            { label: "Preferred", desc: "Desired but flexible" },
-                            { label: "Required", desc: "Essential to strategy" },
-                          ].map((income) => {
-                            const isSelected = suitabilityData.guaranteedIncome.toLowerCase().includes(income.label.toLowerCase());
-                            return (
-                              <button
-                                key={income.label}
-                                onClick={() => updateField("guaranteedIncome", income.label)}
-                                className={`p-3 rounded-lg border-2 transition-all ${
-                                  isSelected
-                                    ? "border-blue-500 bg-blue-50"
-                                    : "border-slate-200 bg-white hover:border-slate-300"
-                                }`}
-                              >
-                                <div className="text-sm font-medium text-slate-900">{income.label}</div>
-                                <div className="text-xs text-slate-600">{income.desc}</div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
                       {/* Score Badge */}
                       <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg">
                         <div className="flex items-center gap-2">
@@ -395,10 +494,10 @@ export function ActionTab({
 
                       <Button
                         onClick={() => markStepComplete("suitability")}
-                        disabled={isComplete}
+                        disabled={isComplete && !suitabilityEdited}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
                       >
-                        {isComplete ? (
+                        {isComplete && !suitabilityEdited ? (
                           <>
                             <CheckCircle2 className="h-4 w-4 mr-2" />
                             Suitability Confirmed
@@ -415,63 +514,75 @@ export function ActionTab({
 
                   {step.id === "transaction" && (
                     <div className="space-y-4">
-                      <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-4">
                         {transactionOptions.map((opt, idx) => {
                           const isSelected = selectedTransaction === idx;
                           return (
                             <button
                               key={idx}
                               onClick={() => setSelectedTransaction(idx)}
-                              className={`w-full text-left p-5 rounded-lg border-2 transition-all ${
-                                isSelected
+                              disabled={!opt.isAvailable}
+                              className={`p-6 rounded-lg border-2 transition-all text-left ${
+                                !opt.isAvailable
+                                  ? "opacity-50 cursor-not-allowed bg-slate-50"
+                                  : isSelected
                                   ? "border-blue-500 bg-blue-50 shadow-lg"
                                   : "border-slate-200 bg-white hover:border-slate-300"
                               }`}
                             >
-                              <div className="flex items-start gap-3">
+                              <div className="flex items-center justify-between mb-3">
+                                <Badge
+                                  className={
+                                    opt.type === "replace"
+                                      ? "bg-blue-100 text-blue-700 border-blue-300"
+                                      : "bg-slate-100 text-slate-700 border-slate-300"
+                                  }
+                                >
+                                  {opt.type === "replace" ? "Replacement" : "Renewal"}
+                                </Badge>
                                 <div
-                                  className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5 ${
+                                  className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
                                     isSelected
                                       ? "border-blue-600 bg-blue-600"
                                       : "border-slate-300 bg-white"
                                   }`}
                                 >
                                   {isSelected && (
-                                    <div className="w-3 h-3 rounded-full bg-white" />
-                                  )}
-                                </div>
-                                <div className="flex-1">
-                                  <Badge
-                                    variant="secondary"
-                                    className={
-                                      opt.type === "replace"
-                                        ? "bg-blue-100 text-blue-700 border-blue-300"
-                                        : "bg-slate-100 text-slate-700 border-slate-300"
-                                    }
-                                  >
-                                    {opt.type === "replace" ? "Replace" : "Renew"}
-                                  </Badge>
-                                  <div className="font-bold text-slate-900 mt-2">
-                                    {opt.label}
-                                  </div>
-                                  {opt.pros && opt.pros.length > 0 && (
-                                    <ul className="mt-2 space-y-1">
-                                      {opt.pros.map((p, i) => (
-                                        <li
-                                          key={i}
-                                          className="text-xs text-green-700 flex items-start gap-1"
-                                        >
-                                          <span>+</span> {p}
-                                        </li>
-                                      ))}
-                                    </ul>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-white" />
                                   )}
                                 </div>
                               </div>
+                              <div className="text-lg font-bold text-slate-900 mb-2">
+                                {opt.label}
+                              </div>
+                              <p className="text-sm text-slate-600 mb-3">
+                                {opt.description}
+                              </p>
+                              {opt.pros && opt.pros.length > 0 && (
+                                <div className="space-y-1.5 mb-3">
+                                  {opt.pros.map((pro, i) => (
+                                    <div key={i} className="text-xs text-green-700 flex items-start gap-1">
+                                      <span className="font-bold">+</span> {pro}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {opt.requirements && opt.requirements.length > 0 && (
+                                <div className="pt-3 border-t border-slate-200 text-xs text-slate-600">
+                                  {opt.requirements.join(" • ")}
+                                </div>
+                              )}
+                              {!opt.isAvailable && opt.unavailableReason && (
+                                <div className="pt-3 border-t border-red-200 text-xs text-red-600 flex items-start gap-1">
+                                  <AlertCircle className="h-3 w-3 mt-0.5" />
+                                  {opt.unavailableReason}
+                                </div>
+                              )}
                             </button>
                           );
                         })}
                       </div>
+
                       <Button
                         onClick={() => markStepComplete("transaction")}
                         disabled={isComplete || selectedTransaction === null}

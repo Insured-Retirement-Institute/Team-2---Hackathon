@@ -83,15 +83,6 @@ export function AlertDetailPage() {
   };
 
   const handleStepClick = (step: WorkflowStep) => {
-    // Prevent forward navigation - only allow going back or staying on current
-    const stepOrder: WorkflowStep[] = ["overview", "compare", "action"];
-    const currentIdx = stepOrder.indexOf(activeTab);
-    const targetIdx = stepOrder.indexOf(step);
-    
-    if (targetIdx > currentIdx && !completedSteps.has(stepOrder[targetIdx - 1])) {
-      return; // Block forward navigation if previous step not completed
-    }
-
     if (activeTab === "overview" && step !== "overview") {
       setCompletedSteps((prev) => new Set(prev).add("overview"));
     }

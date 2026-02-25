@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
 export interface ProductOption {
+  id?: string;
   name: string;
   carrier: string;
   rate: string;
@@ -16,6 +17,7 @@ export interface ProductOption {
   guaranteedMinRate?: string;
   riders?: string[];
   features?: string[];
+  cons?: string[];
   liquidity?: string;
   mvaPenalty?: string;
   licensingApproved?: boolean;
@@ -76,6 +78,16 @@ const mockComparison: ComparisonResult = {
       surrenderPeriod: "7 years",
       freeWithdrawal: "10%",
       guaranteedMinRate: "1.50%",
+      features: [
+        "Established carrier relationship",
+        "Familiar product structure",
+        "No new underwriting required",
+      ],
+      cons: [
+        "Rate significantly below market",
+        "Higher MVA penalty exposure",
+        "Limited liquidity options",
+      ],
     },
     alternatives: [
       {
@@ -88,6 +100,16 @@ const mockComparison: ComparisonResult = {
         freeWithdrawal: "10%",
         guaranteedMinRate: "2.50%",
         licensingApproved: true,
+        features: [
+          "Highest guaranteed rate (4.25%)",
+          "3% premium bonus on deposits",
+          "Enhanced death benefit included",
+        ],
+        cons: [
+          "Longer 7-year surrender period",
+          "New carrier relationship required",
+          "Higher initial surrender charges",
+        ],
       },
       {
         name: "Athene Performance Elite",
@@ -98,6 +120,16 @@ const mockComparison: ComparisonResult = {
         freeWithdrawal: "10%",
         guaranteedMinRate: "2.00%",
         licensingApproved: true,
+        features: [
+          "Balanced rate and term (4.10%, 5 years)",
+          "Moderate surrender period",
+          "Strong carrier reputation",
+        ],
+        cons: [
+          "Mid-tier rate compared to alternatives",
+          "MVA penalty still applies",
+          "Standard liquidity provisions only",
+        ],
       },
       {
         name: "Nationwide Peak",
@@ -109,6 +141,16 @@ const mockComparison: ComparisonResult = {
         guaranteedMinRate: "2.25%",
         licensingApproved: false,
         licensingDetails: "Appointment required",
+        features: [
+          "Shortest surrender period (5 years)",
+          "Enhanced liquidity (15% free withdrawal)",
+          "Lower MVA penalty risk",
+        ],
+        cons: [
+          "Appointment and training required",
+          "Lower rate than top alternative",
+          "No premium bonus offered",
+        ],
       },
     ],
     missingData: false,
