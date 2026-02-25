@@ -43,9 +43,10 @@ interface CompareTabProps {
   isLoading: boolean;
   onParametersChange: (params: ComparisonParameters) => void;
   onRunComparison: () => void;
-  onRecompareWithProducts: (productIds: string[]) => void;
+  onRecompareWithProducts: (products: ProductOption[]) => void;
   onEditProfile?: () => void;
   startOnParameters?: boolean;
+  onNext?: () => void;
 }
 
 export function CompareTab({
@@ -59,6 +60,7 @@ export function CompareTab({
   onRecompareWithProducts,
   onEditProfile,
   startOnParameters,
+  onNext,
 }: CompareTabProps) {
   const [view, setView] = useState<CompareView>(
     startOnParameters ? "parameters" : "overview",
@@ -93,7 +95,7 @@ export function CompareTab({
   }, [shelfOpen, shelfProducts.length, loadingShelf]);
 
   const handleShelfSelect = (products: ProductOption[]) => {
-    onRecompareWithProducts(products.map((p) => p.id));
+    onRecompareWithProducts(products);
   };
 
   if (view === "parameters") {
@@ -162,6 +164,16 @@ export function CompareTab({
           alternatives={comparisonData.alternatives}
           comparisonData={comparisonData}
         />
+        {onNext && (
+          <div className="flex justify-end pt-4">
+            <button
+              onClick={onNext}
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+            >
+              Continue to Action →
+            </button>
+          </div>
+        )}
       </div>
     );
   }

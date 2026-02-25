@@ -24,16 +24,16 @@ import type {
   AlertDetail,
   ComparisonParameters,
   SuitabilityData,
+  ComparisonData,
+  ProductOption,
 } from "@/types/alert-detail";
 import {
   fetchAlertDetail,
   fetchClientProfile,
   saveClientProfile,
   saveSuitability,
-  runComparison,
-  recompareWithProducts,
 } from "@/api/alert-detail";
-import type { ComparisonData } from "@/types/alert-detail";
+import { runComparison, recompareWithProducts } from "@/api/compare";
 
 export function AlertDetailPage() {
   const { alertId } = useParams<{ alertId: string }>();
@@ -83,6 +83,15 @@ export function AlertDetailPage() {
   };
 
   const handleStepClick = (step: WorkflowStep) => {
+    // Prevent forward navigation - only allow going back or staying on current
+    const stepOrder: WorkflowStep[] = ["overview", "compare", "action"];
+    const currentIdx = stepOrder.indexOf(activeTab);
+    const targetIdx = stepOrder.indexOf(step);
+    
+    if (targetIdx > currentIdx && !completedSteps.has(stepOrder[targetIdx - 1])) {
+      return; // Block forward navigation if previous step not completed
+    }
+
     if (activeTab === "overview" && step !== "overview") {
       setCompletedSteps((prev) => new Set(prev).add("overview"));
     }
@@ -121,10 +130,10 @@ export function AlertDetailPage() {
     toast.success(`Transaction ${txId} submitted successfully`);
   };
 
-  const handleRecompareWithProducts = async (productIds: string[]) => {
+  const handleRecompareWithProducts = async (products: ProductOption[]) => {
     setCompareLoading(true);
     try {
-      const result = await recompareWithProducts(alertId!, productIds);
+      const result = await recompareWithProducts(alertId!, products);
       setComparisonData(result.comparisonData);
     } catch {
       toast.error("Failed to update comparison");
@@ -244,6 +253,10 @@ export function AlertDetailPage() {
                     setEditingProfile(true);
                     setActiveTab("compare");
                   }}
+                  onNext={() => {
+                    setCompletedSteps((prev) => new Set(prev).add("overview"));
+                    setActiveTab("compare");
+                  }}
                 />
               )}
               {activeTab === "compare" && parameters && (
@@ -262,6 +275,10 @@ export function AlertDetailPage() {
                   }}
                   startOnParameters={editingProfile}
                   key={editingProfile ? "edit" : "default"}
+                  onNext={() => {
+                    setCompletedSteps((prev) => new Set(prev).add("compare"));
+                    setActiveTab("action");
+                  }}
                 />
               )}
               {activeTab === "action" && suitabilityData && (
