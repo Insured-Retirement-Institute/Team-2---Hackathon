@@ -25,9 +25,11 @@ async def lifespan(_app: FastAPI):
     logger.info("Application shutdown complete")
 
 
+root_path = os.environ.get("ROOT_PATH", "")
 app = FastAPI(
     lifespan=lifespan,
-    root_path=os.environ.get("ROOT_PATH", ""),
+    root_path=root_path,
+    swagger_ui_parameters={"url": f"{root_path}/openapi.json"} if root_path else None,
 )
 
 
