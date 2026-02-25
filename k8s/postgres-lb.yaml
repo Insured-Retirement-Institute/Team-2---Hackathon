@@ -1,0 +1,18 @@
+# Expose CNPG read-write PostgreSQL via Network Load Balancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: hackdb-external
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+  selector:
+    cnpg.io/cluster: hackdb
+    role: primary
