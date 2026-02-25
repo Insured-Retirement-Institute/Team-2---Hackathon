@@ -3,9 +3,11 @@ import type {
   ClientProfile,
   ComparisonParameters,
   ComparisonResult,
+  PolicyData,
   ProductOption,
   SuitabilityData,
   SubmissionData,
+  VisualizationProduct,
 } from "@/types/alert-detail";
 import { mockAlerts } from "./mock/alerts";
 import { logRequest, logResponse } from "./logger";
@@ -105,12 +107,12 @@ export async function recompareWithProducts(alertId: string, selectedProducts: P
 
 /**
  * Save suitability data
- * PUT /api/alerts/{alertId}/suitability
+ * PUT /api/clients/{clientId}/suitability
  */
-export async function saveSuitability(_alertId: string, _data: SuitabilityData): Promise<void> {
-  logRequest("PUT /api/alerts/{alertId}/suitability", { alertId: _alertId, data: _data });
+export async function saveSuitability(_clientId: string, _data: SuitabilityData): Promise<void> {
+  logRequest("PUT /api/clients/{clientId}/suitability", { clientId: _clientId, data: _data });
   return new Promise((resolve) => {
-    setTimeout(() => { logResponse("PUT /api/alerts/{alertId}/suitability", { success: true }); resolve(); }, 300);
+    setTimeout(() => { logResponse("PUT /api/clients/{clientId}/suitability", { success: true }); resolve(); }, 300);
   });
 }
 
@@ -148,5 +150,66 @@ export async function submitTransaction(
       logResponse("POST /api/alerts/{alertId}/transaction", r);
       resolve(r);
     }, 500);
+  });
+}
+
+/**
+ * Fetch policy data
+ * GET /api/clients/{clientId}/policies/{policyId}
+ */
+export async function fetchPolicyData(_clientId: string, _policyId: string): Promise<PolicyData> {
+  logRequest("GET /api/clients/{clientId}/policies/{policyId}", { clientId: _clientId, policyId: _policyId });
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const alert = mockAlerts.find((a) => a.clientId === _clientId && a.policyId === _policyId) ?? mockAlerts[0];
+      const r = getMockPolicyData(alert);
+      logResponse("GET /api/clients/{clientId}/policies/{policyId}", r);
+      resolve(r);
+    }, 300);
+  });
+}
+
+/**
+ * Fetch visualization data for a product
+ * GET /api/products/{productId}/visualization
+ */
+export async function fetchVisualization(_productId: string): Promise<VisualizationProduct> {
+  logRequest("GET /api/products/{productId}/visualization", { productId: _productId });
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // Mock: generate a visualization product based on the first alert's comparison data
+      const alert = mockAlerts[0];
+      const comparison = getMockComparisonData(alert);
+      const product = comparison.alternatives[0] ?? comparison.current;
+      const rate = parseFloat(product.rate?.replace("%", "") || "4.0");
+      const minRate = parseFloat(product.guaranteedMinRate?.replace("%", "") || "2.0");
+      const surrenderYears = parseInt(product.surrenderPeriod || "5");
+      const bonus = product.premiumBonus ? parseFloat(product.premiumBonus.replace("%", "")) : undefined;
+      const initialValue = 150000;
+      const r: VisualizationProduct = {
+        id: _productId, name: product.name, carrier: product.carrier,
+        currentRate: rate, guaranteedMinRate: minRate, surrenderYears, initialValue, premiumBonus: bonus,
+        incomeScore: 70, growthScore: 75, liquidityScore: 60, protectionScore: 80,
+        projectedRates: Array.from({ length: 11 }, (_, i) => ({
+          year: i, conservativeRate: minRate,
+          expectedRate: i === 0 ? rate : Math.max(rate - i * 0.08, minRate),
+          optimisticRate: i === 0 ? rate : Math.min(rate + i * 0.05, rate + 0.5),
+        })),
+        performanceData: Array.from({ length: 21 }, (_, i) => {
+          const yr = i === 0 ? rate : Math.max(rate - i * 0.08, minRate);
+          const bm = bonus && i === 0 ? 1 + bonus / 100 : 1;
+          const v = initialValue * bm * Math.pow(1 + yr / 100, i);
+          return { year: i, value: Math.round(v), income: i >= 10 ? Math.round(v * 0.045) : undefined };
+        }),
+        features: [
+          { name: "Surrender Period", startYear: 0, endYear: surrenderYears, category: "surrender" },
+          { name: "Rate Guarantee", startYear: 0, endYear: parseInt(product.term || "5"), category: "guarantee" },
+          ...(bonus ? [{ name: "Premium Bonus", startYear: 0, endYear: 1, category: "bonus" as const }] : []),
+          ...(product.riders || []).map((rd) => ({ name: rd, startYear: 0, endYear: 20, category: "rider" as const })),
+        ],
+      };
+      logResponse("GET /api/products/{productId}/visualization", r);
+      resolve(r);
+    }, 300);
   });
 }

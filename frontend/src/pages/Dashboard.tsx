@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useChatContext } from "@/hooks/useChatContext";
-import { useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, ShieldCheck } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { LayoutDashboard } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { StatsCards } from "@/components/StatsCards";
 import { GroupedAlertsTable } from "@/components/GroupedAlertsTable";
@@ -72,13 +72,6 @@ export function Dashboard() {
                 <p className="text-sm text-slate-600">Annuity Renewal Intelligence</p>
               </div>
             </div>
-            <Link
-              to="/admin/responsible-ai"
-              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-            >
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              Responsible AI
-            </Link>
           </div>
         </div>
       </div>

@@ -53,6 +53,7 @@ export type PolicyData = {
 };
 
 export type ProductOption = {
+  id: string;
   name: string;
   carrier: string;
   rate: string;

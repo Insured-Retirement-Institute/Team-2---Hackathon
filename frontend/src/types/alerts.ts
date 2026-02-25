@@ -1,5 +1,6 @@
 export type RenewalAlert = {
   id: string;
+  clientId: string;
   policyId: string;
   clientName: string;
   carrier: string;

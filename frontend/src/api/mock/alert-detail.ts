@@ -181,6 +181,7 @@ export const mockComparisonParameters: ComparisonParameters = {
 export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
   return {
     current: {
+      id: "prod-securechoice",
       name: "SecureChoice MYGA",
       carrier: alert.carrier,
       rate: alert.currentRate,
@@ -196,6 +197,7 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
     },
     alternatives: [
       {
+        id: "prod-flexgrowth",
         name: "FlexGrowth Plus MYGA",
         carrier: "Great American",
         rate: "4.25%",
@@ -212,6 +214,7 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
         riders: ["3% Premium Bonus", "Enhanced Death Benefit (+10%)", "Tax-Deferred Growth", "Free Annual Withdrawal (10%)", "Nursing Home Waiver"],
       },
       {
+        id: "prod-secureincome",
         name: "Secure Income Pro MYGA",
         carrier: "North American",
         rate: "3.95%",
@@ -227,6 +230,7 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
         riders: ["Tax-Deferred Growth", "Enhanced Free Withdrawal (15%)", "Nursing Home Waiver", "Terminal Illness Waiver"],
       },
       {
+        id: "prod-premiumshield",
         name: "Premium Shield MYGA",
         carrier: "American Equity",
         rate: "4.10%",
@@ -249,14 +253,14 @@ export function getMockComparisonData(alert: RenewalAlert): ComparisonData {
 
 export function getMockProductShelf(): ProductOption[] {
   return [
-    { name: "FlexGrowth Plus MYGA", carrier: "Great American", rate: "4.25%", term: "7 years", premiumBonus: "3.0%", guaranteedMinRate: "2.50%", surrenderPeriod: "7", surrenderCharge: "7% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "None", licensingApproved: true, licensingDetails: "Active carrier appointment confirmed.", riders: ["3% Premium Bonus", "Enhanced Death Benefit (+10%)", "Nursing Home Waiver"] },
-    { name: "Secure Income Pro MYGA", carrier: "North American", rate: "3.95%", term: "5 years", guaranteedMinRate: "2.00%", surrenderPeriod: "5", surrenderCharge: "5% (declining)", freeWithdrawal: "15%", deathBenefit: "Account Value", mvaPenalty: "-2.1%", licensingApproved: false, licensingDetails: "Carrier appointment pending. Product training required.", riders: ["Enhanced Free Withdrawal (15%)", "Nursing Home Waiver", "Terminal Illness Waiver"] },
-    { name: "Premium Shield MYGA", carrier: "American Equity", rate: "4.10%", term: "6 years", premiumBonus: "2.0%", guaranteedMinRate: "1.75%", surrenderPeriod: "6", surrenderCharge: "6% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-2.5%", licensingApproved: true, licensingDetails: "Fully approved through 12/31/2026.", riders: ["2% Premium Bonus", "Nursing Home Waiver"] },
-    { name: "SafeHarbor Fixed Annuity", carrier: "Athene", rate: "4.40%", term: "5 years", guaranteedMinRate: "2.25%", surrenderPeriod: "5", surrenderCharge: "5% (declining)", freeWithdrawal: "10%", deathBenefit: "Account Value", mvaPenalty: "None", licensingApproved: true, riders: ["Tax-Deferred Growth", "Nursing Home Waiver"] },
-    { name: "Pinnacle Rate MYGA", carrier: "Global Atlantic", rate: "4.50%", term: "7 years", premiumBonus: "1.5%", guaranteedMinRate: "2.00%", surrenderPeriod: "7", surrenderCharge: "8% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-3.0%", licensingApproved: true, riders: ["1.5% Premium Bonus", "Enhanced Death Benefit", "Nursing Home Waiver", "Terminal Illness Waiver"] },
-    { name: "ValueLock 3-Year MYGA", carrier: "Midland National", rate: "3.75%", term: "3 years", guaranteedMinRate: "1.50%", surrenderPeriod: "3", surrenderCharge: "3% (declining)", freeWithdrawal: "10%", deathBenefit: "Account Value", mvaPenalty: "None", licensingApproved: true, riders: ["Tax-Deferred Growth", "Nursing Home Waiver"] },
-    { name: "Horizon Growth MYGA", carrier: "Jackson National", rate: "4.15%", term: "5 years", premiumBonus: "2.5%", guaranteedMinRate: "1.75%", surrenderPeriod: "5", surrenderCharge: "6% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-1.8%", licensingApproved: false, licensingDetails: "Product training required before selling.", riders: ["2.5% Premium Bonus", "Enhanced Death Benefit (+5%)", "Nursing Home Waiver"] },
-    { name: "Legacy Plus 10 MYGA", carrier: "Nationwide", rate: "4.65%", term: "10 years", premiumBonus: "4.0%", guaranteedMinRate: "2.75%", surrenderPeriod: "10", surrenderCharge: "10% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-4.0%", licensingApproved: true, riders: ["4% Premium Bonus", "Enhanced Death Benefit (+15%)", "Nursing Home Waiver", "Terminal Illness Waiver", "RMD-Friendly Withdrawals"] },
-    { name: "QuickAccess MYGA", carrier: "Fidelity & Guaranty", rate: "3.60%", term: "3 years", guaranteedMinRate: "1.25%", surrenderPeriod: "3", surrenderCharge: "3% (declining)", freeWithdrawal: "20%", deathBenefit: "Account Value", mvaPenalty: "None", licensingApproved: true, riders: ["Enhanced Free Withdrawal (20%)", "Nursing Home Waiver"] },
+    { id: "prod-flexgrowth", name: "FlexGrowth Plus MYGA", carrier: "Great American", rate: "4.25%", term: "7 years", premiumBonus: "3.0%", guaranteedMinRate: "2.50%", surrenderPeriod: "7", surrenderCharge: "7% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "None", licensingApproved: true, licensingDetails: "Active carrier appointment confirmed.", riders: ["3% Premium Bonus", "Enhanced Death Benefit (+10%)", "Nursing Home Waiver"] },
+    { id: "prod-secureincome", name: "Secure Income Pro MYGA", carrier: "North American", rate: "3.95%", term: "5 years", guaranteedMinRate: "2.00%", surrenderPeriod: "5", surrenderCharge: "5% (declining)", freeWithdrawal: "15%", deathBenefit: "Account Value", mvaPenalty: "-2.1%", licensingApproved: false, licensingDetails: "Carrier appointment pending. Product training required.", riders: ["Enhanced Free Withdrawal (15%)", "Nursing Home Waiver", "Terminal Illness Waiver"] },
+    { id: "prod-premiumshield", name: "Premium Shield MYGA", carrier: "American Equity", rate: "4.10%", term: "6 years", premiumBonus: "2.0%", guaranteedMinRate: "1.75%", surrenderPeriod: "6", surrenderCharge: "6% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-2.5%", licensingApproved: true, licensingDetails: "Fully approved through 12/31/2026.", riders: ["2% Premium Bonus", "Nursing Home Waiver"] },
+    { id: "prod-safeharbor", name: "SafeHarbor Fixed Annuity", carrier: "Athene", rate: "4.40%", term: "5 years", guaranteedMinRate: "2.25%", surrenderPeriod: "5", surrenderCharge: "5% (declining)", freeWithdrawal: "10%", deathBenefit: "Account Value", mvaPenalty: "None", licensingApproved: true, riders: ["Tax-Deferred Growth", "Nursing Home Waiver"] },
+    { id: "prod-pinnacle", name: "Pinnacle Rate MYGA", carrier: "Global Atlantic", rate: "4.50%", term: "7 years", premiumBonus: "1.5%", guaranteedMinRate: "2.00%", surrenderPeriod: "7", surrenderCharge: "8% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-3.0%", licensingApproved: true, riders: ["1.5% Premium Bonus", "Enhanced Death Benefit", "Nursing Home Waiver", "Terminal Illness Waiver"] },
+    { id: "prod-valuelock", name: "ValueLock 3-Year MYGA", carrier: "Midland National", rate: "3.75%", term: "3 years", guaranteedMinRate: "1.50%", surrenderPeriod: "3", surrenderCharge: "3% (declining)", freeWithdrawal: "10%", deathBenefit: "Account Value", mvaPenalty: "None", licensingApproved: true, riders: ["Tax-Deferred Growth", "Nursing Home Waiver"] },
+    { id: "prod-horizon", name: "Horizon Growth MYGA", carrier: "Jackson National", rate: "4.15%", term: "5 years", premiumBonus: "2.5%", guaranteedMinRate: "1.75%", surrenderPeriod: "5", surrenderCharge: "6% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-1.8%", licensingApproved: false, licensingDetails: "Product training required before selling.", riders: ["2.5% Premium Bonus", "Enhanced Death Benefit (+5%)", "Nursing Home Waiver"] },
+    { id: "prod-legacy", name: "Legacy Plus 10 MYGA", carrier: "Nationwide", rate: "4.65%", term: "10 years", premiumBonus: "4.0%", guaranteedMinRate: "2.75%", surrenderPeriod: "10", surrenderCharge: "10% (declining)", freeWithdrawal: "10%", deathBenefit: "Enhanced", mvaPenalty: "-4.0%", licensingApproved: true, riders: ["4% Premium Bonus", "Enhanced Death Benefit (+15%)", "Nursing Home Waiver", "Terminal Illness Waiver", "RMD-Friendly Withdrawals"] },
+    { id: "prod-quickaccess", name: "QuickAccess MYGA", carrier: "Fidelity & Guaranty", rate: "3.60%", term: "3 years", guaranteedMinRate: "1.25%", surrenderPeriod: "3", surrenderCharge: "3% (declining)", freeWithdrawal: "20%", deathBenefit: "Account Value", mvaPenalty: "None", licensingApproved: true, riders: ["Enhanced Free Withdrawal (20%)", "Nursing Home Waiver"] },
   ];
 }

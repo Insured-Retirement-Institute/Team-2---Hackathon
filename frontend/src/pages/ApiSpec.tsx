@@ -14,7 +14,7 @@ export function ApiSpec() {
         </Button>
         <h1 className="text-lg font-bold text-slate-900">API Specification v4</h1>
       </div>
-      <SwaggerUI url="/api-spec-v4.yaml" />
+      <SwaggerUI url="/api-spec-v5.yaml" />
     </div>
   );
 }

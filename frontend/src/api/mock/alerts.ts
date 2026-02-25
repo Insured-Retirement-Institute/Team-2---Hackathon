@@ -8,6 +8,7 @@ export const mockAlerts: RenewalAlert[] = [
   // Maria Rodriguez - 2 alerts (replacement + suitability)
   {
     id: "alert-ANN-2020-5621-renewal",
+    clientId: "CLI-1001",
     policyId: "ANN-2020-5621",
     clientName: "Maria Rodriguez",
     carrier: "Athene",
@@ -26,6 +27,7 @@ export const mockAlerts: RenewalAlert[] = [
   },
   {
     id: "alert-ANN-2020-5621-suitability",
+    clientId: "CLI-1001",
     policyId: "ANN-2020-5621",
     clientName: "Maria Rodriguez",
     carrier: "Athene",
@@ -45,6 +47,7 @@ export const mockAlerts: RenewalAlert[] = [
   // Robert Chen - 1 alert (replacement)
   {
     id: "alert-ANN-2019-8934",
+    clientId: "CLI-1002",
     policyId: "ANN-2019-8934",
     clientName: "Robert Chen",
     carrier: "Nationwide",
@@ -64,6 +67,7 @@ export const mockAlerts: RenewalAlert[] = [
   // David Thompson - 1 alert (replacement)
   {
     id: "alert-ANN-2020-7123-renewal",
+    clientId: "CLI-1003",
     policyId: "ANN-2020-7123",
     clientName: "David Thompson",
     carrier: "Allianz",
@@ -83,6 +87,7 @@ export const mockAlerts: RenewalAlert[] = [
   // Jessica Martinez - 1 alert (suitability)
   {
     id: "alert-ANN-2019-3421",
+    clientId: "CLI-1004",
     policyId: "ANN-2019-3421",
     clientName: "Jessica Martinez",
     carrier: "Nationwide",
@@ -102,6 +107,7 @@ export const mockAlerts: RenewalAlert[] = [
   // Daniel Garcia - 2 alerts (replacement + missing info)
   {
     id: "alert-ANN-2020-7845-renewal",
+    clientId: "CLI-1005",
     policyId: "ANN-2020-7845",
     clientName: "Daniel Garcia",
     carrier: "Pacific Life",
@@ -119,6 +125,7 @@ export const mockAlerts: RenewalAlert[] = [
   },
   {
     id: "alert-ANN-2020-7845-missing",
+    clientId: "CLI-1005",
     policyId: "ANN-2020-7845",
     clientName: "Daniel Garcia",
     carrier: "Pacific Life",
@@ -139,6 +146,7 @@ export const mockAlerts: RenewalAlert[] = [
   // Nancy White - 1 alert (suitability)
   {
     id: "alert-ANN-2019-2134",
+    clientId: "CLI-1006",
     policyId: "ANN-2019-2134",
     clientName: "Nancy White",
     carrier: "Allianz",
@@ -158,6 +166,7 @@ export const mockAlerts: RenewalAlert[] = [
   // George Robinson - 1 alert (replacement)
   {
     id: "alert-ANN-2021-5678",
+    clientId: "CLI-1007",
     policyId: "ANN-2021-5678",
     clientName: "George Robinson",
     carrier: "Allianz",
@@ -177,6 +186,7 @@ export const mockAlerts: RenewalAlert[] = [
   // Jennifer Martinez - 1 alert (income planning)
   {
     id: "alert-ANN-2018-3456-income",
+    clientId: "CLI-1008",
     policyId: "ANN-2018-3456",
     clientName: "Jennifer Martinez",
     carrier: "Pacific Life",

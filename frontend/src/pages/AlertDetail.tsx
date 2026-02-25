@@ -44,10 +44,8 @@ export function AlertDetailPage() {
   const loadDetail = async () => {
     setLoading(true);
     try {
-      const [detailData, profileData] = await Promise.all([
-        fetchAlertDetail(alertId!),
-        fetchClientProfile(alertId!),
-      ]);
+      const detailData = await fetchAlertDetail(alertId!);
+      const profileData = await fetchClientProfile(detailData.alert.clientId);
       setDetail(detailData);
       setSuitabilityData(detailData.suitabilityData);
       setParameters(profileData.parameters);
@@ -70,7 +68,7 @@ export function AlertDetailPage() {
   const handleRunComparison = async () => {
     setCompareLoading(true);
     try {
-      if (parameters) await saveClientProfile(alertId!, parameters);
+      if (parameters && detail) await saveClientProfile(detail.alert.clientId, parameters);
       const result = await runComparison(alertId!);
       setComparisonData(result.comparisonData);
       setCompletedSteps((prev) => new Set(prev).add("compare"));
