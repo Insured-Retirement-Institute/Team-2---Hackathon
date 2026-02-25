@@ -7,8 +7,12 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi>=0.129.0",
     "httpx>=0.28.0",
+    "schemas",
     "uvicorn>=0.34.0",
 ]
+
+[tool.uv.sources]
+schemas = { workspace = true }
 
 [dependency-groups]
 dev = [

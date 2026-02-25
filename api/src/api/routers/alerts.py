@@ -8,14 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from api.database import fetch_rows, pool
-
-# Import generated Pydantic models from agents package
-import sys
-from pathlib import Path
-agents_dir = Path(__file__).parent.parent.parent.parent / "agents"
-sys.path.insert(0, str(agents_dir))
-
-from iri_schemas import (
+from schemas.iri_schemas import (
     RenewalAlert,
     DashboardStats,
     Priority,
