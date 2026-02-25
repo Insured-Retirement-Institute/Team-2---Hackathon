@@ -28,6 +28,9 @@ paths:
         and the full set of policy features, benefits, riders, and limitations.
       operationId: getPolicyData
       tags: [Policies]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
       responses:
         '200':
           description: Successful response
@@ -109,6 +112,9 @@ paths:
         suitability score.
       operationId: getSuitabilityData
       tags: [Suitability]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
       responses:
         '200':
           description: Successful response
@@ -138,9 +144,9 @@ paths:
                       - "Nursing home waiver"
                       - "Terminal illness benefit"
                       - "Guaranteed lifetime withdrawal"
-                    advisorEligibility: "Series 6, state insurance license -- all appointments current"
-                    score: 82
-                    isPrefilled: false
+                    advisorEligibility: null
+                    score: null
+                    isPrefilled: null
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -153,6 +159,9 @@ paths:
         to or acknowledged by the client during the sales or servicing process.
       operationId: getDisclosureItems
       tags: [Disclosures]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
       responses:
         '200':
           description: Successful response
@@ -205,6 +214,9 @@ paths:
         current licensing status for the product.
       operationId: getProductOptions
       tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
       responses:
         '200':
           description: Successful response
@@ -278,6 +290,9 @@ paths:
         performance data, and time-bounded product feature windows.
       operationId: getVisualizationProducts
       tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
       responses:
         '200':
           description: Successful response
@@ -373,6 +388,9 @@ paths:
         parameters sub-object captures the full comparison parameter set.
       operationId: getClientProfiles
       tags: [Clients]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
       responses:
         '200':
           description: Successful response
@@ -425,9 +443,9 @@ paths:
                       livingBenefits:
                         - "Nursing home waiver"
                         - "Terminal illness benefit"
-                      advisorEligibility: "Series 6, state insurance license -- all appointments current"
-                      score: 82
-                      isPrefilled: false
+                      advisorEligibility: null
+                      score: null
+                      isPrefilled: null
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -440,6 +458,24 @@ components:
       description: |
         OAuth 2.0 client credentials token. Obtain a token from the Cognito
         token endpoint using `grant_type=client_credentials`.
+
+  parameters:
+    persona:
+      name: persona
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [agent]
+      description: Caller persona. Must be "agent".
+    userId:
+      name: UserID
+      in: header
+      required: true
+      schema:
+        type: string
+        default: "1001"
+      description: User identifier. Must be "1001".
 
   responses:
     Unauthorized:
@@ -614,9 +650,6 @@ components:
         - rateExpectations
         - surrenderTimeline
         - livingBenefits
-        - advisorEligibility
-        - score
-        - isPrefilled
       properties:
         ID:
           type: string
@@ -668,14 +701,15 @@ components:
             - "Guaranteed lifetime withdrawal"
         advisorEligibility:
           type: string
+          nullable: true
           description: Advisor licensing and appointment status relevant to the assessment.
-          example: "Series 6, state insurance license -- all appointments current"
         score:
           type: integer
+          nullable: true
           description: Composite suitability score (0-100).
-          example: 82
         isPrefilled:
           type: boolean
+          nullable: true
           description: Whether the assessment was pre-populated from existing data.
 
     DisclosureItem:
@@ -1141,9 +1175,6 @@ components:
         - rateExpectations
         - surrenderTimeline
         - livingBenefits
-        - advisorEligibility
-        - score
-        - isPrefilled
       properties:
         clientObjectives:
           type: string
@@ -1176,10 +1207,13 @@ components:
             type: string
         advisorEligibility:
           type: string
+          nullable: true
           description: Advisor licensing and appointment status relevant to the assessment.
         score:
           type: integer
+          nullable: true
           description: Composite suitability score (0-100).
         isPrefilled:
           type: boolean
+          nullable: true
           description: Whether the assessment was pre-populated from existing data.
