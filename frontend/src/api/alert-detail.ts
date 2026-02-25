@@ -10,8 +10,26 @@ import type {
   VisualizationProduct,
 } from "@/types/alert-detail";
 import { logRequest, logResponse } from "./logger";
+<<<<<<< HEAD
+import { mockAlerts } from "./mock/alerts";
+import {
+  getMockPolicyData,
+  mockSuitabilityScore,
+  mockSuitabilityData,
+  mockDisclosureItems,
+  getMockTransactionOptions,
+  mockAuditLog,
+  mockComparisonParameters,
+  getMockComparisonData,
+  getMockProductShelf,
+} from "./mock/alert-detail";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+=======
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+>>>>>>> origin/main
 
 /**
  * Fetch alert detail with policy data
@@ -19,6 +37,32 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
  */
 export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
   logRequest("GET /api/alerts/{alertId}", { alertId });
+<<<<<<< HEAD
+  
+  if (USE_MOCKS) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const alert = mockAlerts.find((a) => a.id === alertId) ?? mockAlerts[0];
+        const clientAlerts = mockAlerts.filter((a) => a.clientName === alert.clientName);
+        const comparisonData = getMockComparisonData(alert);
+        const r = {
+          alert,
+          clientAlerts,
+          policyData: getMockPolicyData(alert),
+          aiSuitabilityScore: mockSuitabilityScore,
+          suitabilityData: mockSuitabilityData,
+          disclosureItems: mockDisclosureItems,
+          transactionOptions: getMockTransactionOptions(alert, comparisonData),
+          auditLog: mockAuditLog,
+        };
+        logResponse("GET /api/alerts/{alertId} (mock)", r);
+        resolve(r);
+      }, 300);
+    });
+  }
+
+=======
+>>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/alerts/${alertId}`);
   if (!res.ok)
     throw new Error(`Failed to fetch alert detail: ${res.statusText}`);
@@ -35,6 +79,24 @@ export async function fetchClientProfile(
   clientId: string,
 ): Promise<ClientProfile> {
   logRequest("GET /api/clients/{clientId}/profile", { clientId });
+<<<<<<< HEAD
+  
+  if (USE_MOCKS) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const r = {
+          clientId,
+          clientName: "Maria Rodriguez",
+          parameters: mockComparisonParameters,
+        };
+        logResponse("GET /api/clients/{clientId}/profile (mock)", r);
+        resolve(r);
+      }, 300);
+    });
+  }
+
+=======
+>>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`);
   if (!res.ok)
     throw new Error(`Failed to fetch client profile: ${res.statusText}`);
@@ -52,6 +114,19 @@ export async function saveClientProfile(
   parameters: ComparisonParameters,
 ): Promise<void> {
   logRequest("PUT /api/clients/{clientId}/profile", { clientId, parameters });
+<<<<<<< HEAD
+  
+  if (USE_MOCKS) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        logResponse("PUT /api/clients/{clientId}/profile (mock)", { success: true });
+        resolve();
+      }, 300);
+    });
+  }
+
+=======
+>>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -122,6 +197,19 @@ export async function saveSuitability(
   data: SuitabilityData,
 ): Promise<void> {
   logRequest("PUT /api/alerts/{alertId}/suitability", { alertId, data });
+<<<<<<< HEAD
+  
+  if (USE_MOCKS) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        logResponse("PUT /api/alerts/{alertId}/suitability (mock)", { success: true });
+        resolve();
+      }, 300);
+    });
+  }
+
+=======
+>>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/suitability`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -318,6 +406,20 @@ export async function fetchVisualization(
  */
 export async function fetchProductShelf(): Promise<ProductOption[]> {
   logRequest("GET /passthrough/product-options");
+<<<<<<< HEAD
+  
+  if (USE_MOCKS) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const r = getMockProductShelf();
+        logResponse("GET /passthrough/product-options (mock)", r);
+        resolve(r);
+      }, 300);
+    });
+  }
+
+=======
+>>>>>>> origin/main
   const res = await fetch("/passthrough/product-options");
   if (!res.ok)
     throw new Error(`Failed to fetch product shelf: ${res.statusText}`);

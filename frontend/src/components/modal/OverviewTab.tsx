@@ -23,6 +23,7 @@ interface OverviewTabProps {
   clientAlerts: RenewalAlert[];
   features: PolicyFeaturesData;
   onEditProfile?: () => void;
+  onNext?: () => void;
 }
 
 export function OverviewTab({
@@ -30,6 +31,7 @@ export function OverviewTab({
   clientAlerts,
   features,
   onEditProfile,
+  onNext,
 }: OverviewTabProps) {
   const rateDrop = (
     ((parseFloat(alert.currentRate) - parseFloat(alert.renewalRate)) /
@@ -217,6 +219,18 @@ export function OverviewTab({
           />
         </div>
       </div>
+
+      {/* Next Button */}
+      {onNext && (
+        <div className="flex justify-end pt-4">
+          <button
+            onClick={onNext}
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+          >
+            Continue to Compare →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
