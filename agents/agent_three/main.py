@@ -9,6 +9,8 @@ Run from repo root: PYTHONPATH=. uv run python -m agents.agent_three
 from __future__ import annotations
 
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 _repo_root = Path(__file__).resolve().parent.parent.parent
@@ -27,6 +29,8 @@ from strands import Agent, tool
 
 from agents.agent_three_schemas import ChatRequest, ChatResponse, ScreenState
 from agents.agent_two import generate_product_recommendations, get_current_database_context
+from agents.audit_writer import persist_event
+from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 
 
 @tool
@@ -119,17 +123,55 @@ def run_chat(
             screen_state = ScreenState(screen_state)
         except ValueError:
             screen_state = ScreenState.elsewhere
-    message = build_user_message_for_agent(screen_state, user_message, client_id, changes_json)
-    agent = create_agent_three()
-    result = agent(message)
-    reply = result.get("output", result) if isinstance(result, dict) else str(result)
-    return ChatResponse(
-        reply=reply,
-        screen_state=screen_state,
-        agent_two_invoked=False,
-        agent_two_summary=None,
-        storable_payload=None,
-    )
+    run_id = str(uuid.uuid4())
+    timestamp = datetime.now(timezone.utc).isoformat()
+    input_summary = {
+        "screen_state": screen_state.value,
+        "client_id_scope": client_id,
+        "agent_two_invoked": False,
+    }
+    try:
+        message = build_user_message_for_agent(screen_state, user_message, client_id, changes_json)
+        agent = create_agent_three()
+        result = agent(message)
+        reply = result.get("output", result) if isinstance(result, dict) else str(result)
+        persist_event(
+            AgentRunEvent(
+                event_id=str(uuid.uuid4()),
+                timestamp=timestamp,
+                agent_id=AgentId.agent_three,
+                run_id=run_id,
+                client_id_scope=client_id,
+                input_summary=input_summary,
+                success=True,
+                explanation_summary="Chat reply generated",
+                input_validation_passed=True,
+                guardrail_triggered=None,
+            )
+        )
+        return ChatResponse(
+            reply=reply,
+            screen_state=screen_state,
+            agent_two_invoked=False,
+            agent_two_summary=None,
+            storable_payload=None,
+        )
+    except Exception as e:
+        persist_event(
+            AgentRunEvent(
+                event_id=str(uuid.uuid4()),
+                timestamp=timestamp,
+                agent_id=AgentId.agent_three,
+                run_id=run_id,
+                client_id_scope=client_id,
+                input_summary=input_summary,
+                success=False,
+                error_message=str(e),
+                input_validation_passed=True,
+                guardrail_triggered=None,
+            )
+        )
+        raise
 
 
 def main() -> None:

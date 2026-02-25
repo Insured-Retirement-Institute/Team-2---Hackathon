@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import json
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 _repo_root = Path(__file__).resolve().parent.parent.parent
@@ -45,7 +47,9 @@ from agents.iri_client import (
     submit_iri_transaction as iri_submit_transaction,
     snooze_iri_alert as iri_snooze,
 )
+from agents.audit_writer import persist_event
 from agents.logic import apply_business_logic
+from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.schemas import BookOfBusinessOutput, PolicyNotification, PolicyOutput
 from agents.sureify_client import get_book_of_business as fetch_policies
 from agents.sureify_client import get_notifications_for_policies as fetch_notifications
@@ -279,22 +283,97 @@ def create_agent() -> Agent:
     )
 
 
+def _emit_agent_one_event(
+    run_id: str,
+    input_summary: dict,
+    success: bool,
+    error_message: str | None = None,
+    explanation_summary: str | None = None,
+) -> None:
+    event = AgentRunEvent(
+        event_id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        agent_id=AgentId.agent_one,
+        run_id=run_id,
+        client_id_scope="Marty McFly",
+        input_summary=input_summary,
+        success=success,
+        error_message=error_message,
+        explanation_summary=explanation_summary,
+        input_validation_passed=True,
+        guardrail_triggered=None,
+    )
+    persist_event(event)
+
+
 def main() -> None:
     import os
+    run_id = str(uuid.uuid4())
     if os.environ.get("SUREIFY_AGENT_SCHEMA_ONLY"):
         print(get_book_of_business_json_schema())
+        _emit_agent_one_event(
+            run_id,
+            {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_json_schema"]},
+            True,
+            explanation_summary="JSON schema returned",
+        )
         return
     if os.environ.get("SUREIFY_AGENT_TOOL_ONLY"):
-        json_out = get_book_of_business_with_notifications_and_flags("Marty McFly")
-        print(json_out)
+        try:
+            json_out = get_book_of_business_with_notifications_and_flags("Marty McFly")
+            print(json_out)
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
+                True,
+                explanation_summary="Book of business produced with notifications and flags",
+            )
+        except Exception as e:
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
+                False,
+                error_message=str(e),
+            )
+            raise
         return
     if os.environ.get("SUREIFY_AGENT_IRI_ONLY"):
-        print(get_book_of_business_as_iri_alerts("Marty McFly"))
+        try:
+            print(get_book_of_business_as_iri_alerts("Marty McFly"))
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_as_iri_alerts"]},
+                True,
+                explanation_summary="Book of business as IRI alerts",
+            )
+        except Exception as e:
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_as_iri_alerts"]},
+                False,
+                error_message=str(e),
+            )
+            raise
         return
-    agent = create_agent()
-    user_message = "Produce the book of business for Marty McFly. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
-    result = agent(user_message)
-    print(result.get("output", result) if isinstance(result, dict) else result)
+    try:
+        agent = create_agent()
+        user_message = "Produce the book of business for Marty McFly. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
+        result = agent(user_message)
+        print(result.get("output", result) if isinstance(result, dict) else result)
+        _emit_agent_one_event(
+            run_id,
+            {"customer_identifier_scope": "Marty McFly", "tools_used": ["agent_run"]},
+            True,
+            explanation_summary="Book of business produced with notifications and flags",
+        )
+    except Exception as e:
+        _emit_agent_one_event(
+            run_id,
+            {"customer_identifier_scope": "Marty McFly", "tools_used": ["agent_run"]},
+            False,
+            error_message=str(e),
+        )
+        raise
 
 
 if __name__ == "__main__":

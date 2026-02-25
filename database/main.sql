@@ -12,6 +12,8 @@
 \i products.sql
 \i index_options.sql
 \i riders.sql
+\i agent_two_recommendation_runs.sql
+\i agent_run_events.sql
 
 CREATE TABLE llm_converstations (
     id BIGINT BY DEFAULT AS IDENTITY PRIMARY KEY,

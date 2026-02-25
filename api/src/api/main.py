@@ -54,3 +54,4 @@ async def readiness():
 
 app.include_router(passthrough.router)
 app.include_router(policies.router)
+app.include_router(responsible_ai.router)

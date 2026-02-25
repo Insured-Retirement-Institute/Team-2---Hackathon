@@ -1,0 +1,52 @@
+# Agent Two: agent_two_recommendation_runs table — for DBAs
+#
+# Stores the full storable payload per recommendation run. agent_run_events.payload_ref
+# references this table for Agent Two drill-down in the Responsible AI dashboard.
+#
+# Payload schema: see agent_two_storable_payload.yaml (JSONB column stores that shape).
+# Written by: agents/audit_writer.persist_agent_two_payload()
+# DDL: ../agent_two_recommendation_runs.sql
+#
+# Create this table before agent_run_events (FK dependency).
+
+table_name: agent_two_recommendation_runs
+description: |
+  One row per Agent Two recommendation run. The payload column holds the full
+  AgentTwoStorablePayload JSON (run_id, created_at, client_id, explanation,
+  recommendations, merged_profile_summary, iri_comparison_result). Used for
+  audit and for dashboard drill-down when payload_ref is set in agent_run_events.
+
+columns:
+  id:
+    type: UUID
+    constraint: PRIMARY KEY DEFAULT gen_random_uuid()
+    description: Surrogate key; referenced by agent_run_events.payload_ref.
+  run_id:
+    type: VARCHAR(100)
+    constraint: NOT NULL UNIQUE
+    description: Business key from payload (UUID string). One per recommendation run.
+  created_at:
+    type: TIMESTAMPTZ
+    constraint: NOT NULL
+    description: When the run was produced (from payload.created_at, ISO 8601 UTC).
+  client_id:
+    type: VARCHAR(100)
+    constraint: NOT NULL
+    description: Client identifier for this run.
+  payload:
+    type: JSONB
+    constraint: NOT NULL
+    description: Full AgentTwoStorablePayload. Schema in agent_two_storable_payload.yaml.
+
+indexes:
+  - name: idx_agent_two_runs_created_at
+    columns: [created_at DESC]
+  - name: idx_agent_two_runs_client_id
+    columns: [client_id]
+
+# Payload (JSONB) shape: see agent_two_storable_payload.yaml
+payload_schema_ref: agent_two_storable_payload.yaml
+
+# Query examples:
+#   - By event: SELECT * FROM agent_two_recommendation_runs WHERE id = $1::uuid;
+#   - Latest per client: SELECT DISTINCT ON (client_id) * FROM agent_two_recommendation_runs ORDER BY client_id, created_at DESC;

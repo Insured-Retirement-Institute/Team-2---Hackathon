@@ -1,0 +1,114 @@
+# Responsible AI: agent_run_events table — for DBAs
+#
+# Unified audit table for all three agents (agent_one, agent_two, agent_three).
+# Each agent run emits one row; the admin dashboard reads from this table for
+# runs, explainability coverage, validation, and (optionally) guardrail metrics.
+#
+# Source: agents/responsible_ai_schemas.AgentRunEvent
+# Written by: agents/audit_writer.persist_event() (from agent_one, agent_two, agent_three)
+# DDL: ../agent_run_events.sql
+#
+# Dependency: agent_run_events.payload_ref references agent_two_recommendation_runs(id).
+# Create agent_two_recommendation_runs first (see agent_two_recommendation_runs_table.yaml).
+
+table_name: agent_run_events
+description: |
+  One row per agent run. Stores event_id (business key), outcome (success/error),
+  explainability fields (summary, data_sources_used, choice_criteria), validation
+  and guardrail flags, and optional payload_ref for Agent Two drill-down.
+
+columns:
+  id:
+    type: BIGSERIAL
+    constraint: PRIMARY KEY
+    description: Surrogate key.
+  event_id:
+    type: UUID
+    constraint: NOT NULL UNIQUE
+    description: Business key for the event (from AgentRunEvent.event_id).
+  timestamp:
+    type: TIMESTAMPTZ
+    constraint: NOT NULL
+    description: When the run occurred (UTC). From AgentRunEvent.timestamp (ISO 8601).
+  agent_id:
+    type: VARCHAR(20)
+    constraint: NOT NULL CHECK (agent_id IN ('agent_one', 'agent_two', 'agent_three'))
+    description: Which agent produced this run.
+  run_id:
+    type: VARCHAR(100)
+    constraint: nullable
+    description: Optional run identifier (e.g. agentTwo's run_id).
+  client_id_scope:
+    type: VARCHAR(200)
+    constraint: nullable
+    description: Redacted or hashed client scope; no PII.
+  input_summary:
+    type: JSONB
+    default: '{}'
+    description: Summary of inputs (e.g. tools_used, screen_state, sections_present). No raw PII.
+  success:
+    type: BOOLEAN
+    constraint: NOT NULL
+    description: Whether the run completed successfully.
+  error_message:
+    type: TEXT
+    constraint: nullable
+    description: If success=false, the error message.
+  explanation_summary:
+    type: TEXT
+    constraint: nullable
+    description: Short narrative of what the agent did (explainability).
+  data_sources_used:
+    type: TEXT[]
+    constraint: nullable
+    description: e.g. ["sureify_products", "db_suitability"]. Mainly from agentTwo.
+  choice_criteria:
+    type: TEXT[]
+    constraint: nullable
+    description: Criteria applied (e.g. risk tolerance, time horizon). Mainly from agentTwo.
+  input_validation_passed:
+    type: BOOLEAN
+    constraint: nullable
+    description: Whether input validation passed (e.g. JSON parse and schema check).
+  guardrail_triggered:
+    type: BOOLEAN
+    constraint: nullable
+    description: Reserved for future Bedrock guardrail interventions.
+  payload_ref:
+    type: UUID
+    constraint: nullable REFERENCES agent_two_recommendation_runs(id)
+    description: For agent_two events, FK to full storable payload for drill-down.
+
+indexes:
+  - name: idx_agent_run_events_timestamp
+    columns: [timestamp DESC]
+  - name: idx_agent_run_events_agent_id
+    columns: [agent_id]
+  - name: idx_agent_run_events_success
+    columns: [success]
+  - name: idx_agent_run_events_client_id_scope
+    columns: [client_id_scope]
+
+# --- Event payload shape (AgentRunEvent) — maps to columns above ---
+event_schema:
+  type: object
+  required: [event_id, timestamp, agent_id, success]
+  properties:
+    event_id: { type: string, format: uuid }
+    timestamp: { type: string, format: date-time, description: ISO 8601 UTC }
+    agent_id: { type: string, enum: [agent_one, agent_two, agent_three] }
+    run_id: { type: string, nullable: true }
+    client_id_scope: { type: string, nullable: true }
+    input_summary: { type: object, description: No PII }
+    success: { type: boolean }
+    error_message: { type: string, nullable: true }
+    explanation_summary: { type: string, nullable: true }
+    data_sources_used: { type: array, items: { type: string }, nullable: true }
+    choice_criteria: { type: array, items: { type: string }, nullable: true }
+    input_validation_passed: { type: boolean, nullable: true }
+    guardrail_triggered: { type: boolean, nullable: true }
+    payload_ref: { type: string, format: uuid, nullable: true }
+
+# Query examples for dashboard:
+#   - List events: SELECT * FROM agent_run_events WHERE timestamp BETWEEN $1 AND $2 AND ($3::text IS NULL OR agent_id = $3) ORDER BY timestamp DESC LIMIT $4 OFFSET $5;
+#   - Stats: COUNT(*), COUNT(*) FILTER (WHERE success), COUNT(*) FILTER (WHERE agent_id = 'agent_two' AND explanation_summary IS NOT NULL), etc.
