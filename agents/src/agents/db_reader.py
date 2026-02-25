@@ -8,6 +8,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 # Optional: only needed when DATABASE_URL or RDS* are set
 try:
     import psycopg2

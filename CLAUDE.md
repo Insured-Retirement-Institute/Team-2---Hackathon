@@ -112,6 +112,20 @@ Schema management: Design in SQL files, preview with `pgschema:plan`, apply with
 
 4. **Mock-Friendly**: Agents work with mock Sureify data when API credentials not provided
 
+5. **EKS Pod Identity for AWS Services (MANDATORY)**: When deploying workloads that need AWS API access (Bedrock, S3, etc.), **always use EKS Pod Identity** via `podIdentityAssociations` in `eksctl-cluster.yaml`. Never use static credentials or IRSA annotations.
+   - Add the ServiceAccount to `k8s/eksctl-cluster.yaml` under `iam.podIdentityAssociations`
+   - Reference the ServiceAccount in the Deployment spec
+   - After updating eksctl config, run: `eksctl update podidentityassociation -f k8s/eksctl-cluster.yaml`
+   ```yaml
+   # Example in eksctl-cluster.yaml
+   iam:
+     podIdentityAssociations:
+       - namespace: default
+         serviceAccountName: my-service-sa
+         permissionPolicyARNs:
+           - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+   ```
+
 ## Configuration
 
 - `mise.toml` - Task definitions

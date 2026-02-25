@@ -9,15 +9,11 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-_repo_root = Path(__file__).resolve().parent.parent.parent
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
-
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
 _env_file = _repo_root / ".env"
 if _env_file.exists():
     try:
@@ -27,6 +23,10 @@ if _env_file.exists():
         pass
 
 from strands import Agent, tool
+
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from agents.agent_two_schemas import AgentTwoStorablePayload, ProductRecommendationsOutput, ProfileChangesInput
 from agents.audit_writer import persist_agent_two_payload, persist_event
@@ -216,6 +216,7 @@ Output: Return the full product recommendations JSON to the user (recommendation
 
 def create_agent_two() -> Agent:
     """Create the Strands agent for agentTwo."""
+    logger.debug("Creating agent_two Strands agent with Bedrock")
     return Agent(
         tools=[get_current_database_context, generate_product_recommendations],
         system_prompt=AGENT_TWO_SYSTEM_PROMPT,

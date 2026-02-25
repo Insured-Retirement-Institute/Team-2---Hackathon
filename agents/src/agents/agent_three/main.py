@@ -8,15 +8,11 @@ Run from repo root: PYTHONPATH=. uv run python -m agents.agent_three
 
 from __future__ import annotations
 
-import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-_repo_root = Path(__file__).resolve().parent.parent.parent
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
-
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
 _env_file = _repo_root / ".env"
 if _env_file.exists():
     try:
@@ -26,6 +22,10 @@ if _env_file.exists():
         pass
 
 from strands import Agent, tool
+
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from agents.agent_three_schemas import ChatRequest, ChatResponse, ScreenState
 from agents.agent_two import generate_product_recommendations, get_current_database_context
@@ -84,6 +84,7 @@ then use the tools:
 
 def create_agent_three() -> Agent:
     """Create the Strands chatbot agent with screen context and agentTwo delegation tools."""
+    logger.debug("Creating agent_three Strands agent with Bedrock")
     return Agent(
         tools=[get_recommendation_context, get_product_recommendations_and_explanation],
         system_prompt=AGENT_THREE_SYSTEM_PROMPT,

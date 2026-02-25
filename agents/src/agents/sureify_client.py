@@ -14,6 +14,10 @@ import asyncio
 import os
 from typing import Any
 
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 # ---------------------------------------------------------------------------
 # Mock data (used when Sureify API is not configured)
 # ---------------------------------------------------------------------------

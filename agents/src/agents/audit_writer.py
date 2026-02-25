@@ -6,7 +6,6 @@ Same connection pattern as agents/db_reader.py.
 
 from __future__ import annotations
 
-import logging
 import os
 import uuid
 
@@ -17,9 +16,10 @@ except ImportError:
     psycopg2 = None  # type: ignore
     Json = None  # type: ignore
 
+from agents.logging_config import get_logger
 from agents.responsible_ai_schemas import AgentRunEvent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _get_connection_params() -> dict[str, str] | None:

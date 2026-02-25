@@ -11,15 +11,11 @@ Run from repo root: PYTHONPATH=. uv run python -m agents.agent_one
 from __future__ import annotations
 
 import json
-import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-_repo_root = Path(__file__).resolve().parent.parent.parent
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
-
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
 _env_file = _repo_root / ".env"
 if _env_file.exists():
     try:
@@ -30,6 +26,10 @@ if _env_file.exists():
 
 import os as _os
 _os.environ.pop("AWS_BEARER_TOKEN_BEDROCK", None)
+
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from strands import Agent, tool
 
@@ -280,6 +280,7 @@ When the user asks for a JSON schema to share with their database admin team (to
 
 def create_agent() -> Agent:
     """Create the Strands agent with book-of-business tools and system prompt."""
+    logger.debug("Creating agent_one Strands agent with Bedrock")
     return Agent(
         tools=[
             get_book_of_business,

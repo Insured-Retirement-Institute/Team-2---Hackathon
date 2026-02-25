@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 from agents.agent_two_schemas import (
     ChoiceExplanation,
     ProductRecommendation,

@@ -12,8 +12,11 @@ import os
 import re
 from typing import Any
 
+from agents.logging_config import get_logger
 from schemas.iri_schemas import AlertType, DashboardStats, Priority, RenewalAlert, Status
 from agents.schemas import BookOfBusinessOutput, PolicyOutput
+
+logger = get_logger(__name__)
 
 
 def _get_nested(data: dict[str, Any], *keys: str) -> Any:

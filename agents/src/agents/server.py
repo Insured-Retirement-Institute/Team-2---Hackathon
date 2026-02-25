@@ -8,14 +8,10 @@ Run locally: uvicorn agents.server:app --reload --port 8000
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from typing import Any
 
-_repo_root = Path(__file__).resolve().parent.parent
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
-
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent
 _env_file = _repo_root / ".env"
 if _env_file.exists():
     try:
@@ -23,6 +19,10 @@ if _env_file.exists():
         load_dotenv(_env_file)
     except ImportError:
         pass
+
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
