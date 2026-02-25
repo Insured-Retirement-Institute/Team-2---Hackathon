@@ -90,7 +90,7 @@ class SureifyClient:
         return self._access_token
 
     def _headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self._access_token}", "UserID": 1001}
+        return {"Authorization": f"Bearer {self._access_token}", "UserID": "1001"}
 
     async def _get(self, path: str, response_key: str) -> list[dict]:
         if not self._access_token:
