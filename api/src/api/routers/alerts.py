@@ -34,6 +34,18 @@ class ApiResponse(BaseModel):
     snoozeUntil: str | None = None
 
 
+class AlertDetail(BaseModel):
+    """Full alert detail with policy data, suitability, disclosures, etc."""
+    alert: RenewalAlert
+    clientAlerts: list[RenewalAlert] | None = None
+    policyData: dict | None = None
+    aiSuitabilityScore: dict | None = None
+    suitabilityData: dict | None = None
+    disclosureItems: list[dict] | None = None
+    transactionOptions: list[dict] | None = None
+    auditLog: list[dict] | None = None
+
+
 @router.get("/alerts", response_model=list[RenewalAlert])
 async def get_alerts(
     status: Annotated[Status | None, Query()] = None,
@@ -78,11 +90,12 @@ async def get_dashboard_stats() -> DashboardStats:
     return DashboardStats(**rows[0])
 
 
-@router.get("/alerts/{alert_id}")
-async def get_alert_detail(alert_id: str):
+@router.get("/alerts/{alert_id}", response_model=AlertDetail)
+async def get_alert_detail(alert_id: str) -> AlertDetail:
     """
     Get detailed information about a specific alert.
 
+    Returns AlertDetail with alert info, policy data, suitability, disclosures, etc.
     The UI calls this when a user clicks on an alert to view full details.
     """
     rows = await fetch_rows("get_alert_by_id", alert_id)
@@ -90,16 +103,40 @@ async def get_alert_detail(alert_id: str):
     if not rows:
         raise HTTPException(status_code=404, detail=f"Alert {alert_id} not found")
 
-    alert = dict(rows[0])
+    alert_row = dict(rows[0])
 
-    # If alert_detail JSON exists, merge it into the response
-    if alert.get("alert_detail"):
-        detail_json = alert.pop("alert_detail")
-        # The alert_detail column contains the full AlertDetail structure
-        return detail_json
+    # Build RenewalAlert from row data
+    renewal_alert = RenewalAlert(**{
+        k: v for k, v in alert_row.items()
+        if k not in ['alert_detail', 'agent_data']
+    })
 
-    # Otherwise return basic alert info
-    return RenewalAlert(**alert)
+    # If alert_detail JSON exists, use it for full detail
+    if alert_row.get("alert_detail"):
+        detail_json = alert_row["alert_detail"]
+        # Return AlertDetail with data from alert_detail JSONB
+        return AlertDetail(
+            alert=renewal_alert,
+            clientAlerts=detail_json.get("clientAlerts"),
+            policyData=detail_json.get("policyData"),
+            aiSuitabilityScore=detail_json.get("aiSuitabilityScore"),
+            suitabilityData=detail_json.get("suitabilityData"),
+            disclosureItems=detail_json.get("disclosureItems"),
+            transactionOptions=detail_json.get("transactionOptions"),
+            auditLog=detail_json.get("auditLog"),
+        )
+
+    # Otherwise return basic AlertDetail with just the alert
+    return AlertDetail(
+        alert=renewal_alert,
+        clientAlerts=[],
+        policyData=None,
+        aiSuitabilityScore=None,
+        suitabilityData=None,
+        disclosureItems=[],
+        transactionOptions=[],
+        auditLog=[],
+    )
 
 
 @router.post("/alerts/{alert_id}/snooze", response_model=ApiResponse)
@@ -175,25 +212,41 @@ async def save_suitability(
     Save suitability data for an alert.
 
     Logic:
-    1. Lookup customer_identifier from alerts table using alert_id
-    2. Use that as clientId to update client_suitability_data table
-    3. Requires client_profiles record to exist first (FK constraint)
+    1. Lookup alert_detail from alerts table using alert_id
+    2. Extract clientId from alert_detail.policy.clientId
+    3. Use that clientId to update client_suitability_data table
+    4. Requires client_profiles record to exist first (FK constraint)
     """
-    # 1. Get customer_identifier from alerts table
+    # 1. Get alert_detail from alerts table
     alert_row = await pool.fetchrow(
-        "SELECT customer_identifier FROM alerts WHERE id = $1",
+        "SELECT alert_detail FROM alerts WHERE id = $1",
         alert_id
     )
 
-    if not alert_row or not alert_row['customer_identifier']:
+    if not alert_row:
         raise HTTPException(
             status_code=404,
-            detail=f"Alert {alert_id} not found or has no customer_identifier"
+            detail=f"Alert {alert_id} not found"
         )
 
-    client_id = alert_row['customer_identifier']
+    # 2. Extract clientId from alert_detail.policy.clientId
+    alert_detail = alert_row.get('alert_detail')
+    if not alert_detail:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Alert {alert_id} has no alert_detail data"
+        )
 
-    # 2. Verify client_profiles record exists (FK constraint requirement)
+    policy_data = alert_detail.get('policy', {})
+    client_id = policy_data.get('clientId')
+
+    if not client_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Alert {alert_id} has no clientId in policy data"
+        )
+
+    # 3. Verify client_profiles record exists (FK constraint requirement)
     profile_exists = await pool.fetchrow(
         "SELECT client_id FROM client_profiles WHERE client_id = $1",
         client_id
@@ -205,7 +258,7 @@ async def save_suitability(
             detail=f"Client profile must be fetched at least once before saving suitability data. Client ID: {client_id}"
         )
 
-    # 3. Insert or update suitability data
+    # 4. Insert or update suitability data
     await pool.execute(
         """
         INSERT INTO client_suitability_data (
