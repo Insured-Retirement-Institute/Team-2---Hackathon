@@ -91,6 +91,68 @@ description = "Build and push API Docker image to ECR"
 depends = ["ecr:build", "ecr:push"]
 
 # =============================================================================
+# Frontend ECR Build & Push
+# =============================================================================
+
+[tasks."frontend:ecr:create"]
+description = "Create ECR repository for frontend"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+REPO_NAME="hack2future-frontend"
+
+aws ecr create-repository \
+  --repository-name "$REPO_NAME" \
+  --region "$AWS_REGION" \
+  --image-scanning-configuration scanOnPush=true \
+  --encryption-configuration encryptionType=AES256 \
+  2>/dev/null || echo "Repository $REPO_NAME already exists"
+
+echo "ECR repository ready: $REPO_NAME"
+"""
+
+[tasks."frontend:build"]
+description = "Build frontend Docker image for ECR"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-frontend"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Building $REPO_NAME:$TAG for linux/amd64..."
+docker build --platform linux/amd64 -t "$REPO_NAME:$TAG" -f frontend/Dockerfile .
+docker tag "$REPO_NAME:$TAG" "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image built and tagged: $REGISTRY/$REPO_NAME:$TAG"
+"""
+
+[tasks."frontend:push"]
+description = "Push frontend Docker image to ECR"
+depends = ["ecr:login", "frontend:build"]
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-frontend"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Pushing $REGISTRY/$REPO_NAME:$TAG..."
+docker push "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image pushed successfully!"
+"""
+
+[tasks."frontend:build-push"]
+description = "Build and push frontend Docker image to ECR"
+depends = ["frontend:build", "frontend:push"]
+
+# =============================================================================
 # EKS Cluster Management
 # =============================================================================
 
@@ -142,8 +204,8 @@ kubectl config current-context
 # =============================================================================
 
 [tasks."eks:deploy"]
-description = "Deploy everything to EKS (CNPG + DB + App + Gateway)"
-depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app", "eks:deploy:gateway"]
+description = "Deploy everything to EKS (CNPG + DB + App + Frontend + Gateway)"
+depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app", "eks:deploy:frontend", "eks:deploy:gateway"]
 
 [tasks."eks:deploy:cnpg"]
 description = "Install CloudNativePG operator"
@@ -199,6 +261,22 @@ kubectl rollout status deployment/hack2future --timeout=120s
 
 echo  "API deployed!"
 kubectl get pods -l app=hack2future
+"""
+
+[tasks."eks:deploy:frontend"]
+description = "Deploy frontend"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Deploying frontend..."
+kubectl apply -f k8s/frontend.yaml
+
+echo "Waiting for deployment..."
+kubectl rollout status deployment/hack2future-frontend --timeout=120s
+
+echo "Frontend deployed!"
+kubectl get pods -l app=hack2future-frontend
 """
 
 [tasks."eks:deploy:lbc"]
