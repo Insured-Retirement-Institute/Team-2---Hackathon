@@ -1,9 +1,11 @@
 import asyncio
 import logging
 import os
+from typing import Annotated, AsyncGenerator
 
 import asyncpg
-from fastapi import HTTPException
+from asyncpg import Connection
+from fastapi import Depends, HTTPException
 
 from api.config import QUERIES_DIR
 
@@ -65,9 +67,20 @@ async def close_db():
         await pool.close()
 
 
-async def fetch_rows(query_name: str, *args) -> list[dict]:
+async def get_db() -> AsyncGenerator[Connection, None]:
+    global pool
+    if pool is None or pool._closed:
+        raise HTTPException(status_code=503, detail="Database not available")
+    async with pool.acquire() as conn:
+        yield conn
+
+
+DbConnection = Annotated[Connection, Depends(get_db)]
+
+
+async def fetch_rows(conn: Connection, query_name: str, *args) -> list[dict]:
     sql = queries.get(query_name)
     if sql is None:
         raise HTTPException(status_code=500, detail=f"Query {query_name} not found")
-    rows = await pool.fetch(sql, *args)
+    rows = await conn.fetch(sql, *args)
     return [dict(r) for r in rows]

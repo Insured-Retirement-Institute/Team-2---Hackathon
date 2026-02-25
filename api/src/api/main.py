@@ -4,8 +4,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from api.database import close_db, init_db, pool
-from api.routers import passthrough, policies, responsible_ai
+from api import database
+from api.database import close_db, init_db
+from api.routers import passthrough, policies
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -25,24 +26,26 @@ async def lifespan(_app: FastAPI):
     logger.info("Application shutdown complete")
 
 
+root_path = os.environ.get("ROOT_PATH", "")
 app = FastAPI(
     lifespan=lifespan,
-    root_path=os.environ.get("ROOT_PATH", ""),
+    root_path=root_path,
+    swagger_ui_parameters={"url": f"{root_path}/openapi.json"} if root_path else None,
 )
 
 
 @app.get("/health")
 async def health():
-    db_status = "connected" if pool and not pool._closed else "disconnected"
+    db_status = "connected" if database.pool and not database.pool._closed else "disconnected"
     return {"status": "ok", "database": db_status}
 
 
 @app.get("/health/ready")
 async def readiness():
-    if not pool or pool._closed:
+    if not database.pool or database.pool._closed:
         return {"status": "not_ready", "reason": "database not connected"}
     try:
-        async with pool.acquire() as conn:
+        async with database.pool.acquire() as conn:
             await conn.fetchval("SELECT 1")
         return {"status": "ready"}
     except Exception as e:

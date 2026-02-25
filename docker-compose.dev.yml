@@ -38,5 +38,14 @@ services:
       - ./api:/app
       - /app/.venv
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "3001:80"
+    depends_on:
+      - api
+
 volumes:
   postgres_data:
