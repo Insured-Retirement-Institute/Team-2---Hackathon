@@ -1,0 +1,39 @@
+# ACK IAM Controller v1.6.1
+# Manages AWS IAM resources via Kubernetes CRDs
+#
+# Prerequisites:
+#   1. Create cluster with Pod Identity: eksctl create cluster -f k8s/eksctl-cluster.yaml
+#   2. Namespace and service account created below
+#
+# Install via Helm:
+#   helm install ack-iam-controller \
+#     oci://public.ecr.aws/aws-controllers-k8s/iam-chart \
+#     --version v1.6.1 \
+#     --namespace ack-system \
+#     --create-namespace \
+#     --set aws.region=us-east-1 \
+#     --set serviceAccount.create=true \
+#     --set serviceAccount.name=ack-iam-controller
+#
+# Pod Identity is configured via eksctl-cluster.yaml (podIdentityAssociations)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ack-system
+  labels:
+    app.kubernetes.io/name: ack-system
+---
+# ConfigMap for ACK IAM controller settings
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ack-iam-user-config
+  namespace: ack-system
+data:
+  # AWS region for IAM resources (IAM is global but needs a region for API calls)
+  AWS_REGION: us-east-1
+  # Enable deletion policy - resources deleted in K8s will be deleted in AWS
+  DELETION_POLICY: delete
+  # Log level for debugging
+  ACK_LOG_LEVEL: info

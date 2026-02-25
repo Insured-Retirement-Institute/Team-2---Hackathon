@@ -14,6 +14,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -50,7 +56,6 @@ async def readiness():
         return {"status": "ready"}
     except Exception as e:
         return {"status": "not_ready", "reason": str(e)}
-
 
 app.include_router(passthrough.router)
 app.include_router(policies.router)

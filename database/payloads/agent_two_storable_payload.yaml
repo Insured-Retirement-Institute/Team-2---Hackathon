@@ -1,0 +1,113 @@
+# AgentTwo storable payload — for DBAs
+# This is the JSON payload that agentTwo produces for database storage. It includes
+# the agent's explanation of its choices (why these recommendations) and all data
+# needed to persist a "recommendation run" for audit and display.
+#
+# Source: agents/agent_two_schemas.AgentTwoStorablePayload
+# Produced by: agents/agent_two.generate_product_recommendations (storable_payload field
+#              in the response; also at top-level key "storable_payload" in the JSON).
+#
+# Suggested table: agent_two_recommendation_runs
+#   - id (PK, uuid or bigserial)
+#   - run_id (unique, from payload.run_id — can be PK if storing 1:1)
+#   - created_at (timestamptz, from payload.created_at)
+#   - client_id (varchar, indexed)
+#   - payload (JSONB) — store the full payload below for audit/query
+#   - Optional: extracted columns for reporting (e.g. recommendation_count, data_sources)
+#
+# Alternative: normalize into runs + recommendation_rows (one row per product recommended).
+
+payload_name: AgentTwoStorablePayload
+description: |
+  Single JSON object to store per recommendation run. Contains unique run id, timestamp,
+  client, summary of input sections received, structured explanation of agentTwo's choices,
+  and the list of recommendations with per-item match reasons.
+
+content_type: application/json
+source: agents/agent_two.py (set on ProductRecommendationsOutput.storable_payload)
+
+root:
+  type: object
+  required: [run_id, created_at, client_id, explanation, recommendations]
+  properties:
+    run_id:
+      type: string
+      format: uuid
+      description: Unique identifier for this recommendation run (UUID). Use as business key or PK.
+    created_at:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp when the run was produced (UTC).
+      example: "2026-02-24T18:30:00.123456+00:00"
+    client_id:
+      type: string
+      description: Client identifier (e.g. client_account_number or name) for this run.
+    input_summary:
+      type: object
+      description: Summary of incoming JSON; which sections were present (no PII). For audit.
+      properties:
+        sections_present:
+          type: array
+          items: { type: string, enum: [suitability, clientGoals, clientProfile] }
+          description: Which top-level keys were present in the request.
+    explanation:
+      type: object
+      required: [summary, data_sources_used, choice_criteria, input_sections_received]
+      description: Structured explanation of agentTwo's choices (why these recommendations).
+      properties:
+        summary:
+          type: string
+          description: Short narrative of how recommendations were derived (sources + criteria).
+        data_sources_used:
+          type: array
+          items: { type: string }
+          description: e.g. ["sureify_products", "db_suitability"] or ["db_products", "db_suitability"]
+        choice_criteria:
+          type: array
+          items: { type: string }
+          description: Criteria applied, e.g. risk tolerance, time horizon, liquidity, financial objectives
+        input_sections_received:
+          type: array
+          items: { type: string }
+          description: Which input sections were present (suitability, clientGoals, clientProfile)
+    recommendations:
+      type: array
+      description: Recommended products; each includes match_reason (why this product).
+      items:
+        type: object
+        required: [product_id, name, carrier, rate]
+        properties:
+          product_id: { type: string }
+          name: { type: string }
+          carrier: { type: string }
+          rate: { type: string, example: "4.25%" }
+          term: { type: string, nullable: true }
+          surrenderPeriod: { type: string, nullable: true }
+          freeWithdrawal: { type: string, nullable: true }
+          guaranteedMinRate: { type: string, nullable: true }
+          risk_profile: { type: string, nullable: true }
+          suitable_for: { type: string, nullable: true }
+          key_benefits: { type: string, nullable: true }
+          match_reason:
+            type: string
+            nullable: true
+            description: Human-readable reason this product was recommended (contextualized from profile).
+    merged_profile_summary:
+      type: object
+      nullable: true
+      description: Merged suitability + goals/profile used for recommendations (audit trail).
+      properties:
+        suitability: { type: object }
+        goals_and_profile: { type: object }
+    iri_comparison_result:
+      type: object
+      nullable: true
+      description: If IRI compare was run, the ComparisonResult from IRI API.
+
+# --- Example row (conceptual) for agent_two_recommendation_runs ---
+# id              | run_id   | created_at | client_id   | payload (JSONB)
+# uuid / bigserial | (uuid)  | timestamptz | varchar(50) | { full payload above }
+#
+# Query examples:
+#   - Latest run per client: SELECT DISTINCT ON (client_id) * FROM agent_two_recommendation_runs ORDER BY client_id, created_at DESC;
+#   - Runs that used Sureify: SELECT * FROM agent_two_recommendation_runs WHERE payload->'explanation'->'data_sources_used' ? 'sureify_products';

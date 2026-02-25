@@ -4,17 +4,12 @@
 # preserved and their logs remain inspectable.
 #
 # Preferred usage through mise:
-#   mise run schema:plan          # preview changes
-#   mise run schema:apply         # execute changes
-#   mise run schema:history       # list past migration jobs
-#   mise run schema:clean         # delete all completed migration jobs
+#   mise run pgschema:plan-k8s       # preview changes
+#   mise run pgschema:apply-k8s      # execute changes
 #
 # Manual usage:
 #   kubectl create -f k8s/pgschema-update.yaml        # plan (default)
 #   kubectl logs job/<job-name>                        # view output
-#
-#   sed 's/value: plan/value: apply/' k8s/pgschema-update.yaml | kubectl create -f -
-# TODO: not sure if I like the grants setup here, isn't there a better way?
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -29,34 +24,32 @@ spec:
         app: pgschema-update
     spec:
       restartPolicy: Never
-      # ttlSecondsAfterFinished: 3600  # Clean up after 1hr
       containers:
         - name: pgschema
           image: pgplex/pgschema:latest
           env:
-            # target database
             - name: PGHOST
               valueFrom:
                 secretKeyRef:
-                  name: sds-dev-superuser
+                  name: hackdb-superuser
                   key: host
             - name: PGPORT
               valueFrom:
                 secretKeyRef:
-                  name: sds-dev-superuser
+                  name: hackdb-superuser
                   key: port
             - name: PGUSER
               valueFrom:
                 secretKeyRef:
-                  name: sds-dev-superuser
+                  name: hackdb-superuser
                   key: username
             - name: PGPASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: sds-dev-superuser
+                  name: hackdb-superuser
                   key: password
             - name: PGDATABASE
-              value: main
+              value: hackathon
             # "plan" (default, safe preview) or "apply" (executes changes)
             - name: PGSCHEMA_COMMAND
               value: plan
@@ -70,39 +63,14 @@ spec:
                 EXTRA_ARGS="--auto-approve"
               fi
 
-              cat /schemas/raw/*.sql > /tmp/raw.sql
-              cat /schemas/domain/*.sql > /tmp/domain.sql
-
-              echo "=== raw schema ==="
-              pgschema $PGSCHEMA_COMMAND --file /tmp/raw.sql --schema raw $EXTRA_ARGS
-
-              echo ""
-              echo "=== domain schema ==="
-              pgschema $PGSCHEMA_COMMAND --file /tmp/domain.sql --schema domain $EXTRA_ARGS
-
-              if [ "$PGSCHEMA_COMMAND" = "apply" ]; then
-                echo ""
-                echo "=== grants ==="
-                cat /schemas/grants/*.sql | psql
-              fi
+              echo "=== hackathon schema ==="
+              pgschema $PGSCHEMA_COMMAND --file /schemas/main.sql --schema hackathon $EXTRA_ARGS
           volumeMounts:
-            - name: raw-schema
-              mountPath: /schemas/raw
-              readOnly: true
-            - name: domain-schema
-              mountPath: /schemas/domain
-              readOnly: true
-            - name: grants
-              mountPath: /schemas/grants
+            - name: database-schema
+              mountPath: /schemas
               readOnly: true
 
       volumes:
-        - name: raw-schema
+        - name: database-schema
           configMap:
-            name: pgschema-raw
-        - name: domain-schema
-          configMap:
-            name: pgschema-domain
-        - name: grants
-          configMap:
-            name: pgschema-grants
+            name: pgschema-database

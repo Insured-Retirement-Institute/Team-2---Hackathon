@@ -1,0 +1,186 @@
+# AgentTwo — payloads (DB context, profile changes input, product recommendations output)
+# Source: agents/agent_two_schemas.py, agents/db_reader.py, agents/recommendations.py
+# For DBAs: map to tables clients, client_suitability_profiles, contract_summary, products
+
+description: |
+  AgentTwo reads the DB (get_current_database_context), accepts JSON changes from the
+  front-end (suitability, client goals, client profile), and returns product recommendations.
+  These YAML blocks define all payload shapes for storage/ETL design.
+
+# =============================================================================
+# 1. DB CONTEXT PAYLOAD (response from get_current_database_context)
+# =============================================================================
+# Source: agents/db_reader.get_current_database_context()
+# Maps to: tables clients, client_suitability_profiles, contract_summary, products
+
+db_context_payload:
+  description: Full snapshot of current DB state for a client (or all). Used by AgentTwo before applying changes.
+  payload_name: CurrentDatabaseContext
+  content_type: application/json
+
+  root:
+    type: object
+    required: [clients, client_suitability_profiles, contract_summary, products]
+    properties:
+      clients:
+        type: array
+        description: Rows from table clients
+        items:
+          type: object
+          properties:
+            client_account_number: { type: string, maxLength: 20 }
+            client_name: { type: string, maxLength: 100 }
+            process_dt: { type: string, format: date-time }
+        db_table: clients
+      client_suitability_profiles:
+        type: array
+        description: Rows from table client_suitability_profiles
+        items:
+          type: object
+          properties:
+            client_account_number: { type: string }
+            age: { type: integer }
+            life_stage: { type: string }
+            marital_status: { type: string }
+            dependents: { type: integer }
+            risk_tolerance: { type: string }
+            investment_experience: { type: string }
+            volatility_comfort: { type: string }
+            primary_objective: { type: string }
+            secondary_objective: { type: string }
+            liquidity_importance: { type: string }
+            investment_horizon: { type: string }
+            withdrawal_horizon: { type: string }
+            current_income_need: { type: string }
+            annual_income_range: { type: string }
+            net_worth_range: { type: string }
+            liquid_net_worth_range: { type: string }
+            tax_bracket: { type: string }
+            retirement_target_year: { type: integer }
+            state: { type: string }
+            citizenship: { type: string }
+            advisory_model: { type: string }
+            is_fee_based_account: { type: boolean }
+        db_table: client_suitability_profiles
+      contract_summary:
+        type: array
+        description: Rows from table contract_summary (optionally filtered by client)
+        items: { type: object }
+        db_table: contract_summary
+      products:
+        type: array
+        description: Product catalog (can_sell = true); used for recommendations
+        items: { type: object }
+        db_table: products
+
+# =============================================================================
+# 2. PROFILE CHANGES INPUT (front-end → AgentTwo)
+# =============================================================================
+# Source: agents/agent_two_schemas.ProfileChangesInput
+# Only changed fields are sent; AgentTwo merges with DB state. All sections optional.
+
+profile_changes_input:
+  description: JSON from front-end with changes to suitability, client goals, and/or client profile.
+  payload_name: ProfileChangesInput
+  content_type: application/json
+  source: Front-end POST / agentTwo tool generate_product_recommendations(changes_json, ...)
+
+  root:
+    type: object
+    properties:
+      suitability:
+        type: object
+        description: Suitability form changes (aligns with IRI SuitabilityData). All fields optional.
+        properties:
+          clientObjectives: { type: string, nullable: true }
+          riskTolerance: { type: string, nullable: true }
+          timeHorizon: { type: string, nullable: true }
+          liquidityNeeds: { type: string, nullable: true }
+          taxConsiderations: { type: string, nullable: true }
+          guaranteedIncome: { type: string, nullable: true }
+          rateExpectations: { type: string, nullable: true }
+          surrenderTimeline: { type: string, nullable: true }
+          livingBenefits: { type: array, items: string, nullable: true }
+          advisorEligibility: { type: string, nullable: true }
+          score: { type: integer, nullable: true }
+          isPrefilled: { type: boolean, nullable: true }
+        maps_to: client_suitability_profiles (partial overlay)
+      clientGoals:
+        type: object
+        description: Client goals (financial objectives, distribution). All fields optional.
+        properties:
+          financialObjectives: { type: string, nullable: true }
+          distributionPlan: { type: string, nullable: true }
+          ownedAssets: { type: string, nullable: true }
+          timeToFirstDistribution: { type: string, nullable: true }
+          expectedHoldingPeriod: { type: string, nullable: true }
+          sourceOfFunds: { type: string, nullable: true }
+          employmentStatus: { type: string, nullable: true }
+      clientProfile:
+        type: object
+        description: Client profile / comparison parameters. All fields optional.
+        properties:
+          residesInNursingHome: { type: string, enum: [yes, no], nullable: true }
+          hasLongTermCareInsurance: { type: string, enum: [yes, no], nullable: true }
+          hasMedicareSupplemental: { type: string, enum: [yes, no], nullable: true }
+          grossIncome: { type: string, nullable: true }
+          disposableIncome: { type: string, nullable: true }
+          taxBracket: { type: string, nullable: true }
+          householdLiquidAssets: { type: string, nullable: true }
+          monthlyLivingExpenses: { type: string, nullable: true }
+          totalAnnuityValue: { type: string, nullable: true }
+          householdNetWorth: { type: string, nullable: true }
+          anticipateExpenseIncrease: { type: string, enum: [yes, no], nullable: true }
+          anticipateIncomeDecrease: { type: string, enum: [yes, no], nullable: true }
+          anticipateLiquidAssetDecrease: { type: string, enum: [yes, no], nullable: true }
+          applyToMeansTestedBenefits: { type: string, enum: [yes, no], nullable: true }
+
+# =============================================================================
+# 3. PRODUCT RECOMMENDATIONS OUTPUT (AgentTwo → front-end / ETL)
+# =============================================================================
+# Source: agents/agent_two_schemas.ProductRecommendationsOutput
+
+product_recommendations_output:
+  description: Response from generate_product_recommendations: merged profile summary + recommended products.
+  payload_name: ProductRecommendationsOutput
+  content_type: application/json
+  source: agents/agent_two.generate_product_recommendations
+
+  root:
+    type: object
+    required: [client_id, recommendations]
+    properties:
+      client_id:
+        type: string
+        description: Client identifier used for the request
+      merged_profile_summary:
+        type: object
+        nullable: true
+        description: Summary of DB state merged with input changes (suitability + goals_and_profile)
+        properties:
+          suitability: { type: object }
+          goals_and_profile: { type: object }
+      recommendations:
+        type: array
+        items:
+          type: object
+          required: [product_id, name, carrier, rate]
+          properties:
+            product_id: { type: string }
+            name: { type: string }
+            carrier: { type: string }
+            rate: { type: string, example: "4.25%" }
+            term: { type: string, nullable: true }
+            surrenderPeriod: { type: string, nullable: true }
+            freeWithdrawal: { type: string, nullable: true }
+            guaranteedMinRate: { type: string, nullable: true }
+            risk_profile: { type: string, nullable: true }
+            suitable_for: { type: string, nullable: true }
+            key_benefits: { type: string, nullable: true }
+            match_reason: { type: string, nullable: true }
+      iri_comparison_result:
+        type: object
+        nullable: true
+        description: If IRI compare was run (alert_id + IRI_API_BASE_URL), the ComparisonResult from IRI API
+
+  # DBA notes: To persist recommendations, consider table product_recommendations(client_id, product_id, payload JSONB, created_at).
