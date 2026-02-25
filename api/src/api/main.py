@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from api import database
 from api.database import close_db, init_db
-from api.routers import passthrough, policies, responsible_ai
+from api.routers import passthrough, policies
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
