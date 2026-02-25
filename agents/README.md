@@ -2,34 +2,34 @@
 
 Strands-based agent that scans Sureify APIs and produces the **book of business** for a customer (e.g. **Marty McFly**), with all policies as JSON (aligned with [api/src/api/sureify_models.py](../api/src/api/sureify_models.py)), applicable notifications, and business-logic flags: replacements, data quality issues, income activation eligibility, and scheduled-meeting recommendation.
 
-## Quick start (tool-only, no LLM)
+## AgentOne — Quick start (tool-only, no LLM)
 
 Runs the composite tool only (mock Sureify data, no Bedrock/credentials):
 
 ```bash
 # From repo root
-SUREIFY_AGENT_TOOL_ONLY=1 PYTHONPATH=. python -m agents.main
+SUREIFY_AGENT_TOOL_ONLY=1 PYTHONPATH=. python -m agents.agent_one
 ```
 
 Output: single JSON object with `customer_identifier` and `policies` array; each policy includes `policy`, `notifications`, `replacement_opportunity`, `replacement_reason`, `data_quality_issues`, `income_activation_eligible`, `schedule_meeting`, `schedule_meeting_reason`.
 
-## Full agent (Strands + LLM)
+## AgentOne — Full agent (Strands + LLM)
 
 Requires Bedrock with **native IAM auth**. Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_REGION` in `.env` (or use `aws configure`). `.env` is loaded automatically; bearer token is not used.
 
 ```bash
-PYTHONPATH=. python -m agents.main
+PYTHONPATH=. python -m agents.agent_one
 ```
 
 The agent will use the tools to produce the same book-of-business JSON for Marty McFly.
 
-## JSON schema for database team
+## AgentOne — JSON schema for database team
 
 To get a JSON schema describing the book-of-business structure (for your DB admin team to build tables):
 
 - **Via agent:** Run the agent and ask: *"Create a JSON schema I can share with my database admin team to build the table."* The agent will call `get_book_of_business_json_schema` and return the schema.
 - **Direct (no LLM):**  
-  `SUREIFY_AGENT_SCHEMA_ONLY=1 PYTHONPATH=. python -m agents.main`  
+  `SUREIFY_AGENT_SCHEMA_ONLY=1 PYTHONPATH=. python -m agents.agent_one`  
   Pipe to a file to share: `... > book_of_business_schema.json`
 
 ## IRI API (renewal alerts + dashboard) — OpenAPI-driven
@@ -46,7 +46,7 @@ PYTHONPATH=. python -m agents.regenerate_iri_schemas
 
 ```bash
 # Output book of business as IRI alerts + dashboardStats (no LLM)
-SUREIFY_AGENT_IRI_ONLY=1 PYTHONPATH=. python -m agents.main
+SUREIFY_AGENT_IRI_ONLY=1 PYTHONPATH=. python -m agents.agent_one
 ```
 
 ## Config
@@ -110,17 +110,38 @@ PYTHONPATH=. python -m agents.agent_two --client-id "Marty McFly"
 PYTHONPATH=. python -m agents.agent_two --changes agents/sample_changes.json --client-id "Marty McFly"
 ```
 
+## AgentThree (chatbot)
+
+**AgentThree** is the main chatbot. It receives the user's **current screen state** (dashboard, product_comparison, or elsewhere) and uses that as context. When the user asks about **products** or **recommendation explainability** ("why did you recommend this?"), it delegates to **agentTwo** and explains the results in a friendly way.
+
+```bash
+# Run chatbot (needs Bedrock/AWS in .env)
+PYTHONPATH=. python -m agents.agent_three --screen product_comparison --message "Why did you recommend this product?"
+PYTHONPATH=. python -m agents.agent_three --screen dashboard --message "What can you help me with?"
+PYTHONPATH=. python -m agents.agent_three --screen elsewhere --message "I want new recommendations" --changes agents/sample_changes.json --client-id "Marty McFly"
+```
+
+- **Screen state:** Front-end sends `screen_state`: `dashboard` | `product_comparison` | `elsewhere`. The agent uses it to tailor tone and when to call agentTwo.
+- **AgentTwo delegation:** AgentThree has tools `get_recommendation_context(client_id)` and `get_product_recommendations_and_explanation(changes_json, client_id, alert_id)`. It calls them when the user asks for context, recommendations, or explainability.
+- **Request/response:** See `agents/agent_three_schemas.py` (`ChatRequest`, `ChatResponse`) and `database/payloads/agent_three_chat_payloads.yaml` for DBA.
+
 ## Layout
 
-- `main.py` – Strands agent (agentOne), system prompt, and tools (book of business, JSON schema, IRI alerts and API).
-- `agent_two.py` – AgentTwo: DB context + front-end changes JSON → product recommendations.
-- `db_reader.py` – Sync DB reader for agentTwo (clients, client_suitability_profiles, contract_summary, products).
-- `agent_two_schemas.py` – `ProfileChangesInput`, `ProductRecommendation`, `ProductRecommendationsOutput`.
-- `recommendations.py` – Merge DB + changes and recommend products from the products table.
-- `sureify_client.py` – Delegates to [api.sureify_client](../api/src/api/sureify_client.py) when configured (`SUREIFY_BASE_URL` + `SUREIFY_CLIENT_ID` + `SUREIFY_CLIENT_SECRET`); otherwise mock data for Marty McFly. Exposes `get_book_of_business` (→ get_policies) and `get_notifications_for_policies` (→ get_notes).
-- `logic.py` – Business rules: replacement opportunity, data quality, income activation, schedule meeting.
-- `schemas.py` – `PolicyOutput`, `BookOfBusinessOutput` (Pydantic) for the frontend.
-- `iri_api_spec.yaml` – **OpenAPI 3.0.3** (source of truth for IRI API and DB schema).
-- `iri_schemas.py` – **Generated** from the OpenAPI spec (RenewalAlert, DashboardStats, Error, enums). Regenerate with `python -m agents.regenerate_iri_schemas`.
-- `iri_client.py` – IRI API HTTP client and mapping from book-of-business to RenewalAlert + DashboardStats.
-- `regenerate_iri_schemas.py` – Regenerates `iri_schemas.py` from `iri_api_spec.yaml`.
+Agents are in subfolders; shared code stays under `agents/`:
+
+| Path | Description |
+|------|--------------|
+| **agent_one/** | Book of business (Sureify policies, notifications, IRI). Run: `python -m agents.agent_one` |
+| **agent_two/** | DB + changes → product recommendations (explanation, storable payload). Run: `python -m agents.agent_two` |
+| **agent_three/** | Chatbot (screen state, delegates to agentTwo). Run: `python -m agents.agent_three` |
+| `db_reader.py` | Sync DB reader (clients, client_suitability_profiles, contract_summary, products) |
+| `agent_two_schemas.py` | ProfileChangesInput, ProductRecommendationsOutput, AgentTwoStorablePayload, etc. |
+| `agent_three_schemas.py` | ScreenState, ChatRequest, ChatResponse |
+| `recommendations.py` | Merge DB + changes; recommend from Sureify /puddle/products or DB |
+| `sureify_client.py` | get_book_of_business, get_notifications_for_policies, get_products (or mock) |
+| `logic.py` | Replacement, data quality, income activation, schedule meeting |
+| `schemas.py` | PolicyOutput, BookOfBusinessOutput (frontend) |
+| `iri_api_spec.yaml` | OpenAPI 3.0.3 (IRI API); `iri_schemas.py` generated from it |
+| `iri_client.py` | IRI HTTP client; map book-of-business → RenewalAlert + DashboardStats |
+| `regenerate_iri_schemas.py` | Regenerate `iri_schemas.py` from spec |
+| `sample_changes.json` | Sample profile changes for testing agentTwo/agentThree |

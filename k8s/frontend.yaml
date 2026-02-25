@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hack2future-frontend
+  labels:
+    app: hack2future-frontend
+spec:
+  selector:
+    matchLabels:
+      app: hack2future-frontend
+  template:
+    metadata:
+      labels:
+        app: hack2future-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: 992382684611.dkr.ecr.us-east-1.amazonaws.com/hack2future-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hack2future-frontend
+  labels:
+    app: hack2future-frontend
+spec:
+  selector:
+    app: hack2future-frontend
+  ports:
+    - port: 80
+      targetPort: 80

@@ -1,0 +1,81 @@
+# AgentThree (chatbot) — request and response payloads for DBAs
+# AgentThree uses screen state (dashboard, product_comparison, elsewhere) as context
+# and delegates to agentTwo for product/recommendation explainability.
+#
+# Source: agents/agent_three_schemas.py
+# Use: API design, logging chat turns, or storing conversation context.
+
+description: |
+  AgentThree is the main chatbot. The front-end sends the user's current screen and
+  message; optional changes_json and alert_id when on product comparison. Responses
+  can include a reply and optional flags when agentTwo was used (for analytics).
+
+# =============================================================================
+# CHAT REQUEST (front-end → agentThree)
+# =============================================================================
+
+chat_request:
+  payload_name: ChatRequest
+  content_type: application/json
+  source: agents/agent_three_schemas.ChatRequest
+
+  root:
+    type: object
+    required: [screen_state, user_message]
+    properties:
+      screen_state:
+        type: string
+        enum: [dashboard, product_comparison, elsewhere]
+        description: Where the user is on the screen. Drives chatbot context.
+      user_message:
+        type: string
+        description: What the user said or asked.
+      client_id:
+        type: string
+        default: "Marty McFly"
+        description: Client identifier; used when agentThree calls agentTwo.
+      changes_json:
+        type: string
+        nullable: true
+        description: Optional JSON string with suitability/clientGoals/clientProfile when user wants recommendations and form data is available.
+      alert_id:
+        type: string
+        default: ""
+        description: Optional IRI alert ID when on product comparison / action flow.
+
+# =============================================================================
+# CHAT RESPONSE (agentThree → front-end)
+# =============================================================================
+
+chat_response:
+  payload_name: ChatResponse
+  content_type: application/json
+  source: agents/agent_three_schemas.ChatResponse
+
+  root:
+    type: object
+    required: [reply, screen_state]
+    properties:
+      reply:
+        type: string
+        description: The chatbot's reply to the user.
+      screen_state:
+        type: string
+        enum: [dashboard, product_comparison, elsewhere]
+        description: Echo of the screen state used as context.
+      agent_two_invoked:
+        type: boolean
+        default: false
+        description: True if agentThree called agentTwo (context or recommendations).
+      agent_two_summary:
+        type: string
+        nullable: true
+        description: Short summary of what agentTwo returned (e.g. '3 recommendations with explanation').
+      storable_payload:
+        type: object
+        nullable: true
+        description: If agentTwo returned recommendations, the storable_payload for the database (see agent_two_storable_payload.yaml).
+
+# --- DBA notes ---
+# To persist chat turns: e.g. table chat_turns (id, created_at, screen_state, user_message, client_id, reply, agent_two_invoked, storable_payload JSONB).
+# screen_state is a small enum; index by client_id and created_at for "recent conversation" queries.

@@ -6,11 +6,10 @@ apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 
 metadata:
-  name: sds-cluster
+  name: hackathon
   region: us-east-1
-  version: "1.31"
+  version: "1.35"
   tags:
-    Project: sds
     Environment: dev
 
 autoModeConfig:
@@ -23,6 +22,23 @@ autoModeConfig:
 
 iam:
   withOIDC: true
+  podIdentityAssociations:
+    - namespace: ack-system
+      serviceAccountName: ack-iam-controller
+      permissionPolicyARNs:
+        - arn:aws:iam::aws:policy/IAMFullAccess
+    - namespace: kube-system
+      serviceAccountName: ebs-csi-controller-sa
+      permissionPolicyARNs:
+        - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+    - namespace: kube-system
+      serviceAccountName: aws-load-balancer-controller
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+
+addons:
+  - name: aws-ebs-csi-driver
+    # Required for gp3 StorageClass provisioning on EKS Auto Mode
 
 cloudWatch:
   clusterLogging:

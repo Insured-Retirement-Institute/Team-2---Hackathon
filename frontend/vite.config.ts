@@ -10,4 +10,14 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      // Proxy API calls to the backend; use path /api-backend so /admin/responsible-ai (the SPA route) is not forwarded
+      '/api-backend': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-backend/, ''),
+      },
+    },
+  },
 })

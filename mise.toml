@@ -33,12 +33,12 @@ aws ecr get-login-password --region "$AWS_REGION" | \
 """
 
 [tasks."ecr:create"]
-description = "Create ECR repository for sds-api"
+description = "Create ECR repository for hack2future"
 run = """
 #!/bin/bash
 set -euo pipefail
 AWS_REGION="${AWS_REGION:-us-east-1}"
-REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+REPO_NAME="${ECR_REPO_NAME:-hack2future}"
 
 aws ecr create-repository \
   --repository-name "$REPO_NAME" \
@@ -57,12 +57,12 @@ run = """
 set -euo pipefail
 AWS_REGION="${AWS_REGION:-us-east-1}"
 AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
-REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+REPO_NAME="${ECR_REPO_NAME:-hack2future}"
 TAG="${IMAGE_TAG:-latest}"
 REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
-echo "Building $REPO_NAME:$TAG..."
-docker build -t "$REPO_NAME:$TAG" -f api/Dockerfile .
+echo "Building $REPO_NAME:$TAG for linux/amd64..."
+docker build --platform linux/amd64 -t "$REPO_NAME:$TAG" -f api/Dockerfile .
 docker tag "$REPO_NAME:$TAG" "$REGISTRY/$REPO_NAME:$TAG"
 
 echo "Image built and tagged: $REGISTRY/$REPO_NAME:$TAG"
@@ -76,7 +76,7 @@ run = """
 set -euo pipefail
 AWS_REGION="${AWS_REGION:-us-east-1}"
 AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
-REPO_NAME="${ECR_REPO_NAME:-sds-api}"
+REPO_NAME="${ECR_REPO_NAME:-hack2future}"
 TAG="${IMAGE_TAG:-latest}"
 REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
 
@@ -89,6 +89,68 @@ echo "Image pushed successfully!"
 [tasks."ecr:build-push"]
 description = "Build and push API Docker image to ECR"
 depends = ["ecr:build", "ecr:push"]
+
+# =============================================================================
+# Frontend ECR Build & Push
+# =============================================================================
+
+[tasks."frontend:ecr:create"]
+description = "Create ECR repository for frontend"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+REPO_NAME="hack2future-frontend"
+
+aws ecr create-repository \
+  --repository-name "$REPO_NAME" \
+  --region "$AWS_REGION" \
+  --image-scanning-configuration scanOnPush=true \
+  --encryption-configuration encryptionType=AES256 \
+  2>/dev/null || echo "Repository $REPO_NAME already exists"
+
+echo "ECR repository ready: $REPO_NAME"
+"""
+
+[tasks."frontend:build"]
+description = "Build frontend Docker image for ECR"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-frontend"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Building $REPO_NAME:$TAG for linux/amd64..."
+docker build --platform linux/amd64 -t "$REPO_NAME:$TAG" -f frontend/Dockerfile .
+docker tag "$REPO_NAME:$TAG" "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image built and tagged: $REGISTRY/$REPO_NAME:$TAG"
+"""
+
+[tasks."frontend:push"]
+description = "Push frontend Docker image to ECR"
+depends = ["ecr:login", "frontend:build"]
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-frontend"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Pushing $REGISTRY/$REPO_NAME:$TAG..."
+docker push "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image pushed successfully!"
+"""
+
+[tasks."frontend:build-push"]
+description = "Build and push frontend Docker image to ECR"
+depends = ["frontend:build", "frontend:push"]
 
 # =============================================================================
 # EKS Cluster Management
@@ -142,8 +204,27 @@ kubectl config current-context
 # =============================================================================
 
 [tasks."eks:deploy"]
-description = "Deploy everything to EKS (CNPG + DB + App)"
-depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app"]
+description = "Deploy everything to EKS (CNPG + DB + App + Agents + Frontend + Gateway)"
+depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app", "eks:deploy:agents", "eks:deploy:frontend", "eks:deploy:gateway"]
+
+[tasks."eks:deploy:agents"]
+description = "Deploy agents"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Creating agents service account..."
+kubectl apply -f k8s/agents-rbac.yaml
+
+echo "Deploying agents..."
+kubectl apply -f k8s/agents.yaml
+
+echo "Waiting for agents deployment..."
+kubectl rollout status deployment/agents --timeout=120s
+
+echo "Agents deployed!"
+kubectl get pods -l app=agents
+"""
 
 [tasks."eks:deploy:cnpg"]
 description = "Install CloudNativePG operator"
@@ -179,41 +260,359 @@ echo "Deploying PostgreSQL cluster..."
 kubectl apply -f k8s/dev-cluster.yaml
 
 echo "Waiting for PostgreSQL cluster to be ready..."
-kubectl wait --for=condition=Ready cluster/sds-dev --timeout=600s
+kubectl wait --for=condition=Ready cluster/hackdb --timeout=600s
 
 echo "PostgreSQL cluster ready!"
-kubectl get cluster sds-dev
+kubectl get cluster hackdb
 """
 
 [tasks."eks:deploy:app"]
-description = "Deploy SDS API"
+description = "Deploy API"
 run = """
 #!/bin/bash
 set -euo pipefail
 
-echo "Deploying SDS API..."
+echo "Deploying API..."
 kubectl apply -f k8s/api.yaml
 
 echo "Waiting for deployment..."
-kubectl rollout status deployment/sds-api --timeout=120s
+kubectl rollout status deployment/hack2future --timeout=120s
 
-echo "SDS API deployed!"
-kubectl get pods -l app=sds-api
+echo  "API deployed!"
+kubectl get pods -l app=hack2future
 """
 
-[tasks."eks:deploy:schema"]
-description = "Deploy schema configmaps and run migrations"
+[tasks."eks:deploy:frontend"]
+description = "Deploy frontend"
 run = """
 #!/bin/bash
 set -euo pipefail
 
-echo "Creating schema configmaps..."
-kubectl create configmap pgschema-raw --from-file=sql/raw/ --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap pgschema-domain --from-file=sql/domain/ --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap pgschema-grants --from-file=sql/grants/ --dry-run=client -o yaml | kubectl apply -f -
+echo "Deploying frontend..."
+kubectl apply -f k8s/frontend.yaml
 
-echo "Running schema migrations (plan mode)..."
-kubectl create -f k8s/pgschema-update.yaml
+echo "Waiting for deployment..."
+kubectl rollout status deployment/hack2future-frontend --timeout=120s
 
-echo "Check logs with: kubectl logs -l app=pgschema-update --tail=100"
+echo "Frontend deployed!"
+kubectl get pods -l app=hack2future-frontend
+"""
+
+[tasks."eks:deploy:lbc"]
+description = "Install AWS Load Balancer Controller with Gateway API support"
+run = """
+#!/bin/bash
+set -euo pipefail
+LBC_VERSION="${LBC_VERSION:-3.1.0}"
+CLUSTER_NAME="${CLUSTER_NAME:-hackathon}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+POLICY_NAME="AWSLoadBalancerControllerIAMPolicy"
+
+echo "Getting VPC ID and Account ID..."
+VPC_ID=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.resourcesVpcConfig.vpcId' --output text)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo "VPC ID: $VPC_ID"
+echo "Account: $AWS_ACCOUNT_ID"
+
+# Create IAM policy if it doesn't exist
+echo "Checking IAM policy..."
+POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${POLICY_NAME}"
+if ! aws iam get-policy --policy-arn "$POLICY_ARN" &>/dev/null; then
+  echo "Creating IAM policy..."
+  curl -sS -o /tmp/iam-policy.json \
+    "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v${LBC_VERSION}/docs/install/iam_policy.json"
+  aws iam create-policy --policy-name "$POLICY_NAME" --policy-document file:///tmp/iam-policy.json
+else
+  echo "IAM policy already exists"
+fi
+
+# Create Pod Identity association with the policy
+echo "Setting up Pod Identity..."
+eksctl create podidentityassociation \
+  --cluster "$CLUSTER_NAME" \
+  --region "$AWS_REGION" \
+  --namespace kube-system \
+  --service-account-name aws-load-balancer-controller \
+  --permission-policy-arns "$POLICY_ARN" \
+  2>/dev/null || echo "Pod Identity association exists, updating..."
+
+# If association exists, ensure the policy is attached to the role
+ASSOC_ROLE=$(aws eks list-pod-identity-associations --cluster-name "$CLUSTER_NAME" --region "$AWS_REGION" \
+  --query "associations[?serviceAccount=='aws-load-balancer-controller'].associationId" --output text)
+if [[ -n "$ASSOC_ROLE" ]]; then
+  ROLE_ARN=$(aws eks describe-pod-identity-association --cluster-name "$CLUSTER_NAME" --association-id "$ASSOC_ROLE" --region "$AWS_REGION" \
+    --query 'association.roleArn' --output text)
+  ROLE_NAME=$(basename "$ROLE_ARN")
+  echo "Ensuring policy is attached to role: $ROLE_NAME"
+  aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$POLICY_ARN" 2>/dev/null || true
+fi
+
+echo "Adding EKS Helm repo..."
+helm repo add eks https://aws.github.io/eks-charts 2>/dev/null || true
+helm repo update
+
+echo "Installing Gateway API CRDs..."
+kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml"
+
+echo "Installing LBC Gateway API CRDs..."
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/config/crd/gateway/gateway-crds.yaml"
+
+echo "Installing AWS Load Balancer Controller v${LBC_VERSION} with Gateway API..."
+helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName="$CLUSTER_NAME" \
+  --set region="$AWS_REGION" \
+  --set vpcId="$VPC_ID" \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set "controllerConfig.featureGates.ALBGatewayAPI=true" \
+  --set "controllerConfig.featureGates.NLBGatewayAPI=true" \
+  --set defaultTargetType=ip \
+  --wait
+
+echo "AWS Load Balancer Controller installed!"
+kubectl get deployment -n kube-system aws-load-balancer-controller
+"""
+
+[tasks."eks:deploy:gateway"]
+description = "Deploy Gateway API for ALB"
+depends = ["eks:deploy:lbc"]
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Deploying Gateway API resources..."
+kubectl apply -f k8s/gateway.yaml
+
+echo "Waiting for ALB provisioning (takes ~2 minutes)..."
+for i in {1..24}; do
+  ALB_DNS=$(kubectl get gateway hack2future-gateway -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
+  if [[ -n "$ALB_DNS" ]]; then
+    echo ""
+    echo "ALB DNS: $ALB_DNS"
+    echo "API URL: http://$ALB_DNS"
+    exit 0
+  fi
+  echo -n "."
+  sleep 5
+done
+
+echo ""
+echo "ALB still provisioning. Check status with:"
+echo "  kubectl get gateway hack2future-gateway"
+"""
+
+[tasks."eks:gateway:status"]
+description = "Get Gateway status and URL"
+run = """
+#!/bin/bash
+set -euo pipefail
+kubectl get gateway hack2future-gateway
+kubectl get httproute hack2future-route
+echo ""
+echo "ALB DNS:"
+kubectl get gateway hack2future-gateway -o jsonpath='{.status.addresses[0].value}'
+echo ""
+"""
+
+[tasks."eks:deploy:ack-iam"]
+description = "Install ACK IAM Controller v1.6.1"
+run = """
+#!/bin/bash
+set -euo pipefail
+ACK_IAM_VERSION="${ACK_IAM_VERSION:-v1.6.1}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+
+echo "Installing ACK IAM Controller ${ACK_IAM_VERSION}..."
+helm install ack-iam-controller \
+  oci://public.ecr.aws/aws-controllers-k8s/iam-chart \
+  --version "$ACK_IAM_VERSION" \
+  --namespace ack-system \
+  --create-namespace \
+  --set aws.region="$AWS_REGION" \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=ack-iam-controller
+
+echo "Waiting for ACK IAM controller..."
+kubectl wait --for=condition=Available deployment/ack-iam-controller \
+  -n ack-system --timeout=120s
+
+echo "ACK IAM Controller ready!"
+kubectl get pods -n ack-system
+"""
+
+[tasks."pgschema:sync-configmap"]
+description = "Sync database schema files to k8s configmap"
+run = """
+#!/bin/bash
+set -euo pipefail
+CONFIGMAP_ARGS="--from-file=main.sql=database/main.sql"
+while IFS= read -r f; do
+  key="${f#database/}"
+  CONFIGMAP_ARGS="$CONFIGMAP_ARGS --from-file=$key=$f"
+done < <(fd -e sql . database -E main.sql)
+kubectl create configmap pgschema-database $CONFIGMAP_ARGS \
+  --dry-run=client -o yaml | kubectl apply -f -
+echo "Configmap pgschema-database updated"
+"""
+
+[tasks."pgschema:plan-k8s"]
+description = "Preview schema changes (k8s)"
+depends = ["pgschema:sync-configmap"]
+run = """
+#!/bin/bash
+set -euo pipefail
+JOB_NAME=$(kubectl create -f k8s/pgschema-update.yaml -o name)
+echo "Created $JOB_NAME"
+kubectl wait --for=condition=Complete --timeout=60s $JOB_NAME || true
+kubectl logs $JOB_NAME
+"""
+
+[tasks."pgschema:apply-k8s"]
+description = "Apply schema changes (k8s)"
+depends = ["pgschema:sync-configmap"]
+run = """
+#!/bin/bash
+set -euo pipefail
+JOB_NAME=$(sed 's/value: plan/value: apply/' k8s/pgschema-update.yaml | kubectl create -f - -o name)
+echo "Created $JOB_NAME"
+kubectl wait --for=condition=Complete --timeout=60s $JOB_NAME || true
+kubectl logs $JOB_NAME
+"""
+
+# =============================================================================
+# Agents ECR Build & Push
+# =============================================================================
+
+[tasks."agents:ecr:create"]
+description = "Create ECR repository for agents"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+REPO_NAME="hack2future-agents"
+
+aws ecr create-repository \
+  --repository-name "$REPO_NAME" \
+  --region "$AWS_REGION" \
+  --image-scanning-configuration scanOnPush=true \
+  --encryption-configuration encryptionType=AES256 \
+  2>/dev/null || echo "Repository $REPO_NAME already exists"
+
+echo "ECR repository ready: $REPO_NAME"
+"""
+
+[tasks."agents:build"]
+description = "Build agents Docker image for ECR"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-agents"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Building $REPO_NAME:$TAG for linux/amd64..."
+docker build --platform linux/amd64 -t "$REPO_NAME:$TAG" -f agents/Dockerfile .
+docker tag "$REPO_NAME:$TAG" "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image built and tagged: $REGISTRY/$REPO_NAME:$TAG"
+"""
+
+[tasks."agents:push"]
+description = "Push agents Docker image to ECR"
+depends = ["ecr:login"]
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+REPO_NAME="hack2future-agents"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Pushing $REGISTRY/$REPO_NAME:$TAG..."
+docker push "$REGISTRY/$REPO_NAME:$TAG"
+
+echo "Image pushed successfully!"
+"""
+
+[tasks."agents:build-push"]
+description = "Build and push agents Docker image to ECR"
+depends = ["agents:build", "agents:push"]
+
+[tasks."agents:deploy"]
+description = "Deploy agents to EKS"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Creating agents service account..."
+kubectl apply -f k8s/agents-rbac.yaml
+
+echo "Deploying agents..."
+kubectl apply -f k8s/agents.yaml
+
+echo "Waiting for agents deployment..."
+kubectl rollout status deployment/agents --timeout=120s
+
+echo "Agents deployed!"
+kubectl get pods -l app=agents
+"""
+
+[tasks."agents:deploy:bedrock-policy"]
+description = "Create Bedrock IAM policy and Pod Identity association for agents"
+run = """
+#!/bin/bash
+set -euo pipefail
+CLUSTER_NAME="${CLUSTER_NAME:-hackathon}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+POLICY_NAME="AgentsBedrockPolicy"
+
+# Create IAM policy if it doesn't exist
+POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${POLICY_NAME}"
+if ! aws iam get-policy --policy-arn "$POLICY_ARN" &>/dev/null; then
+  echo "Creating IAM policy $POLICY_NAME..."
+  aws iam create-policy --policy-name "$POLICY_NAME" --policy-document '{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "BedrockInvoke",
+        "Effect": "Allow",
+        "Action": [
+          "bedrock:InvokeModel",
+          "bedrock:InvokeModelWithResponseStream"
+        ],
+        "Resource": [
+          "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-*",
+          "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-*"
+        ]
+      }
+    ]
+  }'
+else
+  echo "IAM policy $POLICY_NAME already exists"
+fi
+
+# Create Pod Identity association
+echo "Creating Pod Identity association..."
+eksctl create podidentityassociation \
+  --cluster "$CLUSTER_NAME" \
+  --region "$AWS_REGION" \
+  --namespace default \
+  --service-account-name agents-sa \
+  --permission-policy-arns "$POLICY_ARN" \
+  2>/dev/null || echo "Pod Identity association may already exist"
+
+echo "Bedrock policy and Pod Identity configured!"
+"""
+
+[tasks."agents:logs"]
+description = "View logs from agents pod"
+run = """
+#!/bin/bash
+set -euo pipefail
+kubectl logs -l app=agents --tail=100 -f
 """

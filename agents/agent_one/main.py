@@ -5,33 +5,29 @@ Scans Sureify APIs (or mock), lists all policies as JSON using frontend-relevant
 shapes, attaches notifications, and applies business logic (replacements,
 data quality, income activation, scheduled-meeting recommendation).
 
-Run from repo root with PYTHONPATH including repo root so api.src.api is importable:
-  PYTHONPATH=. uv run python agents/main.py
-  or: cd agents && uv run python main.py  (with agents in path)
+Run from repo root: PYTHONPATH=. uv run python -m agents.agent_one
 """
 
 from __future__ import annotations
 
 import json
 import sys
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
-# Ensure repo root is on path for api.src.api when running as script
-_repo_root = Path(__file__).resolve().parent.parent
+_repo_root = Path(__file__).resolve().parent.parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
-# Load .env from repo root so AWS_* and SUREIFY_* are available
 _env_file = _repo_root / ".env"
 if _env_file.exists():
     try:
         from dotenv import load_dotenv
         load_dotenv(_env_file)
     except ImportError:
-        pass  # optional: run with env vars set manually or via shell
+        pass
 
-# Use Bedrock native (IAM) auth: boto3 uses AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY
-# or ~/.aws/credentials (aws configure). Bearer token is not used.
 import os as _os
 _os.environ.pop("AWS_BEARER_TOKEN_BEDROCK", None)
 
@@ -51,38 +47,24 @@ from agents.iri_client import (
     submit_iri_transaction as iri_submit_transaction,
     snooze_iri_alert as iri_snooze,
 )
+from agents.audit_writer import persist_event
 from agents.logic import apply_business_logic
+from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.schemas import BookOfBusinessOutput, PolicyNotification, PolicyOutput
 from agents.sureify_client import get_book_of_business as fetch_policies
 from agents.sureify_client import get_notifications_for_policies as fetch_notifications
 
 
-# ---------------------------------------------------------------------------
-# Tools (Strands @tool)
-# ---------------------------------------------------------------------------
-
-
 @tool
 def get_book_of_business(customer_identifier: str) -> str:
-    """
-    Get the book of business (all policies) for a customer or advisor from Sureify.
-
-    Use this when you need to list all policies for a given customer, e.g. Marty McFly.
-    Returns a JSON list of policy objects (policy numbers, carrier, status, product, etc.).
-    """
+    """Get the book of business (all policies) for a customer or advisor from Sureify."""
     policies = fetch_policies(customer_identifier)
     return json.dumps(policies, default=str, indent=2)
 
 
 @tool
 def get_notifications_for_policies(policy_ids: str) -> str:
-    """
-    Get notifications applicable to the given policies.
-
-    Use this to fetch notifications for the policy IDs returned by get_book_of_business.
-    policy_ids: JSON array of policy ID strings, e.g. '["pol-marty-001", "pol-marty-002"]'
-    Returns a JSON object mapping each policy_id to a list of notifications (type, message, severity).
-    """
+    """Get notifications applicable to the given policies."""
     try:
         ids = json.loads(policy_ids)
     except json.JSONDecodeError:
@@ -95,15 +77,7 @@ def get_notifications_for_policies(policy_ids: str) -> str:
 
 @tool
 def get_book_of_business_with_notifications_and_flags(customer_identifier: str) -> str:
-    """
-    Get the full book of business for a customer with notifications and business logic flags.
-
-    Use this to produce the complete output for Marty McFly: all policies in JSON form
-    (aligned with sureify_models for the frontend), plus for each policy: applicable
-    notifications, replacement_opportunity, data_quality_issues, income_activation_eligible,
-    and schedule_meeting recommendation. Returns a single JSON object with customer_identifier
-    and policies array, ready for the frontend.
-    """
+    """Get the full book of business with notifications and business logic flags."""
     policies = fetch_policies(customer_identifier)
     if not policies:
         out = BookOfBusinessOutput(customer_identifier=customer_identifier, policies=[])
@@ -148,30 +122,14 @@ def get_book_of_business_with_notifications_and_flags(customer_identifier: str) 
 
 @tool
 def get_book_of_business_json_schema() -> str:
-    """
-    Return the JSON schema for the book-of-business output (customer_identifier + policies with notifications and flags).
-
-    Use this when the user asks for a schema to share with their database admin team to build tables.
-    Returns a JSON Schema (draft-07 style) that describes BookOfBusinessOutput and nested types (PolicyOutput, PolicyNotification).
-    """
+    """Return the JSON schema for the book-of-business output."""
     schema = BookOfBusinessOutput.model_json_schema(mode="serialization")
     return json.dumps(schema, indent=2)
 
 
-# ---------------------------------------------------------------------------
-# IRI API tools (OpenAPI spec: agents/iri_api_spec.yaml)
-# ---------------------------------------------------------------------------
-
-
 @tool
 def get_book_of_business_as_iri_alerts(customer_identifier: str) -> str:
-    """
-    Get the book of business for a customer in IRI API format: RenewalAlert list + DashboardStats.
-
-    Use this when the user wants renewal alerts or dashboard data for the IRI Annuity Renewal Intelligence API.
-    Returns JSON with "alerts" (array of RenewalAlert) and "dashboardStats" (total, high, urgent, totalValue)
-    matching the IRI OpenAPI spec. Data is derived from Sureify book of business + agent business logic.
-    """
+    """Get the book of business in IRI API format: RenewalAlert list + DashboardStats."""
     raw = get_book_of_business_with_notifications_and_flags(customer_identifier)
     book = BookOfBusinessOutput.model_validate_json(raw)
     alerts, stats = map_book_of_business_to_iri_alerts(book)
@@ -186,99 +144,56 @@ def get_book_of_business_as_iri_alerts(customer_identifier: str) -> str:
 
 @tool
 def get_iri_alerts(status: str = "", priority: str = "", carrier: str = "") -> str:
-    """
-    Get renewal alerts from the IRI API (GET /alerts). Optional filters: status, priority, carrier.
-
-    Use when the user asks to list or filter alerts from the IRI dashboard backend.
-    Requires IRI_API_BASE_URL to be set. Returns JSON array of RenewalAlert or error.
-    """
-    result = iri_get_alerts(
-        status=status or None,
-        priority=priority or None,
-        carrier=carrier or None,
-    )
+    """Get renewal alerts from the IRI API (GET /alerts)."""
+    result = iri_get_alerts(status=status or None, priority=priority or None, carrier=carrier or None)
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def get_iri_alert_by_id(alert_id: str) -> str:
-    """
-    Get full alert detail from the IRI API (GET /alerts/{alertId} - getAlertDetail).
-
-    Returns AlertDetail: alert, clientAlerts, policyData, aiSuitabilityScore, suitabilityData, disclosureItems, transactionOptions, auditLog.
-    Use when the user asks for full details of a specific alert. Requires IRI_API_BASE_URL.
-    """
+    """Get full alert detail from the IRI API (GET /alerts/{alertId})."""
     result = iri_get_alert(alert_id)
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def snooze_iri_alert(alert_id: str, snooze_days: int, reason: str = "") -> str:
-    """
-    Snooze an IRI alert for a number of days (POST /alerts/{alertId}/snooze).
-
-    snooze_days must be between 1 and 90. Use when the user wants to snooze an alert.
-    Requires IRI_API_BASE_URL.
-    """
+    """Snooze an IRI alert (POST /alerts/{alertId}/snooze)."""
     result = iri_snooze(alert_id, snooze_days, reason or None)
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def dismiss_iri_alert(alert_id: str, reason: str) -> str:
-    """
-    Dismiss an IRI alert with a reason (POST /alerts/{alertId}/dismiss).
-
-    Use when the user wants to permanently dismiss an alert. Requires IRI_API_BASE_URL.
-    """
+    """Dismiss an IRI alert (POST /alerts/{alertId}/dismiss)."""
     result = iri_dismiss(alert_id, reason)
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def get_iri_dashboard_stats() -> str:
-    """
-    Get dashboard statistics from the IRI API (GET /dashboard/stats).
-
-    Returns total alerts, high-priority count, urgent count (daysUntilRenewal <= 30), and totalValue.
-    Requires IRI_API_BASE_URL.
-    """
+    """Get dashboard statistics from the IRI API (GET /dashboard/stats)."""
     result = iri_get_stats()
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def run_iri_comparison(alert_id: str) -> str:
-    """
-    Run comparison analysis for an alert (POST /alerts/{alertId}/compare - runComparison).
-
-    Returns current product vs alternatives (rates, features). Use when the user wants to compare products for an alert.
-    Requires IRI_API_BASE_URL.
-    """
+    """Run comparison analysis for an alert (POST /alerts/{alertId}/compare)."""
     result = iri_run_comparison(alert_id)
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def get_iri_client_profile(client_id: str) -> str:
-    """
-    Get client profile from the IRI API (GET /clients/{clientId}/profile - getClientProfile).
-
-    Returns client comparison parameters (profile, suitability, goals) for the Compare tab.
-    Requires IRI_API_BASE_URL.
-    """
+    """Get client profile from the IRI API (GET /clients/{clientId}/profile)."""
     result = iri_get_client_profile(client_id)
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def save_iri_client_profile(client_id: str, parameters_json: str) -> str:
-    """
-    Save client profile (PUT /clients/{clientId}/profile - saveClientProfile).
-
-    parameters_json: JSON object of ComparisonParameters (e.g. grossIncome, financialObjectives, etc.).
-    Use when the user wants to save or update the client's comparison parameters. Requires IRI_API_BASE_URL.
-    """
+    """Save client profile (PUT /clients/{clientId}/profile)."""
     try:
         params = json.loads(parameters_json)
     except json.JSONDecodeError:
@@ -289,12 +204,7 @@ def save_iri_client_profile(client_id: str, parameters_json: str) -> str:
 
 @tool
 def save_iri_suitability(alert_id: str, suitability_json: str) -> str:
-    """
-    Save suitability data for an alert (PUT /alerts/{alertId}/suitability - saveSuitability).
-
-    suitability_json: JSON object with SuitabilityData fields (clientObjectives, riskTolerance, score, etc.).
-    Requires IRI_API_BASE_URL.
-    """
+    """Save suitability data for an alert (PUT /alerts/{alertId}/suitability)."""
     try:
         data = json.loads(suitability_json)
     except json.JSONDecodeError:
@@ -305,12 +215,7 @@ def save_iri_suitability(alert_id: str, suitability_json: str) -> str:
 
 @tool
 def save_iri_disclosures(alert_id: str, acknowledged_ids_json: str) -> str:
-    """
-    Save disclosure acknowledgments (PUT /alerts/{alertId}/disclosures - saveDisclosures).
-
-    acknowledged_ids_json: JSON array of disclosure item IDs, e.g. ["d1", "d2", "d3"].
-    Requires IRI_API_BASE_URL.
-    """
+    """Save disclosure acknowledgments (PUT /alerts/{alertId}/disclosures)."""
     try:
         ids = json.loads(acknowledged_ids_json)
     except json.JSONDecodeError:
@@ -323,19 +228,10 @@ def save_iri_disclosures(alert_id: str, acknowledged_ids_json: str) -> str:
 
 @tool
 def submit_iri_transaction(alert_id: str, transaction_type: str, rationale: str, client_statement: str) -> str:
-    """
-    Submit transaction for an alert (POST /alerts/{alertId}/transaction - submitTransaction).
-
-    transaction_type: "renew" or "replace". rationale: advisor's rationale. client_statement: client's acknowledgment.
-    Use when the user wants to submit the final renew/replace decision. Requires IRI_API_BASE_URL.
-    """
+    """Submit transaction for an alert (POST /alerts/{alertId}/transaction)."""
     result = iri_submit_transaction(alert_id, transaction_type, rationale, client_statement)
     return json.dumps(result, default=str, indent=2)
 
-
-# ---------------------------------------------------------------------------
-# System prompt and agent
-# ---------------------------------------------------------------------------
 
 BOOK_OF_BUSINESS_SYSTEM_PROMPT = """You are an assistant that scans Sureify APIs and produces the book of business for a given customer.
 
@@ -387,25 +283,97 @@ def create_agent() -> Agent:
     )
 
 
+def _emit_agent_one_event(
+    run_id: str,
+    input_summary: dict,
+    success: bool,
+    error_message: str | None = None,
+    explanation_summary: str | None = None,
+) -> None:
+    event = AgentRunEvent(
+        event_id=str(uuid.uuid4()),
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        agent_id=AgentId.agent_one,
+        run_id=run_id,
+        client_id_scope="Marty McFly",
+        input_summary=input_summary,
+        success=success,
+        error_message=error_message,
+        explanation_summary=explanation_summary,
+        input_validation_passed=True,
+        guardrail_triggered=None,
+    )
+    persist_event(event)
+
+
 def main() -> None:
     import os
-    # If SUREIFY_AGENT_SCHEMA_ONLY=1, print JSON schema for DB team and exit (no LLM)
+    run_id = str(uuid.uuid4())
     if os.environ.get("SUREIFY_AGENT_SCHEMA_ONLY"):
         print(get_book_of_business_json_schema())
+        _emit_agent_one_event(
+            run_id,
+            {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_json_schema"]},
+            True,
+            explanation_summary="JSON schema returned",
+        )
         return
-    # If SUREIFY_AGENT_TOOL_ONLY=1, skip LLM and just run the composite tool (no Bedrock/credentials needed)
     if os.environ.get("SUREIFY_AGENT_TOOL_ONLY"):
-        json_out = get_book_of_business_with_notifications_and_flags("Marty McFly")
-        print(json_out)
+        try:
+            json_out = get_book_of_business_with_notifications_and_flags("Marty McFly")
+            print(json_out)
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
+                True,
+                explanation_summary="Book of business produced with notifications and flags",
+            )
+        except Exception as e:
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
+                False,
+                error_message=str(e),
+            )
+            raise
         return
-    # If SUREIFY_AGENT_IRI_ONLY=1, output book of business as IRI alerts + dashboardStats (no LLM)
     if os.environ.get("SUREIFY_AGENT_IRI_ONLY"):
-        print(get_book_of_business_as_iri_alerts("Marty McFly"))
+        try:
+            print(get_book_of_business_as_iri_alerts("Marty McFly"))
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_as_iri_alerts"]},
+                True,
+                explanation_summary="Book of business as IRI alerts",
+            )
+        except Exception as e:
+            _emit_agent_one_event(
+                run_id,
+                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_as_iri_alerts"]},
+                False,
+                error_message=str(e),
+            )
+            raise
         return
-    agent = create_agent()
-    user_message = "Produce the book of business for Marty McFly. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
-    result = agent(user_message)
-    print(result.get("output", result) if isinstance(result, dict) else result)
+    try:
+        agent = create_agent()
+        user_message = "Produce the book of business for Marty McFly. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
+        result = agent(user_message)
+        print(result.get("output", result) if isinstance(result, dict) else result)
+        _emit_agent_one_event(
+            run_id,
+            {"customer_identifier_scope": "Marty McFly", "tools_used": ["agent_run"]},
+            True,
+            explanation_summary="Book of business produced with notifications and flags",
+        )
+    except Exception as e:
+        _emit_agent_one_event(
+            run_id,
+            {"customer_identifier_scope": "Marty McFly", "tools_used": ["agent_run"]},
+            False,
+            error_message=str(e),
+        )
+        raise
 
 
 if __name__ == "__main__":

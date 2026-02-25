@@ -2,10 +2,7 @@
 AgentTwo: reads the database for current information, accepts JSON changes from the front-end
 (suitability, client goals, client profile), and generates new product recommendations.
 
-Run from repo root:
-  PYTHONPATH=. uv run python -m agents.agent_two
-Or with a changes JSON file:
-  PYTHONPATH=. uv run python -m agents.agent_two --changes changes.json --client-id "Marty McFly"
+Run from repo root: PYTHONPATH=. uv run python -m agents.agent_two
 """
 
 from __future__ import annotations
@@ -17,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-_repo_root = Path(__file__).resolve().parent.parent
+_repo_root = Path(__file__).resolve().parent.parent.parent
 if str(_repo_root) not in sys.path:
     sys.path.insert(0, str(_repo_root))
 
@@ -32,16 +29,13 @@ if _env_file.exists():
 from strands import Agent, tool
 
 from agents.agent_two_schemas import AgentTwoStorablePayload, ProductRecommendationsOutput, ProfileChangesInput
+from agents.audit_writer import persist_agent_two_payload, persist_event
 from agents.db_reader import get_current_database_context as fetch_db_context
 from agents.recommendations import generate_recommendations
+from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.sureify_client import get_book_of_business as fetch_sureify_policies
 from agents.sureify_client import get_notifications_for_policies as fetch_sureify_notifications
 from agents.sureify_client import get_products as fetch_sureify_products
-
-
-# ---------------------------------------------------------------------------
-# Tools
-# ---------------------------------------------------------------------------
 
 
 def _get_sureify_context(customer_identifier: str) -> dict:
@@ -63,8 +57,7 @@ def get_current_database_context(client_id: str = "") -> str:
     """
     Read all current information: from the database (clients, suitability profiles,
     contract_summary, products) and from Sureify (book of business / policies and notifications).
-    client_id: optional; used for DB contract_summary filter and as Sureify customer_identifier
-               (e.g. "Marty McFly"). If empty, Sureify uses "Marty McFly" for mock data.
+    client_id: optional; used for DB contract_summary filter and as Sureify customer_identifier.
     Returns JSON with keys: clients, client_suitability_profiles, contract_summary, products,
     sureify_policies, sureify_notifications_by_policy, sureify_products.
     """
@@ -86,21 +79,55 @@ def generate_product_recommendations(
     """
     Take JSON from the front-end with changes to suitability, client goals, and/or client profile;
     merge with current DB state; and generate new product recommendations.
-    changes_json: JSON object with optional keys "suitability", "clientGoals", "clientProfile"
-                  (each optional; only include changed fields).
-    client_id: client identifier (e.g. client_account_number or client name).
-    alert_id: optional; if provided and IRI_API_BASE_URL is set, save profile/suitability to IRI
-              and run comparison for this alert, then include IRI comparison in the result.
-    Returns JSON: ProductRecommendationsOutput (client_id, merged_profile_summary, recommendations, explanation, storable_payload for DB, iri_comparison_result).
+    changes_json: JSON object with optional keys "suitability", "clientGoals", "clientProfile".
+    client_id: client identifier. alert_id: optional IRI alert ID.
+    Returns JSON: ProductRecommendationsOutput (recommendations, explanation, storable_payload, ...).
     """
+    run_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    event_id = str(uuid.uuid4())
+    client_id_scope = client_id
+
+    def _emit_event(
+        input_summary: dict,
+        success: bool,
+        error_message: str | None = None,
+        explanation_summary: str | None = None,
+        data_sources_used: list[str] | None = None,
+        choice_criteria: list[str] | None = None,
+        input_validation_passed: bool | None = None,
+        payload_ref: str | None = None,
+    ) -> None:
+        event = AgentRunEvent(
+            event_id=event_id,
+            timestamp=created_at,
+            agent_id=AgentId.agent_two,
+            run_id=run_id,
+            client_id_scope=client_id_scope,
+            input_summary=input_summary,
+            success=success,
+            error_message=error_message,
+            explanation_summary=explanation_summary,
+            data_sources_used=data_sources_used,
+            choice_criteria=choice_criteria,
+            input_validation_passed=input_validation_passed,
+            guardrail_triggered=None,
+            payload_ref=payload_ref,
+        )
+        persist_event(event)
+
     try:
         payload = json.loads(changes_json)
     except json.JSONDecodeError as e:
+        _emit_event({}, False, error_message=str(e), input_validation_passed=False)
         return json.dumps({"error": "Invalid JSON", "message": str(e)})
+
+    input_summary = {"sections_present": [k for k in ("suitability", "clientGoals", "clientProfile") if payload.get(k)]}
 
     try:
         changes = ProfileChangesInput.model_validate(payload)
     except Exception as e:
+        _emit_event(input_summary, False, error_message=str(e), input_validation_passed=False)
         return json.dumps({"error": "Invalid changes shape", "message": str(e)})
 
     db_context = fetch_db_context(client_id)
@@ -114,12 +141,10 @@ def generate_product_recommendations(
     if alert_id and os.environ.get("IRI_API_BASE_URL"):
         try:
             from agents.iri_client import (
-                get_iri_client_profile,
                 run_iri_comparison,
                 save_iri_client_profile,
                 save_iri_suitability,
             )
-            # Optionally push changes to IRI and run comparison
             if changes.client_profile:
                 params = changes.client_profile.model_dump(exclude_none=True)
                 save_iri_client_profile(client_id, params)
@@ -128,23 +153,23 @@ def generate_product_recommendations(
                 save_iri_suitability(alert_id, suit)
             iri_result = run_iri_comparison(alert_id)
         except Exception:
-            pass  # continue with local recommendations even if IRI fails
+            pass
 
-    out = generate_recommendations(
-        client_id=client_id,
-        db_context=db_context,
-        changes=changes,
-        alert_id=alert_id or None,
-        iri_comparison_result=iri_result,
-    )
-    # Build storable payload for database (run_id, created_at, explanation, recommendations)
-    input_summary = {
-        "sections_present": [k for k in ("suitability", "clientGoals", "clientProfile") if payload.get(k)],
-    }
+    try:
+        out = generate_recommendations(
+            client_id=client_id,
+            db_context=db_context,
+            changes=changes,
+            alert_id=alert_id or None,
+            iri_comparison_result=iri_result,
+        )
+    except Exception as e:
+        _emit_event(input_summary, False, error_message=str(e), input_validation_passed=True)
+        raise
     if out.explanation:
         storable = AgentTwoStorablePayload(
-            run_id=str(uuid.uuid4()),
-            created_at=datetime.now(timezone.utc).isoformat(),
+            run_id=run_id,
+            created_at=created_at,
             client_id=client_id,
             input_summary=input_summary,
             explanation=out.explanation,
@@ -153,12 +178,25 @@ def generate_product_recommendations(
             iri_comparison_result=out.iri_comparison_result,
         )
         out.storable_payload = storable
+        payload_ref_id = persist_agent_two_payload(
+            run_id=run_id,
+            created_at=created_at,
+            client_id=client_id,
+            payload=storable.model_dump(mode="json"),
+        )
+        _emit_event(
+            input_summary,
+            True,
+            explanation_summary=out.explanation.summary,
+            data_sources_used=out.explanation.data_sources_used or None,
+            choice_criteria=out.explanation.choice_criteria or None,
+            input_validation_passed=True,
+            payload_ref=payload_ref_id,
+        )
+    else:
+        _emit_event(input_summary, True, input_validation_passed=True)
     return out.model_dump_json(indent=2, exclude_none=True)
 
-
-# ---------------------------------------------------------------------------
-# System prompt and agent
-# ---------------------------------------------------------------------------
 
 AGENT_TWO_SYSTEM_PROMPT = """You are agentTwo: you read the database for all current information (clients, suitability profiles, contracts, products) and use JSON changes from the front-end to generate new product recommendations.
 
@@ -189,7 +227,7 @@ def main() -> None:
     parser.add_argument("--changes", type=str, help="Path to JSON file with suitability/clientGoals/clientProfile changes")
     parser.add_argument("--client-id", type=str, default="Marty McFly", help="Client identifier")
     parser.add_argument("--alert-id", type=str, default="", help="Optional IRI alert ID for comparison")
-    parser.add_argument("--tool-only", action="store_true", help="Run tools only (no LLM): DB context then recommendations if --changes given")
+    parser.add_argument("--tool-only", action="store_true", help="Run tools only (no LLM)")
     args = parser.parse_args()
 
     if args.tool_only:
