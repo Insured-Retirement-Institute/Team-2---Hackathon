@@ -12,7 +12,7 @@ import os
 import re
 from typing import Any
 
-from agents.iri_schemas import AlertType, DashboardStats, Priority, RenewalAlert, Status
+from schemas.iri_schemas import AlertType, DashboardStats, Priority, RenewalAlert, Status
 from agents.schemas import BookOfBusinessOutput, PolicyOutput
 
 
