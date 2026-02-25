@@ -85,6 +85,41 @@ def persist_event(event: AgentRunEvent) -> bool:
         return False
 
 
+def persist_agent_one_book_of_business(
+    run_id: str,
+    created_at: str,
+    customer_identifier: str,
+    payload: dict,
+) -> str | None:
+    """
+    Insert agent one's book-of-business JSON (policies with notifications and flags) into agent_one_book_of_business.
+    Returns the inserted row id (UUID string), or None on error or when DB is not configured.
+    """
+    params = _get_connection_params()
+    if not params or psycopg2 is None or Json is None:
+        return None
+    row_id = str(uuid.uuid4())
+    try:
+        with psycopg2.connect(**params) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO agent_one_book_of_business (id, run_id, created_at, customer_identifier, payload)
+                    VALUES (%s::uuid, %s, %s::timestamptz, %s, %s)
+                    """,
+                    (row_id, run_id, created_at, customer_identifier, Json(payload)),
+                )
+            conn.commit()
+        return row_id
+    except Exception as e:
+        logger.warning(
+            "audit_writer: failed to persist agent_one book_of_business run_id=%s: %s",
+            run_id,
+            e,
+        )
+        return None
+
+
 def persist_agent_two_payload(
     run_id: str,
     created_at: str,
