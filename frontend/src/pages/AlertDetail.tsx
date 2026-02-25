@@ -1,7 +1,15 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { BellOff, Clock, AlertTriangle, CheckCircle2, ChevronDown, FileText, ArrowLeft } from "lucide-react";
+import {
+  BellOff,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  FileText,
+  ArrowLeft,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useChatContext } from "@/hooks/useChatContext";
 
@@ -12,9 +20,20 @@ import { OverviewTab } from "@/components/modal/OverviewTab";
 import { CompareTab } from "@/components/modal/CompareTab";
 import { ActionTab } from "@/components/modal/ActionTab";
 
-import type { AlertDetail, ComparisonParameters, SuitabilityData } from "@/types/alert-detail";
-import { fetchAlertDetail, fetchClientProfile, saveClientProfile, runComparison, recompareWithProducts } from "@/api/alert-detail";
-import type { ComparisonData } from "@/types/alert-detail";
+import type {
+  AlertDetail,
+  ComparisonParameters,
+  SuitabilityData,
+  ComparisonData,
+  ProductOption,
+} from "@/types/alert-detail";
+import {
+  fetchAlertDetail,
+  fetchClientProfile,
+  saveClientProfile,
+  saveSuitability,
+} from "@/api/alert-detail";
+import { runComparison, recompareWithProducts } from "@/api/compare";
 
 export function AlertDetailPage() {
   const { alertId } = useParams<{ alertId: string }>();
@@ -24,13 +43,20 @@ export function AlertDetailPage() {
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<AlertDetail | null>(null);
   const [activeTab, setActiveTab] = useState<WorkflowStep>("overview");
-  const [completedSteps, setCompletedSteps] = useState<Set<WorkflowStep>>(new Set());
+  const [completedSteps, setCompletedSteps] = useState<Set<WorkflowStep>>(
+    new Set(),
+  );
 
-  const [parameters, setParameters] = useState<ComparisonParameters | null>(null);
-  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(null);
+  const [parameters, setParameters] = useState<ComparisonParameters | null>(
+    null,
+  );
+  const [comparisonData, setComparisonData] = useState<ComparisonData | null>(
+    null,
+  );
   const [compareLoading, setCompareLoading] = useState(false);
 
-  const [suitabilityData, setSuitabilityData] = useState<SuitabilityData | null>(null);
+  const [suitabilityData, setSuitabilityData] =
+    useState<SuitabilityData | null>(null);
   const [disclosuresAcknowledged, setDisclosuresAcknowledged] = useState(false);
   const [transactionId, setTransactionId] = useState("");
 
@@ -57,18 +83,36 @@ export function AlertDetailPage() {
   };
 
   const handleStepClick = (step: WorkflowStep) => {
+    // Prevent forward navigation - only allow going back or staying on current
+    const stepOrder: WorkflowStep[] = ["overview", "compare", "action"];
+    const currentIdx = stepOrder.indexOf(activeTab);
+    const targetIdx = stepOrder.indexOf(step);
+    
+    if (targetIdx > currentIdx && !completedSteps.has(stepOrder[targetIdx - 1])) {
+      return; // Block forward navigation if previous step not completed
+    }
+
     if (activeTab === "overview" && step !== "overview") {
       setCompletedSteps((prev) => new Set(prev).add("overview"));
     }
     if (step !== "compare") setEditingProfile(false);
     setActiveTab(step);
-    sendContext({ page: `/alerts/${alertId}`, alertId, activeTab: step, clientName: detail?.alert.clientName, policyId: detail?.alert.policyId });
+    sendContext({
+      page: `/alerts/${alertId}`,
+      alertId,
+      activeTab: step,
+      clientName: detail?.alert.clientName,
+      policyId: detail?.alert.policyId,
+    });
   };
 
   const handleRunComparison = async () => {
     setCompareLoading(true);
     try {
-      if (parameters && detail) await saveClientProfile(detail.alert.clientId, parameters);
+      if (parameters && detail)
+        await saveClientProfile(detail.alert.clientId, parameters);
+      if (suitabilityData && detail)
+        await saveSuitability(detail.alert.id, suitabilityData);
       const result = await runComparison(alertId!);
       setComparisonData(result.comparisonData);
       setCompletedSteps((prev) => new Set(prev).add("compare"));
@@ -79,17 +123,17 @@ export function AlertDetailPage() {
     }
   };
 
-  const handleTransactionConfirm = (_type: "renew" | "replace", _rationale: string, _clientStatement: string) => {
+  const handleTransactionConfirm = () => {
     const txId = `TXN-2026-${Math.floor(Math.random() * 10000)}`;
     setTransactionId(txId);
     setCompletedSteps((prev) => new Set(prev).add("action"));
     toast.success(`Transaction ${txId} submitted successfully`);
   };
 
-  const handleRecompareWithProducts = async (productIds: string[]) => {
+  const handleRecompareWithProducts = async (products: ProductOption[]) => {
     setCompareLoading(true);
     try {
-      const result = await recompareWithProducts(alertId!, productIds);
+      const result = await recompareWithProducts(alertId!, products);
       setComparisonData(result.comparisonData);
     } catch {
       toast.error("Failed to update comparison");
@@ -108,29 +152,47 @@ export function AlertDetailPage() {
     );
   }
 
-  const { alert, clientAlerts, policyData, disclosureItems, transactionOptions, auditLog } = detail;
+  const {
+    alert,
+    clientAlerts,
+    policyData,
+    disclosureItems,
+    transactionOptions,
+    auditLog,
+  } = detail;
 
   return (
     <div className="h-screen flex flex-col bg-slate-50">
       {/* Header */}
       <div className="h-20 px-8 flex items-center justify-between border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50 shrink-0">
         <div className="flex items-center gap-4 flex-1">
-          <Button variant="outline" size="sm" onClick={goBack} className="h-10 px-3 gap-2 text-slate-700 hover:text-slate-900 border-slate-300">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goBack}
+            className="h-10 px-3 gap-2 text-slate-700 hover:text-slate-900 border-slate-300"
+          >
             <ArrowLeft className="h-4 w-4" />
             <span className="text-sm font-medium">Dashboard</span>
           </Button>
           <div>
             <h3 className="text-2xl font-bold text-slate-900 mb-1">
-              {alert.alertType.includes("replacement") ? "Replacement Review" : "Renewal Review"}
+              {alert.alertType.includes("replacement")
+                ? "Replacement Review"
+                : "Renewal Review"}
             </h3>
             <div className="flex items-center gap-4">
               <span className="text-sm font-mono text-slate-700 bg-white px-3 py-1 rounded-md border border-slate-200">
                 {alert.policyId}
               </span>
-              <span className="text-sm font-semibold text-slate-700">{alert.clientName}</span>
+              <span className="text-sm font-semibold text-slate-700">
+                {alert.clientName}
+              </span>
               <div className="flex items-center gap-2 bg-red-100 px-3 py-1 rounded-md">
                 <Clock className="h-4 w-4 text-red-700" />
-                <span className="text-sm font-bold text-red-700">{alert.daysUntilRenewal} days until renewal</span>
+                <span className="text-sm font-bold text-red-700">
+                  {alert.daysUntilRenewal} days until renewal
+                </span>
               </div>
             </div>
           </div>
@@ -159,7 +221,8 @@ export function AlertDetailPage() {
               <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
                 <span className="text-sm text-red-800 font-medium">
-                  CRITICAL: Policy renewing at guaranteed minimum rate ({alert.renewalRate}). Immediate action required.
+                  CRITICAL: Policy renewing at guaranteed minimum rate (
+                  {alert.renewalRate}). Immediate action required.
                 </span>
               </div>
             )}
@@ -175,10 +238,26 @@ export function AlertDetailPage() {
 
           {/* Workflow Stepper + Tab Content */}
           <div className="mx-8 mt-6 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
-            <WorkflowStepper currentStep={activeTab} completedSteps={completedSteps} onStepClick={handleStepClick} />
+            <WorkflowStepper
+              currentStep={activeTab}
+              completedSteps={completedSteps}
+              onStepClick={handleStepClick}
+            />
             <div className="flex-1 overflow-y-auto p-8">
               {activeTab === "overview" && (
-                <OverviewTab alert={alert} clientAlerts={clientAlerts} features={policyData.features} onEditProfile={() => { setEditingProfile(true); setActiveTab("compare"); }} />
+                <OverviewTab
+                  alert={alert}
+                  clientAlerts={clientAlerts}
+                  features={policyData.features}
+                  onEditProfile={() => {
+                    setEditingProfile(true);
+                    setActiveTab("compare");
+                  }}
+                  onNext={() => {
+                    setCompletedSteps((prev) => new Set(prev).add("overview"));
+                    setActiveTab("compare");
+                  }}
+                />
               )}
               {activeTab === "compare" && parameters && (
                 <CompareTab
@@ -190,9 +269,16 @@ export function AlertDetailPage() {
                   onParametersChange={setParameters}
                   onRunComparison={handleRunComparison}
                   onRecompareWithProducts={handleRecompareWithProducts}
-                  onEditProfile={() => { setEditingProfile(true); setActiveTab("compare"); }}
+                  onEditProfile={() => {
+                    setEditingProfile(true);
+                    setActiveTab("compare");
+                  }}
                   startOnParameters={editingProfile}
                   key={editingProfile ? "edit" : "default"}
+                  onNext={() => {
+                    setCompletedSteps((prev) => new Set(prev).add("compare"));
+                    setActiveTab("action");
+                  }}
                 />
               )}
               {activeTab === "action" && suitabilityData && (
@@ -221,23 +307,33 @@ export function AlertDetailPage() {
                 <FileText className="h-4 w-4" />
                 <span className="font-semibold">Activity Audit Log</span>
               </span>
-              <ChevronDown className={`h-4 w-4 transition-transform ${auditLogExpanded ? "rotate-180" : ""}`} />
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${auditLogExpanded ? "rotate-180" : ""}`}
+              />
             </button>
             {auditLogExpanded && (
               <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden bg-white">
                 <div className="bg-slate-50 px-6 py-3 border-b border-slate-200">
-                  <p className="text-xs text-slate-600">All actions logged for compliance (immutable record)</p>
+                  <p className="text-xs text-slate-600">
+                    All actions logged for compliance (immutable record)
+                  </p>
                 </div>
                 <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto">
                   {auditLog.map((log, idx) => (
                     <div key={idx} className="px-6 py-3 hover:bg-slate-50">
                       <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-slate-600 font-mono">{log.timestamp}</span>
+                        <span className="text-slate-600 font-mono">
+                          {log.timestamp}
+                        </span>
                         <span className="text-slate-500">{log.user}</span>
                       </div>
                       <div className="text-sm">
-                        <span className="font-semibold text-slate-900">{log.action}</span>
-                        <span className="text-slate-600 ml-2">— {log.details}</span>
+                        <span className="font-semibold text-slate-900">
+                          {log.action}
+                        </span>
+                        <span className="text-slate-600 ml-2">
+                          — {log.details}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -254,12 +350,16 @@ export function AlertDetailPage() {
           {suitabilityData?.score === 100 && disclosuresAcknowledged ? (
             <>
               <CheckCircle2 className="h-5 w-5 text-green-600" />
-              <span className="text-green-800 font-bold text-sm">Ready to proceed with transaction</span>
+              <span className="text-green-800 font-bold text-sm">
+                Ready to proceed with transaction
+              </span>
             </>
           ) : (
             <>
               <AlertTriangle className="h-5 w-5 text-amber-600" />
-              <span className="text-amber-800 font-semibold text-sm">Complete suitability and disclosures to continue</span>
+              <span className="text-amber-800 font-semibold text-sm">
+                Complete suitability and disclosures to continue
+              </span>
             </>
           )}
         </div>

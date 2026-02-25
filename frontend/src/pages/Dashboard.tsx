@@ -13,7 +13,12 @@ export function Dashboard() {
   const navigate = useNavigate();
   const { sendContext } = useChatContext();
   const [alerts, setAlerts] = useState<RenewalAlert[]>([]);
-  const [stats, setStats] = useState<DashboardStats>({ total: 0, high: 0, urgent: 0, totalValue: 0 });
+  const [stats, setStats] = useState<DashboardStats>({
+    total: 0,
+    high: 0,
+    urgent: 0,
+    totalValue: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,7 +28,10 @@ export function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const [alertsData, statsData] = await Promise.all([fetchAlerts(), fetchDashboardStats()]);
+      const [alertsData, statsData] = await Promise.all([
+        fetchAlerts(),
+        fetchDashboardStats(),
+      ]);
       setAlerts(alertsData);
       setStats(statsData);
     } catch {
@@ -34,11 +42,20 @@ export function Dashboard() {
   };
 
   const handleSelectAlert = (alert: RenewalAlert) => {
-    sendContext({ page: `/alerts/${alert.id}`, alertId: alert.id, activeTab: "overview", clientName: alert.clientName, policyId: alert.policyId });
+    sendContext({
+      page: `/alerts/${alert.id}`,
+      alertId: alert.id,
+      activeTab: "overview",
+      clientName: alert.clientName,
+      policyId: alert.policyId,
+    });
     navigate(`/alerts/${alert.id}`);
   };
 
-  const handleSelectClientAlerts = (_clientName: string, alerts: RenewalAlert[]) => {
+  const handleSelectClientAlerts = (
+    _clientName: string,
+    alerts: RenewalAlert[],
+  ) => {
     navigate(`/alerts/${alerts[0].id}`);
   };
 
@@ -68,8 +85,12 @@ export function Dashboard() {
                 <LayoutDashboard className="h-6 w-6 text-blue-700" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-slate-900">IRI Dashboard</h1>
-                <p className="text-sm text-slate-600">Annuity Renewal Intelligence</p>
+                <h1 className="text-2xl font-bold text-slate-900">
+                  IRI Dashboard
+                </h1>
+                <p className="text-sm text-slate-600">
+                  Annuity Renewal Intelligence
+                </p>
               </div>
             </div>
           </div>
@@ -81,7 +102,9 @@ export function Dashboard() {
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
         <div>
           <h2 className="text-3xl font-bold text-slate-900">My Dashboard</h2>
-          <p className="text-base text-slate-600 mt-2">Key portfolio metrics and alerts at a glance</p>
+          <p className="text-base text-slate-600 mt-2">
+            Key portfolio metrics and alerts at a glance
+          </p>
         </div>
 
         <StatsCards stats={stats} />

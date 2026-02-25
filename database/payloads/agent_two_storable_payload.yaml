@@ -92,6 +92,19 @@ root:
             type: string
             nullable: true
             description: Human-readable reason this product was recommended (contextualized from profile).
+    reasons_to_switch:
+      type: object
+      nullable: true
+      description: "Pros (+) and cons (−) for why it makes sense to switch products. Display with + for pros, − for cons."
+      properties:
+        pros:
+          type: array
+          items: { type: string }
+          description: e.g. No new paperwork or underwriting, Maintains existing carrier relationship
+        cons:
+          type: array
+          items: { type: string }
+          description: e.g. Significant rate drop to guaranteed minimum 1.5%, Missing opportunity to capture higher market rates
     merged_profile_summary:
       type: object
       nullable: true

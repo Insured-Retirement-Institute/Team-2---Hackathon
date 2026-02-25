@@ -1,8 +1,21 @@
 import { useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -50,13 +63,14 @@ interface ClientAlertGroup {
 export function GroupedAlertsTable({
   alerts,
   onSelectAlert,
-  onSelectClientAlerts: _onSelectClientAlerts,
   onSnooze,
   onDismiss,
   onAssign,
   selectedAlertId,
 }: GroupedAlertsTableProps) {
-  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
+  const [expandedClients, setExpandedClients] = useState<Set<string>>(
+    new Set(),
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCarrier, setFilterCarrier] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
@@ -68,9 +82,12 @@ export function GroupedAlertsTable({
     const matchesSearch =
       alert.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       alert.policyId.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCarrier = filterCarrier === "all" || alert.carrier === filterCarrier;
-    const matchesPriority = filterPriority === "all" || alert.priority === filterPriority;
-    const matchesStatus = filterStatus === "all" || alert.status === filterStatus;
+    const matchesCarrier =
+      filterCarrier === "all" || alert.carrier === filterCarrier;
+    const matchesPriority =
+      filterPriority === "all" || alert.priority === filterPriority;
+    const matchesStatus =
+      filterStatus === "all" || alert.status === filterStatus;
     return matchesSearch && matchesCarrier && matchesPriority && matchesStatus;
   });
 
@@ -91,7 +108,9 @@ export function GroupedAlertsTable({
         group.alerts.push(alert);
 
         const priorityOrder = { high: 0, medium: 1, low: 2 };
-        if (priorityOrder[alert.priority] < priorityOrder[group.highestPriority]) {
+        if (
+          priorityOrder[alert.priority] < priorityOrder[group.highestPriority]
+        ) {
           group.highestPriority = alert.priority;
         }
 
@@ -107,14 +126,16 @@ export function GroupedAlertsTable({
 
         return acc;
       },
-      {} as Record<string, ClientAlertGroup>
-    )
+      {} as Record<string, ClientAlertGroup>,
+    ),
   );
 
   const sortedClientGroups = [...clientGroups].sort((a, b) => {
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     if (priorityOrder[a.highestPriority] !== priorityOrder[b.highestPriority]) {
-      return priorityOrder[a.highestPriority] - priorityOrder[b.highestPriority];
+      return (
+        priorityOrder[a.highestPriority] - priorityOrder[b.highestPriority]
+      );
     }
     return b.urgentCount - a.urgentCount;
   });
@@ -143,23 +164,42 @@ export function GroupedAlertsTable({
   const getAlertTypeBadge = (alertType: RenewalAlert["alertType"]) => {
     switch (alertType) {
       case "replacement_recommended":
-        return { label: "Replacement", color: "bg-red-50 text-red-700 border-red-300" };
+        return {
+          label: "Replacement",
+          color: "bg-red-50 text-red-700 border-red-300",
+        };
       case "missing_info":
-        return { label: "Missing Info", color: "bg-red-50 text-red-700 border-red-300" };
+        return {
+          label: "Missing Info",
+          color: "bg-red-50 text-red-700 border-red-300",
+        };
       case "suitability_review":
-        return { label: "Suitability", color: "bg-purple-50 text-purple-700 border-purple-300" };
+        return {
+          label: "Suitability",
+          color: "bg-purple-50 text-purple-700 border-purple-300",
+        };
       case "income_planning":
-        return { label: "Income", color: "bg-amber-50 text-amber-700 border-amber-300" };
+        return {
+          label: "Income",
+          color: "bg-amber-50 text-amber-700 border-amber-300",
+        };
       case "replacement_opportunity":
-        return { label: "Replacement", color: "bg-red-50 text-red-700 border-red-300" };
-      default:        return { label: "Review", color: "bg-slate-100 text-slate-700 border-slate-300" };
+        return {
+          label: "Replacement",
+          color: "bg-red-50 text-red-700 border-red-300",
+        };
+      default:
+        return {
+          label: "Review",
+          color: "bg-slate-100 text-slate-700 border-slate-300",
+        };
     }
   };
 
   const getRateDrop = (current: string, renewal: string) => {
     const currentNum = parseFloat(current);
     const renewalNum = parseFloat(renewal);
-    return ((renewalNum - currentNum) / currentNum * 100).toFixed(1);
+    return (((renewalNum - currentNum) / currentNum) * 100).toFixed(1);
   };
 
   return (
@@ -218,8 +258,10 @@ export function GroupedAlertsTable({
       {/* Results Count */}
       <div className="flex items-center justify-between text-sm text-slate-600 px-1">
         <span>
-          {sortedClientGroups.length} {sortedClientGroups.length === 1 ? "client" : "clients"} with{" "}
-          {filteredAlerts.length} {filteredAlerts.length === 1 ? "alert" : "alerts"}
+          {sortedClientGroups.length}{" "}
+          {sortedClientGroups.length === 1 ? "client" : "clients"} with{" "}
+          {filteredAlerts.length}{" "}
+          {filteredAlerts.length === 1 ? "alert" : "alerts"}
         </span>
         <Button
           variant="ghost"
@@ -228,12 +270,16 @@ export function GroupedAlertsTable({
             if (expandedClients.size === sortedClientGroups.length) {
               setExpandedClients(new Set());
             } else {
-              setExpandedClients(new Set(sortedClientGroups.map((g) => g.clientName)));
+              setExpandedClients(
+                new Set(sortedClientGroups.map((g) => g.clientName)),
+              );
             }
           }}
           className="text-blue-600 hover:text-blue-700 h-8"
         >
-          {expandedClients.size === sortedClientGroups.length ? "Collapse All" : "Expand All"}
+          {expandedClients.size === sortedClientGroups.length
+            ? "Collapse All"
+            : "Expand All"}
         </Button>
       </div>
 
@@ -254,20 +300,39 @@ export function GroupedAlertsTable({
           <TableHeader>
             <TableRow className="bg-gradient-to-r from-slate-50 to-slate-100 border-b-2 border-slate-200">
               <TableHead className="font-semibold text-slate-700 w-[40px]"></TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[22%]">Client / Alert</TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[12%]">Alert Type</TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[9%]">Renewal</TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[10%]">Timeline</TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[13%]">Impact</TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[10%]">Value</TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[9%]">Priority</TableHead>
-              <TableHead className="font-semibold text-slate-700 w-[12%] text-right">Actions</TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[22%]">
+                Client / Alert
+              </TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[12%]">
+                Alert Type
+              </TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[9%]">
+                Renewal
+              </TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[10%]">
+                Timeline
+              </TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[13%]">
+                Impact
+              </TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[10%]">
+                Value
+              </TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[9%]">
+                Priority
+              </TableHead>
+              <TableHead className="font-semibold text-slate-700 w-[12%] text-right">
+                Actions
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedClientGroups.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-slate-500">
+                <TableCell
+                  colSpan={9}
+                  className="text-center py-12 text-slate-500"
+                >
                   <div className="flex flex-col items-center gap-2">
                     <Search className="h-8 w-8 text-slate-300" />
                     <p>No alerts found</p>
@@ -285,7 +350,7 @@ export function GroupedAlertsTable({
                     onClick={() => toggleClientExpanded(group.clientName)}
                     className={cn(
                       "cursor-pointer transition-all hover:bg-blue-50 border-b-2 border-slate-200 bg-slate-50/50 font-medium",
-                      group.urgentCount > 0 && "border-l-4 border-l-red-500"
+                      group.urgentCount > 0 && "border-l-4 border-l-red-500",
                     )}
                   >
                     <TableCell className="py-3">
@@ -298,7 +363,9 @@ export function GroupedAlertsTable({
 
                     <TableCell className="py-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{group.clientName}</span>
+                        <span className="font-bold text-slate-900">
+                          {group.clientName}
+                        </span>
                         <Badge
                           variant="outline"
                           className="bg-blue-50 text-blue-700 border-blue-300 text-xs px-2"
@@ -310,25 +377,34 @@ export function GroupedAlertsTable({
 
                     <TableCell className="py-3">
                       <div className="flex gap-1 flex-wrap">
-                        {Array.from(new Set(group.alerts.map((a) => getAlertTypeBadge(a.alertType).label))).map(
-                          (label, idx) => {
-                            const alertWithLabel = group.alerts.find(
-                              (a) => getAlertTypeBadge(a.alertType).label === label
-                            );
-                            const badge = alertWithLabel
-                              ? getAlertTypeBadge(alertWithLabel.alertType)
-                              : { label, color: "bg-slate-100 text-slate-700 border-slate-300" };
-                            return (
-                              <Badge
-                                key={idx}
-                                variant="outline"
-                                className={`${badge.color} text-xs px-2 py-0.5`}
-                              >
-                                {badge.label}
-                              </Badge>
-                            );
-                          }
-                        )}
+                        {Array.from(
+                          new Set(
+                            group.alerts.map(
+                              (a) => getAlertTypeBadge(a.alertType).label,
+                            ),
+                          ),
+                        ).map((label, idx) => {
+                          const alertWithLabel = group.alerts.find(
+                            (a) =>
+                              getAlertTypeBadge(a.alertType).label === label,
+                          );
+                          const badge = alertWithLabel
+                            ? getAlertTypeBadge(alertWithLabel.alertType)
+                            : {
+                                label,
+                                color:
+                                  "bg-slate-100 text-slate-700 border-slate-300",
+                              };
+                          return (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className={`${badge.color} text-xs px-2 py-0.5`}
+                            >
+                              {badge.label}
+                            </Badge>
+                          );
+                        })}
                       </div>
                     </TableCell>
 
@@ -353,7 +429,8 @@ export function GroupedAlertsTable({
                       <div className="text-sm text-slate-600">
                         {group.alerts.filter((a) => a.isMinRate).length > 0 && (
                           <Badge className="bg-red-600 text-white text-xs px-2 py-0.5">
-                            {group.alerts.filter((a) => a.isMinRate).length} at MIN
+                            {group.alerts.filter((a) => a.isMinRate).length} at
+                            MIN
                           </Badge>
                         )}
                       </div>
@@ -392,7 +469,9 @@ export function GroupedAlertsTable({
                             Review
                           </Button>
                         ) : (
-                          <span className="text-xs text-slate-500">{totalAlerts} alerts — expand to review</span>
+                          <span className="text-xs text-slate-500">
+                            {totalAlerts} alerts — expand to review
+                          </span>
                         )}
                       </div>
                     </TableCell>
@@ -401,7 +480,10 @@ export function GroupedAlertsTable({
 
                 const alertRows = isExpanded
                   ? group.alerts.map((alert) => {
-                      const rateDrop = getRateDrop(alert.currentRate, alert.renewalRate);
+                      const rateDrop = getRateDrop(
+                        alert.currentRate,
+                        alert.renewalRate,
+                      );
                       const isUrgent = alert.daysUntilRenewal <= 30;
                       const alertTypeBadge = getAlertTypeBadge(alert.alertType);
 
@@ -412,7 +494,7 @@ export function GroupedAlertsTable({
                           className={cn(
                             "cursor-pointer transition-all hover:bg-blue-50 border-b border-slate-100 bg-white",
                             selectedAlertId === alert.id && "bg-blue-50",
-                            alert.status === "dismissed" && "opacity-50"
+                            alert.status === "dismissed" && "opacity-50",
                           )}
                         >
                           <TableCell className="py-3 pl-12"></TableCell>
@@ -425,7 +507,9 @@ export function GroupedAlertsTable({
                                   {alert.policyId}
                                 </span>
                               </div>
-                              <div className="text-xs text-slate-500">{alert.carrier}</div>
+                              <div className="text-xs text-slate-500">
+                                {alert.carrier}
+                              </div>
                               {alert.alertDescription && (
                                 <div className="text-xs text-slate-600 italic">
                                   {alert.alertDescription}
@@ -444,7 +528,9 @@ export function GroupedAlertsTable({
                           </TableCell>
 
                           <TableCell className="py-3">
-                            <div className="text-sm text-slate-700">{alert.renewalDate}</div>
+                            <div className="text-sm text-slate-700">
+                              {alert.renewalDate}
+                            </div>
                           </TableCell>
 
                           <TableCell className="py-3">
@@ -464,7 +550,9 @@ export function GroupedAlertsTable({
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                                <span className="text-sm font-bold text-red-700">{rateDrop}%</span>
+                                <span className="text-sm font-bold text-red-700">
+                                  {rateDrop}%
+                                </span>
                                 {alert.isMinRate && (
                                   <Badge className="bg-red-600 text-white text-xs px-1.5 py-0">
                                     MIN
@@ -519,10 +607,15 @@ export function GroupedAlertsTable({
                                     className="h-9 w-9 p-0 border-slate-300 hover:bg-slate-100"
                                   >
                                     <MoreVertical className="h-3.5 w-3.5 text-slate-600" />
-                                    <span className="sr-only">More actions</span>
+                                    <span className="sr-only">
+                                      More actions
+                                    </span>
                                   </Button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-44">
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-44"
+                                >
                                   <DropdownMenuItem
                                     onClick={(e) => {
                                       e.stopPropagation();

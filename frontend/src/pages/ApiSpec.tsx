@@ -12,7 +12,9 @@ export function ApiSpec() {
         <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
           <ArrowLeft className="h-4 w-4 mr-1" /> Back
         </Button>
-        <h1 className="text-lg font-bold text-slate-900">API Specification v5</h1>
+        <h1 className="text-lg font-bold text-slate-900">
+          API Specification v5
+        </h1>
       </div>
       <SwaggerUI url="/api-spec-v5.yaml" />
     </div>

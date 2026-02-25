@@ -5,5 +5,7 @@ type ChatContextAPI = {
   sendContext: (ctx: ChatContext) => void;
 };
 
-export const ChatAPIContext = createContext<ChatContextAPI>({ sendContext: () => {} });
+export const ChatAPIContext = createContext<ChatContextAPI>({
+  sendContext: () => {},
+});
 export const useChatContext = () => useContext(ChatAPIContext);

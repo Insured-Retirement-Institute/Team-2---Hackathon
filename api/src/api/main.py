@@ -3,6 +3,7 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api import database
 from api.database import close_db, init_db
@@ -31,6 +32,14 @@ app = FastAPI(
     lifespan=lifespan,
     root_path=root_path,
     swagger_ui_parameters={"url": f"{root_path}/openapi.json"} if root_path else None,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

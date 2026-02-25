@@ -65,6 +65,18 @@ spec:
                   name: sureify-credentials
                   key: client_secret
                   optional: true
+            - name: SUREIFY_TOKEN_URL
+              valueFrom:
+                secretKeyRef:
+                  name: sureify-credentials
+                  key: token_url
+                  optional: true
+            - name: SUREIFY_SCOPE
+              valueFrom:
+                secretKeyRef:
+                  name: sureify-credentials
+                  key: scope
+                  optional: true
             # IRI API credentials (optional)
             - name: IRI_API_BASE_URL
               valueFrom:

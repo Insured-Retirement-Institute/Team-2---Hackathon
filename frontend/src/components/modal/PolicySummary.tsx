@@ -10,7 +10,9 @@ export function PolicySummary({ policy }: PolicySummaryProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-bold text-slate-900 mb-1">Policy Summary</h3>
+        <h3 className="text-lg font-bold text-slate-900 mb-1">
+          Policy Summary
+        </h3>
         <p className="text-xs text-slate-500 font-mono">{policy.contractId}</p>
       </div>
 
@@ -24,7 +26,12 @@ export function PolicySummary({ policy }: PolicySummaryProps) {
         <Row label="Surrender Value" value={policy.surrenderValue} />
         <Separator />
         <Row label="Current Rate" value={policy.currentRate} bold />
-        <Row label="Renewal Rate" value={policy.renewalRate} highlight={policy.isMinRateRenewal ? "red" : undefined} bold />
+        <Row
+          label="Renewal Rate"
+          value={policy.renewalRate}
+          highlight={policy.isMinRateRenewal ? "red" : undefined}
+          bold
+        />
         <Row label="Guaranteed Min" value={policy.guaranteedMinRate} />
         <Row label="Renewal Date" value={policy.renewalDate} />
         <Separator />
@@ -59,15 +66,39 @@ export function PolicySummary({ policy }: PolicySummaryProps) {
       </div>
 
       {/* Key policy metrics */}
-      {(policy.features.surrenderCharge || policy.features.withdrawalAllowance) && (
+      {(policy.features.surrenderCharge ||
+        policy.features.withdrawalAllowance) && (
         <>
           <Separator />
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-slate-700">Key Metrics</h4>
-            {policy.features.surrenderCharge && <Row label="Surrender Charge" value={policy.features.surrenderCharge} />}
-            {policy.features.withdrawalAllowance && <Row label="Free Withdrawal" value={policy.features.withdrawalAllowance} />}
-            {policy.features.mvaPenalty && <Row label="MVA Penalty" value={policy.features.mvaPenalty} highlight="red" />}
-            {policy.features.rateGuarantee && <Row label="Rate Guarantee" value={policy.features.rateGuarantee} />}
+            <h4 className="text-sm font-semibold text-slate-700">
+              Key Metrics
+            </h4>
+            {policy.features.surrenderCharge && (
+              <Row
+                label="Surrender Charge"
+                value={policy.features.surrenderCharge}
+              />
+            )}
+            {policy.features.withdrawalAllowance && (
+              <Row
+                label="Free Withdrawal"
+                value={policy.features.withdrawalAllowance}
+              />
+            )}
+            {policy.features.mvaPenalty && (
+              <Row
+                label="MVA Penalty"
+                value={policy.features.mvaPenalty}
+                highlight="red"
+              />
+            )}
+            {policy.features.rateGuarantee && (
+              <Row
+                label="Rate Guarantee"
+                value={policy.features.rateGuarantee}
+              />
+            )}
           </div>
         </>
       )}
@@ -75,7 +106,17 @@ export function PolicySummary({ policy }: PolicySummaryProps) {
   );
 }
 
-function Row({ label, value, bold, highlight }: { label: string; value: string; bold?: boolean; highlight?: "red" }) {
+function Row({
+  label,
+  value,
+  bold,
+  highlight,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+  highlight?: "red";
+}) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-xs text-slate-500">{label}</span>

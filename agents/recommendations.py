@@ -14,6 +14,7 @@ from agents.agent_two_schemas import (
     ProductRecommendation,
     ProductRecommendationsOutput,
     ProfileChangesInput,
+    ReasonsToSwitch,
 )
 
 
@@ -68,6 +69,45 @@ def _build_match_reason_from_context(
     if not reasons:
         return "Recommended from Sureify product catalog based on profile."
     return "Contextualized from your profile: " + "; ".join(reasons)
+
+
+def _build_reasons_to_switch(
+    recommendations: list[ProductRecommendation],
+    merged_suit: dict[str, Any],
+    merged_goals: dict[str, Any],
+    use_sureify: bool,
+) -> ReasonsToSwitch:
+    """
+    Build pros (+) and cons (−) for why it makes sense to switch products.
+    Example: +No new paperwork or underwriting; −Missing opportunity to capture higher market rates.
+    """
+    pros: list[str] = [
+        "No new paperwork or underwriting",
+        "Maintains existing carrier relationship",
+        "Surrender period already expired or minimal remaining",
+    ]
+
+    # Cons: rate considerations from recommended products
+    cons: list[str] = []
+    rates: list[float] = []
+    for r in recommendations:
+        try:
+            rate_str = (r.rate or "").replace("%", "").strip()
+            if rate_str and rate_str != "N/A":
+                rates.append(float(rate_str))
+        except (ValueError, TypeError):
+            pass
+    if rates:
+        max_rate = max(rates)
+        min_rate = min(rates)
+        if min_rate < max_rate:
+            cons.append(f"Significant rate drop to guaranteed minimum {min_rate}%")
+        if max_rate > 0:
+            cons.append(f"Missing opportunity to capture higher market rates ({max_rate}% available)")
+    elif recommendations:
+        cons.append("Missing opportunity to capture higher market rates (check current product rates)")
+
+    return ReasonsToSwitch(pros=pros, cons=cons)
 
 
 def _build_choice_explanation(
@@ -302,12 +342,14 @@ def generate_recommendations(
     explanation = _build_choice_explanation(
         use_sureify, merged_suit, merged_goals, changes, len(recs)
     )
+    reasons_to_switch = _build_reasons_to_switch(recs, merged_suit, merged_goals, use_sureify)
 
     return ProductRecommendationsOutput(
         client_id=client_id,
         merged_profile_summary=merged_profile_summary,
         recommendations=recs,
         explanation=explanation,
+        reasons_to_switch=reasons_to_switch,
         storable_payload=None,  # Built in agent_two.py with run_id and created_at
         iri_comparison_result=iri_comparison_result,
     )

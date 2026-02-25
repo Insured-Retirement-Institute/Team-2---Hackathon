@@ -174,6 +174,7 @@ def generate_product_recommendations(
             input_summary=input_summary,
             explanation=out.explanation,
             recommendations=out.recommendations,
+            reasons_to_switch=out.reasons_to_switch,
             merged_profile_summary=out.merged_profile_summary,
             iri_comparison_result=out.iri_comparison_result,
         )

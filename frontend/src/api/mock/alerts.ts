@@ -22,8 +22,13 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "replacement_recommended",
-    alertTypes: ["replacement_recommended", "suitability_review", "missing_info"],
-    alertDescription: "Renewal at minimum rate - replacement analysis recommended"
+    alertTypes: [
+      "replacement_recommended",
+      "suitability_review",
+      "missing_info",
+    ],
+    alertDescription:
+      "Renewal at minimum rate - replacement analysis recommended",
   },
   {
     id: "alert-ANN-2020-5621-suitability",
@@ -41,7 +46,8 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "suitability_review",
-    alertDescription: "Annual suitability review required - client objectives may have changed"
+    alertDescription:
+      "Annual suitability review required - client objectives may have changed",
   },
 
   // Robert Chen - 1 alert (replacement)
@@ -61,7 +67,8 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "replacement_recommended",
-    alertDescription: "Renewal at minimum rate - replacement analysis recommended"
+    alertDescription:
+      "Renewal at minimum rate - replacement analysis recommended",
   },
 
   // David Thompson - 1 alert (replacement)
@@ -81,7 +88,8 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "replacement_recommended",
-    alertDescription: "Renewal at minimum rate - replacement analysis recommended"
+    alertDescription:
+      "Renewal at minimum rate - replacement analysis recommended",
   },
 
   // Jessica Martinez - 1 alert (suitability)
@@ -101,7 +109,8 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "suitability_review",
-    alertDescription: "Annual suitability review required - moderate rate drop at renewal"
+    alertDescription:
+      "Annual suitability review required - moderate rate drop at renewal",
   },
 
   // Daniel Garcia - 2 alerts (replacement + missing info)
@@ -121,7 +130,7 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "replacement_recommended",
-    alertDescription: "Standard renewal - rate remains competitive"
+    alertDescription: "Standard renewal - rate remains competitive",
   },
   {
     id: "alert-ANN-2020-7845-missing",
@@ -140,7 +149,7 @@ export const mockAlerts: RenewalAlert[] = [
     missingFields: ["Contact phone update needed"],
     status: "pending",
     alertType: "missing_info",
-    alertDescription: "Client contact information needs update"
+    alertDescription: "Client contact information needs update",
   },
 
   // Nancy White - 1 alert (suitability)
@@ -160,7 +169,8 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "suitability_review",
-    alertDescription: "Annual suitability review required - client objectives confirmation needed"
+    alertDescription:
+      "Annual suitability review required - client objectives confirmation needed",
   },
 
   // George Robinson - 1 alert (replacement)
@@ -180,7 +190,8 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "replacement_recommended",
-    alertDescription: "Replacement analysis recommended - review available alternatives"
+    alertDescription:
+      "Replacement analysis recommended - review available alternatives",
   },
 
   // Jennifer Martinez - 1 alert (income planning)
@@ -200,6 +211,7 @@ export const mockAlerts: RenewalAlert[] = [
     hasDataException: false,
     status: "pending",
     alertType: "income_planning",
-    alertDescription: "Client approaching income distribution phase - income planning review recommended"
-  }
+    alertDescription:
+      "Client approaching income distribution phase - income planning review recommended",
+  },
 ];
