@@ -365,3 +365,117 @@ async def save_client_profile(
     )
 
     return {"success": True, "message": "Profile saved"}
+
+
+@router.get("/{clientId}/policies/{policyId}")
+async def get_policy_data(clientId: str, policyId: str, sureify: SureifyDep):
+    """
+    Get full policy data for a specific client and policy combination.
+
+    Calls /passthrough/policy-data endpoint and filters for the specific policy.
+    """
+    # Get all policy data from Sureify
+    try:
+        policy_data_list = await sureify.get_policy_data()
+
+        # Find the specific policy matching both clientId and policyId
+        matching_policy = None
+        for policy in policy_data_list:
+            # Check if this policy matches both clientId and contractId (policyId)
+            if policy.clientId == clientId and policy.contractId == policyId:
+                matching_policy = policy
+                break
+
+        if not matching_policy:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Policy {policyId} not found for client {clientId}"
+            )
+
+        # Return the policy as a dict
+        return matching_policy.model_dump(mode='json')
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching policy data: {str(e)}"
+        )
+
+
+@router.put("/{clientId}/suitability")
+async def save_suitability(
+    clientId: str,
+    suitability: SuitabilityData
+):
+    """
+    Save suitability data for a client.
+
+    Logic:
+    1. Use clientId directly (passed in path)
+    2. Verify client_profiles record exists (FK constraint requirement)
+    3. Insert or update suitability data in client_suitability_data table
+    """
+    # 1. Verify client_profiles record exists (FK constraint requirement)
+    profile_exists = await pool.fetchrow(
+        "SELECT client_id FROM client_profiles WHERE client_id = $1",
+        clientId
+    )
+
+    if not profile_exists:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Client profile must be fetched at least once before saving suitability data. Client ID: {clientId}"
+        )
+
+    # 2. Insert or update suitability data
+    await pool.execute(
+        """
+        INSERT INTO client_suitability_data (
+            client_id,
+            client_objectives,
+            risk_tolerance,
+            time_horizon,
+            liquidity_needs,
+            tax_considerations,
+            guaranteed_income,
+            rate_expectations,
+            surrender_timeline,
+            living_benefits,
+            advisor_eligibility,
+            score,
+            is_prefilled,
+            updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
+        ON CONFLICT (client_id) DO UPDATE SET
+            client_objectives = EXCLUDED.client_objectives,
+            risk_tolerance = EXCLUDED.risk_tolerance,
+            time_horizon = EXCLUDED.time_horizon,
+            liquidity_needs = EXCLUDED.liquidity_needs,
+            tax_considerations = EXCLUDED.tax_considerations,
+            guaranteed_income = EXCLUDED.guaranteed_income,
+            rate_expectations = EXCLUDED.rate_expectations,
+            surrender_timeline = EXCLUDED.surrender_timeline,
+            living_benefits = EXCLUDED.living_benefits,
+            advisor_eligibility = EXCLUDED.advisor_eligibility,
+            score = EXCLUDED.score,
+            is_prefilled = EXCLUDED.is_prefilled,
+            updated_at = now()
+        """,
+        clientId,
+        suitability.clientObjectives,
+        suitability.riskTolerance,
+        suitability.timeHorizon,
+        suitability.liquidityNeeds,
+        suitability.taxConsiderations,
+        suitability.guaranteedIncome,
+        suitability.rateExpectations,
+        suitability.surrenderTimeline,
+        suitability.livingBenefits,
+        suitability.advisorEligibility,
+        suitability.score,
+        suitability.isPrefilled
+    )
+
+    return {"success": True, "message": "Suitability saved"}

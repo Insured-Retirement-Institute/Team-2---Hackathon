@@ -15,13 +15,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
-
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info("Starting application...")
