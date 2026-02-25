@@ -6,7 +6,9 @@ Logic:
 - PUT: Save ComparisonParameters to client_profiles table
 - PUT /alerts/{alertId}/suitability: Update suitability_data linked via alert's customer_identifier
 """
-from typing import Annotated, Any
+from collections.abc import AsyncGenerator
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -69,8 +71,7 @@ class ClientProfile(BaseModel):
     suitability: SuitabilityData | None = None
 
 
-async def get_sureify_client():
-    """Dependency to get authenticated Sureify client"""
+async def get_sureify_client() -> AsyncGenerator[SureifyClient, None]:
     config = SureifyAuthConfig()
     client = SureifyClient(config)
     await client.authenticate()
@@ -197,41 +198,72 @@ async def get_client_profile(clientId: str, sureify: SureifyDep):
             suitability=suitability
         )
 
-    # 3. No data in DB - fetch from Sureify /puddle/clientProfile
+    # 3. No data in DB - fetch from Sureify using client methods
     try:
-        # Call Sureify puddle API /clientProfile endpoint
-        response = await sureify._get(f"/puddle/clientProfile?clientId={clientId}", {})
+        # Fetch all client profiles and find the matching one
+        client_profiles = await sureify.get_client_profiles()
+        client_data = next((p for p in client_profiles if p.clientId == clientId), None)
 
-        if not response or "clientProfiles" not in response:
+        if not client_data:
             raise HTTPException(status_code=404, detail=f"Client {clientId} not found in Sureify")
 
-        # Extract client profile data
-        client_profiles = response.get("clientProfiles", [])
-        if not client_profiles:
-            raise HTTPException(status_code=404, detail=f"Client {clientId} not found in Sureify")
-
-        client_data = client_profiles[0]
-
-        # Also fetch suitability data from /puddle/suitabilityData
-        suitability_response = await sureify._get(f"/puddle/suitabilityData?clientId={clientId}", {})
-        suitability_list = suitability_response.get("suitabilityData", []) if suitability_response else []
-        suitability_data = suitability_list[0] if suitability_list else None
+        # Fetch suitability data
+        suitability_list = await sureify.get_suitability_data()
+        suitability_data = next((s for s in suitability_list if s.clientId == clientId), None)
 
         # Build response matching the format
-        parameters_dict = client_data.get("parameters", {})
-        parameters = ComparisonParameters(**parameters_dict) if parameters_dict else None
+        parameters = None
+        if client_data.parameters:
+            parameters = ComparisonParameters(
+                residesInNursingHome=client_data.parameters.residesInNursingHome.value if client_data.parameters.residesInNursingHome else None,
+                hasLongTermCareInsurance=client_data.parameters.hasLongTermCareInsurance.value if client_data.parameters.hasLongTermCareInsurance else None,
+                hasMedicareSupplemental=client_data.parameters.hasMedicareSupplemental.value if client_data.parameters.hasMedicareSupplemental else None,
+                grossIncome=client_data.parameters.grossIncome,
+                disposableIncome=client_data.parameters.disposableIncome,
+                taxBracket=client_data.parameters.taxBracket,
+                householdLiquidAssets=client_data.parameters.householdLiquidAssets,
+                monthlyLivingExpenses=client_data.parameters.monthlyLivingExpenses,
+                totalAnnuityValue=client_data.parameters.totalAnnuityValue,
+                householdNetWorth=client_data.parameters.householdNetWorth,
+                anticipateExpenseIncrease=client_data.parameters.anticipateExpenseIncrease.value if client_data.parameters.anticipateExpenseIncrease else None,
+                anticipateIncomeDecrease=client_data.parameters.anticipateIncomeDecrease.value if client_data.parameters.anticipateIncomeDecrease else None,
+                anticipateLiquidAssetDecrease=client_data.parameters.anticipateLiquidAssetDecrease.value if client_data.parameters.anticipateLiquidAssetDecrease else None,
+                financialObjectives=client_data.parameters.financialObjectives,
+                distributionPlan=client_data.parameters.distributionPlan,
+                ownedAssets=client_data.parameters.ownedAssets,
+                timeToFirstDistribution=client_data.parameters.timeToFirstDistribution,
+                expectedHoldingPeriod=client_data.parameters.expectedHoldingPeriod,
+                sourceOfFunds=client_data.parameters.sourceOfFunds,
+                employmentStatus=client_data.parameters.employmentStatus,
+                applyToMeansTestedBenefits=client_data.parameters.applyToMeansTestedBenefits.value if client_data.parameters.applyToMeansTestedBenefits else None,
+            )
 
         suitability = None
         if suitability_data:
-            suitability = SuitabilityData(**suitability_data)
+            suitability = SuitabilityData(
+                clientObjectives=suitability_data.clientObjectives,
+                riskTolerance=suitability_data.riskTolerance,
+                timeHorizon=suitability_data.timeHorizon,
+                liquidityNeeds=suitability_data.liquidityNeeds,
+                taxConsiderations=suitability_data.taxConsiderations,
+                guaranteedIncome=suitability_data.guaranteedIncome,
+                rateExpectations=suitability_data.rateExpectations,
+                surrenderTimeline=suitability_data.surrenderTimeline,
+                livingBenefits=suitability_data.livingBenefits,
+                advisorEligibility=suitability_data.advisorEligibility,
+                score=suitability_data.score,
+                isPrefilled=suitability_data.isPrefilled,
+            )
 
         return ClientProfile(
-            clientId=client_data.get("clientId", clientId),
-            clientName=client_data.get("clientName", ""),
+            clientId=client_data.clientId,
+            clientName=client_data.clientName,
             parameters=parameters,
             suitability=suitability
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching client profile: {str(e)}")
 

@@ -3,7 +3,7 @@
 
 [tasks.generate-models]
 description = "Generate Pydantic models from sureify.json OpenAPI spec"
-run = "uv run datamodel-codegen --input sureify.json --output-model-type pydantic_v2.BaseModel --output api/src/api/sureify_models.py"
+run = "uv run datamodel-codegen --input sureify.yaml --output-model-type pydantic_v2.BaseModel --output api/src/api/sureify_models.py"
 
 # =============================================================================
 # pgschema Tasks
