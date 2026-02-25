@@ -77,13 +77,9 @@ spec:
                   name: sureify-credentials
                   key: scope
                   optional: true
-            # IRI API credentials (optional)
+            # IRI API base URL - points to internal API service in K8s cluster
             - name: IRI_API_BASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: iri-credentials
-                  key: base_url
-                  optional: true
+              value: "http://hack2future:80/api"
           resources:
             requests:
               memory: "256Mi"

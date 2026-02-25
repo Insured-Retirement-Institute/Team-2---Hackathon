@@ -311,3 +311,20 @@ def submit_iri_transaction(alert_id: str, transaction_type: str, rationale: str,
         },
     )
     return out if isinstance(out, dict) else {"error": "INVALID_RESPONSE", "message": "Expected object"}
+
+
+def create_iri_alerts(book_of_business: BookOfBusinessOutput) -> dict:
+    """
+    POST /alerts - Create alerts from BookOfBusinessOutput.
+
+    Sends the complete book of business to the IRI API which will create
+    one alert per policy in the database.
+
+    Returns: Success response with created count or error dict.
+    """
+    out = _request(
+        "POST",
+        "/alerts",
+        json_body=book_of_business.model_dump(mode="json", exclude_none=True),
+    )
+    return out if isinstance(out, dict) else {"error": "INVALID_RESPONSE", "message": "Expected object"}

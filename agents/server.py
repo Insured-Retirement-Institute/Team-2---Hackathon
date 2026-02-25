@@ -51,6 +51,17 @@ class AgentOneResponse(BaseModel):
     format: str
 
 
+class CreateAlertsRequest(BaseModel):
+    customer_identifier: str = "Marty McFly"
+
+
+class CreateAlertsResponse(BaseModel):
+    success: bool
+    message: str
+    created: int
+    errors: list[str] | None = None
+
+
 class AgentTwoContextRequest(BaseModel):
     client_id: str = "Marty McFly"
 
@@ -125,6 +136,48 @@ def agent_one_book_of_business(request: AgentOneRequest):
 
         import json
         return AgentOneResponse(result=json.loads(result), format=request.format)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent-one/create-alerts", response_model=CreateAlertsResponse)
+def agent_one_create_alerts(request: CreateAlertsRequest):
+    """
+    Generate book of business and push alerts to IRI API database.
+
+    This endpoint:
+    1. Fetches policies from Sureify
+    2. Applies business logic (replacements, data quality, etc.)
+    3. POSTs the BookOfBusinessOutput to POST /api/alerts
+    4. Returns success response with created alert count
+
+    Requires IRI_API_BASE_URL environment variable to be set.
+    """
+    try:
+        from agents.agent_one.main import get_book_of_business_with_notifications_and_flags
+        from agents.schemas import BookOfBusinessOutput
+        from agents.iri_client import create_iri_alerts
+
+        # Generate book of business
+        json_output = get_book_of_business_with_notifications_and_flags(request.customer_identifier)
+        book = BookOfBusinessOutput.model_validate_json(json_output)
+
+        # Push to IRI API
+        result = create_iri_alerts(book)
+
+        # Check for errors
+        if isinstance(result, dict) and result.get("error"):
+            raise HTTPException(status_code=500, detail=result.get("message", "Failed to create alerts"))
+
+        # Return success response
+        return CreateAlertsResponse(
+            success=result.get("success", True),
+            message=result.get("message", "Alerts created successfully"),
+            created=result.get("created", len(book.policies)),
+            errors=result.get("errors")
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
