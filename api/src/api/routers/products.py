@@ -1,26 +1,18 @@
 """
 Products shelf endpoint - returns available products for comparison.
 """
+from collections.abc import AsyncGenerator
 from typing import Annotated
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
 
-from api.sureify_client import SureifyClient, SureifyAuthConfig, Product, Persona
+from fastapi import APIRouter, Depends, Query
+
+from api.sureify_client import SureifyClient, SureifyAuthConfig
+from api.sureify_models import ProductOption
 
 router = APIRouter(prefix="/api/products", tags=["Products"])
 
 
-class ProductShelfItem(BaseModel):
-    """Product item for the product shelf"""
-    id: str
-    name: str
-    productCode: str | None = None
-    carrier: str | None = None
-    type: str | None = None
-
-
-async def get_sureify_client():
-    """Dependency to get authenticated Sureify client"""
+async def get_sureify_client() -> AsyncGenerator[SureifyClient, None]:
     config = SureifyAuthConfig()
     client = SureifyClient(config)
     await client.authenticate()
@@ -33,11 +25,10 @@ async def get_sureify_client():
 SureifyDep = Annotated[SureifyClient, Depends(get_sureify_client)]
 
 
-@router.get("/shelf", response_model=list[Product])
+@router.get("/shelf", response_model=list[ProductOption])
 async def get_product_shelf(
     sureify: SureifyDep,
     carrier: Annotated[str | None, Query()] = None,
-    product_type: Annotated[str | None, Query(alias="type")] = None,
 ):
     """
     Get product shelf - all available products for comparison.
@@ -45,25 +36,12 @@ async def get_product_shelf(
     Used by the UI's Product Shelf modal in the Compare tab.
     Users can browse and select products to compare against current policy.
     """
-    # Fetch all products from Sureify
-    products = await sureify.get_products(
-        user_id="1003",  # Use default user for product catalog
-        persona=Persona.agent
-    )
-
-    # Apply filters if provided
-    filtered_products = products
+    products = await sureify.get_product_options()
 
     if carrier:
-        filtered_products = [
-            p for p in filtered_products
-            if p.carrierCode and carrier.lower() in str(p.carrierCode).lower()
+        products = [
+            p for p in products
+            if p.carrier and carrier.lower() in p.carrier.lower()
         ]
 
-    if product_type:
-        filtered_products = [
-            p for p in filtered_products
-            if p.productType and product_type.lower() in str(p.productType).lower()
-        ]
-
-    return filtered_products
+    return products

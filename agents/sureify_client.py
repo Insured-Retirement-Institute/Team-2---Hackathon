@@ -1,9 +1,10 @@
 """
-Sureify API client for agentOne (book of business and notifications).
+Sureify API client for agents (book of business and notifications).
 
 Uses the shared API client (api.sureify_client) when SUREIFY_BASE_URL and
-SUREIFY_CLIENT_ID / SUREIFY_CLIENT_SECRET are set; agent and API stay consistent
-via get_policies() and get_notes(). Policy/Note shapes follow api.sureify_models.
+SUREIFY_CLIENT_ID / SUREIFY_CLIENT_SECRET are set. The new Puddle Data API
+provides PolicyData, ProductOption, SuitabilityData, etc.
+
 Otherwise returns mock data for Marty McFly so the agent can run without the live API.
 """
 
@@ -20,97 +21,102 @@ from typing import Any
 MOCK_POLICIES: list[dict[str, Any]] = [
     {
         "ID": "pol-marty-001",
-        "policyNumber": "WL-2024-001",
-        "status": "Inforce",
-        "statusCategory": "Inforce",
-        "carrier": "SureCo",
-        "effectiveDate": "2024-01-15",
-        "productSnapshot": {
-            "name": "Whole Life 5",
-            "productCode": "WL5",
-            "type": {"name": "Life"},
+        "clientId": "CLT-2024-00100",
+        "contractId": "ANN-2020-5621",
+        "clientName": "Marty McFly",
+        "carrier": "Integrity Life Insurance",
+        "productName": "SecureChoice Multi-Year Guarantee Annuity",
+        "issueDate": "03/15/2018",
+        "currentValue": "$180,000",
+        "surrenderValue": "$176,400",
+        "currentRate": "3.80%",
+        "renewalRate": "1.50%",
+        "guaranteedMinRate": "1.50%",
+        "renewalDate": "03/15/2026",
+        "isMinRateRenewal": True,
+        "suitabilityStatus": "complete",
+        "eligibilityStatus": "eligible",
+        "features": {
+            "surrenderCharge": "2.5% (Year 7 of 10)",
+            "withdrawalAllowance": "10% annually penalty-free",
+            "mvaPenalty": "-3.8% if surrendered today",
+            "rateGuarantee": "5 years remaining",
         },
-        "deathBenefit": {"value": 500000, "currency": "USD"},
-        "cashValue": {"value": 25000, "currency": "USD"},
-        "modalPremium": {"value": 35000, "currency": "USD"},
-        "paymentMode": "Monthly",
-        "nextPremiumDueDate": "2025-03-01",
     },
     {
         "ID": "pol-marty-002",
-        "policyNumber": "FA-2020-042",
-        "status": "Inforce",
-        "statusCategory": "Inforce",
+        "clientId": "CLT-2024-00100",
+        "contractId": "FA-2020-042",
+        "clientName": "Marty McFly",
         "carrier": "SureCo",
-        "effectiveDate": "2020-06-01",
-        "productSnapshot": {
-            "name": "Fixed Annuity Plus",
-            "productCode": "FAP",
-            "type": {"name": "Annuity"},
+        "productName": "Fixed Annuity Plus",
+        "issueDate": "06/01/2020",
+        "currentValue": "$185,000",
+        "surrenderValue": "$180,000",
+        "currentRate": "3.25%",
+        "renewalRate": "2.00%",
+        "guaranteedMinRate": "2.00%",
+        "renewalDate": "06/01/2025",
+        "isMinRateRenewal": True,
+        "suitabilityStatus": "incomplete",
+        "eligibilityStatus": "eligible",
+        "features": {
+            "surrenderCharge": "3% (Year 5 of 7)",
+            "withdrawalAllowance": "10% annually penalty-free",
         },
-        "annuityValue": {"value": 180000, "currency": "USD"},
-        "currentValue": {"value": 185000, "currency": "USD"},
-        "payoutSchedule": None,
-        "qualificationType": "Qualified",
-    },
-    {
-        "ID": "pol-marty-003",
-        "policyNumber": "TL-2019-100",
-        "status": "Inforce",
-        "statusCategory": "Inforce",
-        "carrier": "SureCo",
-        "effectiveDate": "2019-09-01",
-        "productSnapshot": {
-            "name": "Term 20",
-            "productCode": "T20",
-            "type": {"name": "Life"},
-        },
-        "faceAmount": {"value": 250000, "currency": "USD"},
-        "coveredUntilDate": "2039-09-01",
-        "modalPremium": {"value": 2800, "currency": "USD"},
-        "paymentMode": "Annual",
     },
 ]
 
 MOCK_NOTIFICATIONS: dict[str, list[dict[str, Any]]] = {
     "pol-marty-001": [
-        {"type": "premium_due", "message": "Premium due in 30 days (Mar 1, 2025)", "severity": "info"},
-        {"type": "replacement_opportunity", "message": "New product may offer better cash value growth", "severity": "info"},
+        {"type": "renewal_alert", "message": "Rate renewal coming up - may drop to minimum rate", "severity": "warning"},
+        {"type": "replacement_opportunity", "message": "New product may offer better rate guarantee", "severity": "info"},
     ],
     "pol-marty-002": [
-        {"type": "income_activation", "message": "Eligible for income activation; RMD not yet started", "severity": "info"},
+        {"type": "suitability_incomplete", "message": "Suitability assessment not complete", "severity": "warning"},
         {"type": "data_quality", "message": "Beneficiary contact info may be outdated", "severity": "warning"},
-    ],
-    "pol-marty-003": [
-        {"type": "term_conversion", "message": "Term conversion window opens in 6 months", "severity": "info"},
     ],
 }
 
-# Mock products when Sureify API is not configured (for agentTwo recommendations).
 MOCK_PRODUCTS: list[dict[str, Any]] = [
     {
-        "ID": "prod-mock-001",
-        "productCode": "WL5",
-        "name": "Whole Life 5",
-        "carrierCode": "SureCo",
-        "attributes": [{"name": "RiskProfile", "value": "Moderate"}, {"name": "Liquidity", "value": "Free Partial Withdrawals"}],
-        "states": [["AZ", "CA", "OH"]],
+        "ID": "prod-001",
+        "productId": "PROD-FLEXGROWTH-P-7",
+        "name": "FlexGrowth Plus MYGA",
+        "carrier": "Great American",
+        "rate": "4.25%",
+        "term": "7 years",
+        "premiumBonus": "3.0%",
+        "surrenderPeriod": "7",
+        "surrenderCharge": "7% (declining 1% annually)",
+        "freeWithdrawal": "10%",
+        "deathBenefit": "Enhanced -- return of premium plus interest",
+        "guaranteedMinRate": "2.50%",
+        "riders": ["Guaranteed Lifetime Withdrawal Benefit", "Nursing Home Confinement Waiver"],
+        "features": ["Tax-deferred accumulation", "Penalty-free systematic withdrawals"],
+        "liquidity": "10% annual free withdrawal; full liquidity after surrender period",
+        "mvaPenalty": "Subject to MVA during surrender period",
+        "licensingApproved": True,
     },
     {
-        "ID": "prod-mock-002",
-        "productCode": "FAP",
-        "name": "Fixed Annuity Plus",
-        "carrierCode": "SureCo",
-        "attributes": [{"name": "RiskProfile", "value": "Conservative"}, {"name": "Liquidity", "value": "10% annually"}],
-        "states": [["AZ", "CA", "OH", "TX"]],
-    },
-    {
-        "ID": "prod-mock-003",
-        "productCode": "MYGA7",
-        "name": "Multi-Year Guarantee Annuity 7",
-        "carrierCode": "SureCo",
-        "attributes": [{"name": "RiskProfile", "value": "Moderate"}, {"name": "TimeHorizon", "value": "7 years"}],
-        "states": [["AZ", "CA", "OH", "TX", "FL"]],
+        "ID": "prod-002",
+        "productId": "PROD-SAFEHARBOR-F-5",
+        "name": "SafeHarbor Fixed Annuity",
+        "carrier": "Athene",
+        "rate": "3.75%",
+        "term": "5 years",
+        "premiumBonus": None,
+        "surrenderPeriod": "5",
+        "surrenderCharge": "5% (declining 1% annually)",
+        "freeWithdrawal": "10%",
+        "deathBenefit": "Standard -- accumulated contract value",
+        "guaranteedMinRate": "2.00%",
+        "riders": ["Nursing Home Confinement Waiver"],
+        "features": ["Tax-deferred accumulation", "No market value adjustment"],
+        "liquidity": "10% annual free withdrawal; RMD-friendly",
+        "mvaPenalty": None,
+        "licensingApproved": False,
+        "licensingDetails": "Appointment with Athene required -- apply at carrier portal",
     },
 ]
 
@@ -156,65 +162,27 @@ def _model_to_dict(obj: Any) -> dict[str, Any]:
     return dict(obj)
 
 
-def _policy_to_dict(policy: Any) -> dict[str, Any]:
-    """Convert API Policy model to JSON-serializable dict; normalize ID to string for agent logic."""
-    d = _model_to_dict(policy)
-    # Ensure ID is a plain string for agent logic (logic uses policy.get("ID") or policy.get("policyNumber"))
-    if "ID" in d and d["ID"] is not None and not isinstance(d["ID"], str):
-        d["ID"] = str(d["ID"])
-    return d
-
-
-def _note_to_notification(note: Any) -> dict[str, Any]:
-    """Convert API Note to agent notification shape (type, message, severity for PolicyNotification)."""
-    n = _model_to_dict(note)
-    message = n.get("title") or n.get("content") or "Note"
-    return {"type": "note", "message": message, "severity": "info"}
-
-
-def _policy_id_from_value(val: Any) -> str | None:
-    """Extract string policy ID from API ID type or string."""
-    if val is None:
-        return None
-    if isinstance(val, str):
-        return val
-    if hasattr(val, "root"):
-        return getattr(val, "root", None)
-    if hasattr(val, "__root__"):
-        return getattr(val, "__root__", None)
-    if isinstance(val, dict):
-        if "root" in val:
-            return val["root"]
-        if "__root__" in val:
-            return val["__root__"]
-    return str(val)
-
-
-def _product_to_dict(product: Any) -> dict[str, Any]:
-    """Convert API Product model to JSON-serializable dict; normalize ID for agent/recommendations."""
-    d = _model_to_dict(product)
-    if "ID" not in d and "ID_1" in d:
-        d["ID"] = d.pop("ID_1", None)
-    if d.get("ID") is not None and not isinstance(d["ID"], str):
-        d["ID"] = str(d["ID"])
-    return d
+def _run_async(coro):
+    """Run an async coroutine synchronously."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop.run_until_complete(coro)
 
 
 def get_products(customer_identifier: str) -> list[dict[str, Any]]:
     """
-    Fetch products from Sureify /puddle/products.
+    Fetch product options from Sureify /puddle/productOption.
 
-    Uses api.sureify_client.get_products when Sureify is configured (user_id passed
-    as customer_identifier). Otherwise returns mock products for agentTwo recommendations.
+    Uses api.sureify_client.get_product_options when Sureify is configured.
+    Otherwise returns mock products for agent recommendations.
     """
     client = _get_authenticated_client()
     if client is not None:
-        try:
-            from api.sureify_client import get_products as api_get_products
-        except ImportError:
-            from api.src.api.sureify_client import get_products as api_get_products
-        products = api_get_products(client, user_id=customer_identifier)
-        return [_product_to_dict(p) for p in products]
+        products = _run_async(client.get_product_options())
+        return [_model_to_dict(p) for p in products]
     if customer_identifier.lower().replace(" ", "") in ("martymcfly", "marty_mcfly", "marty-mcfly", ""):
         return [dict(p) for p in MOCK_PRODUCTS]
     return []
@@ -224,18 +192,13 @@ def get_book_of_business(customer_identifier: str) -> list[dict[str, Any]]:
     """
     Fetch the book of business (all policies) for a customer or advisor.
 
-    Uses api.sureify_client.get_policies when Sureify is configured (SUREIFY_BASE_URL,
-    SUREIFY_CLIENT_ID, SUREIFY_CLIENT_SECRET). customer_identifier is passed as user_id.
+    Uses api.sureify_client.get_policy_data when Sureify is configured.
     Otherwise returns mock data for Marty McFly.
     """
     client = _get_authenticated_client()
     if client is not None:
-        try:
-            from api.sureify_client import get_policies
-        except ImportError:
-            from api.src.api.sureify_client import get_policies
-        policies = get_policies(client, user_id=customer_identifier)
-        return [_policy_to_dict(p) for p in policies]
+        policies = _run_async(client.get_policy_data())
+        return [_model_to_dict(p) for p in policies]
     # Mock
     if customer_identifier.lower().replace(" ", "") in ("martymcfly", "marty_mcfly", "marty-mcfly"):
         return [dict(p) for p in MOCK_POLICIES]
@@ -247,25 +210,42 @@ def get_notifications_for_policies(
     user_id: str | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     """
-    Fetch notifications applicable to each of the given policy IDs.
+    Get notifications applicable to each of the given policy IDs.
 
-    When Sureify is configured, uses api.sureify_client.get_notes (with user_id
-    when provided) and maps notes to policies by policyID. Otherwise returns mock notifications.
-    Returns a dict mapping policy_id -> list of { type, message, severity }.
+    The new Puddle API doesn't have a separate notifications endpoint.
+    Notifications are derived from policy data (suitabilityStatus, isMinRateRenewal, etc.).
+    When Sureify is configured, we fetch policy data and generate notifications based on status.
+    Otherwise returns mock notifications.
     """
     client = _get_authenticated_client()
     if client is not None:
-        try:
-            from api.sureify_client import get_notes
-        except ImportError:
-            from api.src.api.sureify_client import get_notes
-        kwargs = {"user_id": user_id} if user_id else {}
-        notes = get_notes(client, **kwargs)
+        policies = _run_async(client.get_policy_data())
         result: dict[str, list[dict[str, Any]]] = {pid: [] for pid in policy_ids}
-        for note in notes:
-            pid = _policy_id_from_value(getattr(note, "policyID", None))
-            if pid and pid in result:
-                result[pid].append(_note_to_notification(note))
+        for policy in policies:
+            pid = policy.ID
+            if pid not in result:
+                continue
+            notifications = []
+            # Generate notifications based on policy status
+            if policy.isMinRateRenewal:
+                notifications.append({
+                    "type": "renewal_alert",
+                    "message": f"Rate renewal on {policy.renewalDate} will drop to minimum rate ({policy.guaranteedMinRate})",
+                    "severity": "warning",
+                })
+            if policy.suitabilityStatus.value != "complete":
+                notifications.append({
+                    "type": "suitability_incomplete",
+                    "message": f"Suitability assessment is {policy.suitabilityStatus.value}",
+                    "severity": "warning",
+                })
+            if policy.eligibilityStatus.value == "restricted":
+                notifications.append({
+                    "type": "eligibility_restricted",
+                    "message": "Policy has restricted eligibility for renewal/exchange",
+                    "severity": "info",
+                })
+            result[pid] = notifications
         return result
     # Mock
     result = {}
