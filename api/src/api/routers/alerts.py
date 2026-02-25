@@ -155,3 +155,110 @@ async def dismiss_alert(alert_id: str, request: DismissRequest) -> ApiResponse:
         success=True,
         message="Alert dismissed successfully"
     )
+
+
+class SuitabilityData(BaseModel):
+    """Client suitability assessment data"""
+    clientObjectives: str
+    riskTolerance: str
+    timeHorizon: str
+    liquidityNeeds: str
+    taxConsiderations: str
+    guaranteedIncome: str
+    rateExpectations: str
+    surrenderTimeline: str
+    livingBenefits: list[str]
+    advisorEligibility: str
+    score: int
+    isPrefilled: bool
+
+
+@router.put("/alerts/{alert_id}/suitability")
+async def save_suitability(
+    alert_id: str,
+    suitability: SuitabilityData
+):
+    """
+    Save suitability data for an alert.
+
+    Logic:
+    1. Lookup customer_identifier from alerts table using alert_id
+    2. Use that as clientId to update client_suitability_data table
+    3. Requires client_profiles record to exist first (FK constraint)
+    """
+    # 1. Get customer_identifier from alerts table
+    alert_row = await pool.fetchrow(
+        "SELECT customer_identifier FROM alerts WHERE id = $1",
+        alert_id
+    )
+
+    if not alert_row or not alert_row['customer_identifier']:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Alert {alert_id} not found or has no customer_identifier"
+        )
+
+    client_id = alert_row['customer_identifier']
+
+    # 2. Verify client_profiles record exists (FK constraint requirement)
+    profile_exists = await pool.fetchrow(
+        "SELECT client_id FROM client_profiles WHERE client_id = $1",
+        client_id
+    )
+
+    if not profile_exists:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Client profile must be fetched at least once before saving suitability data. Client ID: {client_id}"
+        )
+
+    # 3. Insert or update suitability data
+    await pool.execute(
+        """
+        INSERT INTO client_suitability_data (
+            client_id,
+            client_objectives,
+            risk_tolerance,
+            time_horizon,
+            liquidity_needs,
+            tax_considerations,
+            guaranteed_income,
+            rate_expectations,
+            surrender_timeline,
+            living_benefits,
+            advisor_eligibility,
+            score,
+            is_prefilled,
+            updated_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
+        ON CONFLICT (client_id) DO UPDATE SET
+            client_objectives = EXCLUDED.client_objectives,
+            risk_tolerance = EXCLUDED.risk_tolerance,
+            time_horizon = EXCLUDED.time_horizon,
+            liquidity_needs = EXCLUDED.liquidity_needs,
+            tax_considerations = EXCLUDED.tax_considerations,
+            guaranteed_income = EXCLUDED.guaranteed_income,
+            rate_expectations = EXCLUDED.rate_expectations,
+            surrender_timeline = EXCLUDED.surrender_timeline,
+            living_benefits = EXCLUDED.living_benefits,
+            advisor_eligibility = EXCLUDED.advisor_eligibility,
+            score = EXCLUDED.score,
+            is_prefilled = EXCLUDED.is_prefilled,
+            updated_at = now()
+        """,
+        client_id,
+        suitability.clientObjectives,
+        suitability.riskTolerance,
+        suitability.timeHorizon,
+        suitability.liquidityNeeds,
+        suitability.taxConsiderations,
+        suitability.guaranteedIncome,
+        suitability.rateExpectations,
+        suitability.surrenderTimeline,
+        suitability.livingBenefits,
+        suitability.advisorEligibility,
+        suitability.score,
+        suitability.isPrefilled
+    )
+
+    return {"success": True, "message": "Suitability data saved"}

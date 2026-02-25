@@ -6,7 +6,7 @@ from fastapi import FastAPI
 
 from api import database
 from api.database import close_db, init_db
-from api.routers import passthrough, policies, profiles, responsible_ai
+from api.routers import passthrough, policies, profiles, alerts, responsible_ai
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -54,6 +54,6 @@ async def readiness():
 
 app.include_router(passthrough.router)
 app.include_router(policies.router)
+app.include_router(alerts.router)
 app.include_router(profiles.router)
-app.include_router(profiles.router_alerts)
 app.include_router(responsible_ai.router)
