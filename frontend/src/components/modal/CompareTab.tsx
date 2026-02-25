@@ -24,7 +24,7 @@ interface CompareTabProps {
   isLoading: boolean;
   onParametersChange: (params: ComparisonParameters) => void;
   onRunComparison: () => void;
-  onRecompareWithProducts: (products: ProductOption[]) => void;
+  onRecompareWithProducts: (productIds: string[]) => void;
   onEditProfile?: () => void;
   startOnParameters?: boolean;
 }
@@ -48,7 +48,7 @@ export function CompareTab({ parameters, comparisonData, clientName, policyValue
   }, [hasRun, comparisonData, isLoading, onRunComparison]);
 
   const handleShelfSelect = (products: ProductOption[]) => {
-    onRecompareWithProducts(products);
+    onRecompareWithProducts(products.map((p) => p.id));
   };
 
   if (view === "parameters") {

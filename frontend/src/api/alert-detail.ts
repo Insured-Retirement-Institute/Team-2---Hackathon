@@ -20,6 +20,7 @@ import {
   mockAuditLog,
   mockComparisonParameters,
   getMockComparisonData,
+  getMockProductShelf,
 } from "./mock/alert-detail";
 
 /**
@@ -92,13 +93,15 @@ export async function runComparison(alertId: string): Promise<ComparisonResult> 
  * Re-run comparison with specific products selected from shelf
  * POST /api/alerts/{alertId}/compare/products
  */
-export async function recompareWithProducts(alertId: string, selectedProducts: ProductOption[]): Promise<ComparisonResult> {
-  logRequest("POST /api/alerts/{alertId}/compare/products", { alertId, selectedProducts });
+export async function recompareWithProducts(alertId: string, productIds: string[]): Promise<ComparisonResult> {
+  logRequest("POST /api/alerts/{alertId}/compare/products", { alertId, productIds });
   return new Promise((resolve) => {
     setTimeout(() => {
       const alert = mockAlerts.find((a) => a.id === alertId) ?? mockAlerts[0];
       const base = getMockComparisonData(alert);
-      const r = { comparisonData: { ...base, alternatives: selectedProducts } };
+      const shelf = getMockProductShelf();
+      const selected = productIds.map((id) => shelf.find((p) => p.id === id)).filter((p): p is ProductOption => !!p);
+      const r = { comparisonData: { ...base, alternatives: selected.length ? selected : base.alternatives } };
       logResponse("POST /api/alerts/{alertId}/compare/products", r);
       resolve(r);
     }, 400);

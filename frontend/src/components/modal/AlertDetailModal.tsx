@@ -11,7 +11,7 @@ import { OverviewTab } from "./OverviewTab";
 import { CompareTab } from "./CompareTab";
 import { ActionTab } from "./ActionTab";
 
-import type { AlertDetail, ComparisonParameters, ComparisonData, SuitabilityData, ProductOption } from "@/types/alert-detail";
+import type { AlertDetail, ComparisonParameters, ComparisonData, SuitabilityData } from "@/types/alert-detail";
 import { fetchAlertDetail, fetchClientProfile, saveClientProfile, runComparison, recompareWithProducts } from "@/api/alert-detail";
 
 interface AlertDetailModalProps {
@@ -98,10 +98,10 @@ export function AlertDetailModal({ open, onClose, alertId }: AlertDetailModalPro
     toast.success(`Transaction ${txId} submitted successfully`);
   };
 
-  const handleRecompareWithProducts = async (products: ProductOption[]) => {
+  const handleRecompareWithProducts = async (productIds: string[]) => {
     setCompareLoading(true);
     try {
-      const result = await recompareWithProducts(alertId, products);
+      const result = await recompareWithProducts(alertId, productIds);
       setComparisonData(result.comparisonData);
     } catch {
       toast.error("Failed to update comparison");

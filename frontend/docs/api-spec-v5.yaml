@@ -168,15 +168,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [selectedProducts]
+              required: [productIds]
               properties:
-                selectedProducts:
+                productIds:
                   type: array
-                  items:
-                    $ref: '#/components/schemas/ProductOption'
+                  items: { type: string }
                   minItems: 1
                   maxItems: 3
-                  description: Products selected from the product shelf to compare against the current policy
+                  description: Product IDs selected from the product shelf to compare against the current policy
       responses:
         '200':
           description: Updated comparison results with selected products as alternatives

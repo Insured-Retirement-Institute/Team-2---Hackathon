@@ -12,7 +12,7 @@ import { OverviewTab } from "@/components/modal/OverviewTab";
 import { CompareTab } from "@/components/modal/CompareTab";
 import { ActionTab } from "@/components/modal/ActionTab";
 
-import type { AlertDetail, ComparisonParameters, SuitabilityData, ProductOption } from "@/types/alert-detail";
+import type { AlertDetail, ComparisonParameters, SuitabilityData } from "@/types/alert-detail";
 import { fetchAlertDetail, fetchClientProfile, saveClientProfile, runComparison, recompareWithProducts } from "@/api/alert-detail";
 import type { ComparisonData } from "@/types/alert-detail";
 
@@ -86,10 +86,10 @@ export function AlertDetailPage() {
     toast.success(`Transaction ${txId} submitted successfully`);
   };
 
-  const handleRecompareWithProducts = async (products: ProductOption[]) => {
+  const handleRecompareWithProducts = async (productIds: string[]) => {
     setCompareLoading(true);
     try {
-      const result = await recompareWithProducts(alertId!, products);
+      const result = await recompareWithProducts(alertId!, productIds);
       setComparisonData(result.comparisonData);
     } catch {
       toast.error("Failed to update comparison");
