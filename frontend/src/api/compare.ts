@@ -1,7 +1,5 @@
 import { logRequest, logResponse } from "./logger";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+import { config } from "@/config";
 
 export interface ProductOption {
   id: string;
@@ -198,7 +196,7 @@ const mockVisualizationProducts: VisualizationProduct[] = [
 export async function runComparison(alertId: string): Promise<ComparisonResult> {
   logRequest(`POST /api/alerts/${alertId}/compare`);
 
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse(`POST /api/alerts/${alertId}/compare (mock)`, mockComparison);
@@ -207,7 +205,7 @@ export async function runComparison(alertId: string): Promise<ComparisonResult> 
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/compare`, {
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}/compare`, {
     method: "POST",
   });
   if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
@@ -222,7 +220,7 @@ export async function recompareWithProducts(
 ): Promise<ComparisonResult> {
   logRequest(`POST /api/alerts/${alertId}/compare/products`);
 
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         const result: ComparisonResult = {
@@ -238,7 +236,7 @@ export async function recompareWithProducts(
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/compare/products`, {
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}/compare/products`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ selectedProducts }),
@@ -252,7 +250,7 @@ export async function recompareWithProducts(
 export async function getVisualizationProducts(): Promise<VisualizationProduct[]> {
   logRequest("GET /passthrough/visualization-products");
 
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse("GET /passthrough/visualization-products (mock)", mockVisualizationProducts);
@@ -261,7 +259,7 @@ export async function getVisualizationProducts(): Promise<VisualizationProduct[]
     });
   }
 
-  const res = await fetch(`${API_BASE_URL.replace("/api", "")}/passthrough/visualization-products`);
+  const res = await fetch(`${config.apiBaseUrl.replace("/api", "")}/passthrough/visualization-products`);
   if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
   const data = await res.json();
   logResponse("GET /passthrough/visualization-products", data);
