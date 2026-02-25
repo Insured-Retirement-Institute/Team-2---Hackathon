@@ -44,21 +44,27 @@ from agents.db_reader import get_current_database_context as fetch_db_context
 from agents.recommendations import generate_recommendations
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.sureify_client import get_book_of_business as fetch_sureify_policies
+from agents.sureify_client import get_client_profiles as fetch_sureify_client_profiles
 from agents.sureify_client import get_notifications_for_policies as fetch_sureify_notifications
 from agents.sureify_client import get_products as fetch_sureify_products
+from agents.sureify_client import get_suitability_data as fetch_sureify_suitability_data
 
 
 def _get_sureify_context(customer_identifier: str) -> dict:
-    """Fetch book of business, notifications, and products from Sureify (or mock when not configured)."""
+    """Fetch Puddle Data API context: policyData, notes (if available), productOption, suitabilityData, clientProfile."""
     policies = fetch_sureify_policies(customer_identifier)
-    policy_ids = [p.get("ID") or p.get("policyNumber") or "" for p in policies if p]
+    policy_ids = [p.get("ID") or p.get("policyNumber") or p.get("contractId") or "" for p in policies if p]
     policy_ids = [x for x in policy_ids if x]
     notifications = fetch_sureify_notifications(policy_ids, user_id=customer_identifier)
     products = fetch_sureify_products(customer_identifier)
+    suitability_data = fetch_sureify_suitability_data(customer_identifier)
+    client_profiles = fetch_sureify_client_profiles(customer_identifier)
     return {
         "sureify_policies": policies,
         "sureify_notifications_by_policy": notifications,
         "sureify_products": products,
+        "sureify_suitability_data": suitability_data,
+        "sureify_client_profiles": client_profiles,
     }
 
 
@@ -66,10 +72,12 @@ def _get_sureify_context(customer_identifier: str) -> dict:
 def get_current_database_context(client_id: str = "") -> str:
     """
     Read all current information: from the database (clients, suitability profiles,
-    contract_summary, products) and from Sureify (book of business / policies and notifications).
-    client_id: optional; used for DB contract_summary filter and as Sureify customer_identifier.
+    contract_summary, products) and from Sureify Puddle Data API (policyData, productOption,
+    suitabilityData, clientProfile; notifications if available).
+    client_id: optional; used for DB contract_summary filter and as Sureify UserID.
     Returns JSON with keys: clients, client_suitability_profiles, contract_summary, products,
-    sureify_policies, sureify_notifications_by_policy, sureify_products.
+    sureify_policies, sureify_notifications_by_policy, sureify_products,
+    sureify_suitability_data, sureify_client_profiles.
     """
     ctx = fetch_db_context(client_id or None)
     sureify_id = client_id.strip() if client_id else "Marty McFly"
@@ -77,6 +85,8 @@ def get_current_database_context(client_id: str = "") -> str:
     ctx["sureify_policies"] = sureify["sureify_policies"]
     ctx["sureify_notifications_by_policy"] = sureify["sureify_notifications_by_policy"]
     ctx["sureify_products"] = sureify["sureify_products"]
+    ctx["sureify_suitability_data"] = sureify["sureify_suitability_data"]
+    ctx["sureify_client_profiles"] = sureify["sureify_client_profiles"]
     return json.dumps(ctx, default=str, indent=2)
 
 
@@ -146,6 +156,8 @@ def generate_product_recommendations(
     db_context["sureify_policies"] = sureify["sureify_policies"]
     db_context["sureify_notifications_by_policy"] = sureify["sureify_notifications_by_policy"]
     db_context["sureify_products"] = sureify["sureify_products"]
+    db_context["sureify_suitability_data"] = sureify["sureify_suitability_data"]
+    db_context["sureify_client_profiles"] = sureify["sureify_client_profiles"]
 
     # Persist front-end client profile when new or as update (upsert)
     if changes.client_profile or changes.suitability:

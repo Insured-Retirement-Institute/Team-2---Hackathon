@@ -142,7 +142,14 @@ def map_book_of_business_to_iri_alerts(book: BookOfBusinessOutput) -> tuple[list
         carrier = policy.get("carrier") or "N/A"
         current_value_fmt = _format_currency(_policy_numeric_value(policy))
         total_value += _policy_numeric_value(policy)
-        days_until = _policy_renewal_days(policy)
+        # Use schema renewal fields when set (e.g. from logic), else derive from policy
+        days_until = (
+            policy_out.days_until_renewal
+            if getattr(policy_out, "days_until_renewal", None) is not None
+            else _policy_renewal_days(policy)
+        )
+        if days_until is None:
+            days_until = 0
         if days_until <= 30:
             urgent_count += 1
 

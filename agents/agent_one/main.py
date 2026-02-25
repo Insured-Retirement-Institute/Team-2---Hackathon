@@ -6,6 +6,14 @@ shapes, attaches notifications, and applies business logic (replacements,
 data quality, income activation, scheduled-meeting recommendation).
 
 Run from repo root: PYTHONPATH=. uv run python -m agents.agent_one
+
+Environment & endpoints (load from repo root .env):
+  Puddle Data API (Sureify): SUREIFY_BASE_URL + SUREIFY_BEARER_TOKEN or client credentials.
+    Endpoints (agents.sureify_client): GET {base}/puddle/policyData, /puddle/suitabilityData,
+    /puddle/disclosureItem, /puddle/productOption, /puddle/visualizationProduct, /puddle/clientProfile,
+    /puddle/notes. Schema: agents/puddle_api_spec.yaml (OpenAPI 1.0.0).
+  IRI API (alerts/dashboard/compare/action): IRI_API_BASE_URL.
+    Endpoints: GET/POST/PUT under {base}/alerts, {base}/dashboard/stats, {base}/clients/{id}/profile.
 """
 
 from __future__ import annotations
@@ -47,12 +55,19 @@ from agents.iri_client import (
     submit_iri_transaction as iri_submit_transaction,
     snooze_iri_alert as iri_snooze,
 )
-from agents.audit_writer import persist_event
-from agents.logic import apply_business_logic
+from agents.audit_writer import persist_agent_one_book_of_business, persist_event
+from agents.logic import RENEWAL_NOTIFICATION_DAYS, apply_business_logic
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.schemas import BookOfBusinessOutput, PolicyNotification, PolicyOutput
-from agents.sureify_client import get_book_of_business as fetch_policies
-from agents.sureify_client import get_notifications_for_policies as fetch_notifications
+from agents.sureify_client import (
+    get_book_of_business as fetch_policies,
+    get_client_profiles as fetch_client_profiles,
+    get_disclosure_items as fetch_disclosure_items,
+    get_notifications_for_policies as fetch_notifications,
+    get_product_options as fetch_product_options,
+    get_suitability_data as fetch_suitability_data,
+    get_visualization_products as fetch_visualization_products,
+)
 
 
 @tool
@@ -73,6 +88,41 @@ def get_notifications_for_policies(policy_ids: str) -> str:
         return json.dumps({"error": "policy_ids must be a JSON array"})
     result = fetch_notifications(ids)
     return json.dumps(result, default=str, indent=2)
+
+
+@tool
+def get_puddle_suitability_data() -> str:
+    """Get all suitability assessments from the Puddle Data API (GET /puddle/suitabilityData)."""
+    data = fetch_suitability_data()
+    return json.dumps(data, default=str, indent=2)
+
+
+@tool
+def get_puddle_disclosure_items() -> str:
+    """Get all disclosure items from the Puddle Data API (GET /puddle/disclosureItem)."""
+    data = fetch_disclosure_items()
+    return json.dumps(data, default=str, indent=2)
+
+
+@tool
+def get_puddle_product_options() -> str:
+    """Get all product options from the Puddle Data API (GET /puddle/productOption)."""
+    data = fetch_product_options()
+    return json.dumps(data, default=str, indent=2)
+
+
+@tool
+def get_puddle_visualization_products() -> str:
+    """Get all visualization products from the Puddle Data API (GET /puddle/visualizationProduct)."""
+    data = fetch_visualization_products()
+    return json.dumps(data, default=str, indent=2)
+
+
+@tool
+def get_puddle_client_profiles() -> str:
+    """Get all client profiles from the Puddle Data API (GET /puddle/clientProfile)."""
+    data = fetch_client_profiles()
+    return json.dumps(data, default=str, indent=2)
 
 
 @tool
@@ -101,6 +151,17 @@ def get_book_of_business_with_notifications_and_flags(customer_identifier: str) 
             )
             for n in notifs
         ]
+        # Generate replacement notification when policy renews in next 30 days
+        days_until = logic.get("days_until_renewal")
+        if days_until is not None and 1 <= days_until <= RENEWAL_NOTIFICATION_DAYS:
+            notifications.append(
+                PolicyNotification(
+                    notification_type="renewal_in_30_days",
+                    message=f"Policy maturing in {days_until} days; consider replacement options",
+                    policy_id=pid or None,
+                    severity="warning",
+                )
+            )
         outputs.append(
             PolicyOutput(
                 policy=p,
@@ -113,11 +174,22 @@ def get_book_of_business_with_notifications_and_flags(customer_identifier: str) 
                 income_activation_reason=logic["income_activation_reason"],
                 schedule_meeting=logic["schedule_meeting"],
                 schedule_meeting_reason=logic["schedule_meeting_reason"],
+                renewal_date=logic.get("renewal_date"),
+                days_until_renewal=logic.get("days_until_renewal"),
             )
         )
 
     out = BookOfBusinessOutput(customer_identifier=customer_identifier, policies=outputs)
-    return out.model_dump_json(indent=2, exclude_none=True)
+    payload_dict = out.model_dump(mode="json", exclude_none=True)
+    run_id = str(uuid.uuid4())
+    created_at = datetime.now(timezone.utc).isoformat()
+    persist_agent_one_book_of_business(
+        run_id=run_id,
+        created_at=created_at,
+        customer_identifier=customer_identifier,
+        payload=payload_dict,
+    )
+    return json.dumps(payload_dict, indent=2, default=str)
 
 
 @tool
@@ -233,28 +305,23 @@ def submit_iri_transaction(alert_id: str, transaction_type: str, rationale: str,
     return json.dumps(result, default=str, indent=2)
 
 
-BOOK_OF_BUSINESS_SYSTEM_PROMPT = """You are an assistant that scans Sureify APIs and produces the book of business for a given customer.
+BOOK_OF_BUSINESS_SYSTEM_PROMPT = """You are an assistant that uses the **Puddle Data API** (Sureify) and **IRI API** to produce the book of business and related data for a given customer.
 
-Your task is to produce the book of business for **Marty McFly** (or the customer identifier you are given):
+**Puddle Data API** (OpenAPI 1.0.0, agents/puddle_api_spec.yaml): All endpoints use UserID header 1001 and optional persona=agent. When configured, use:
+- **Policy data:** `get_book_of_business` / `get_book_of_business_with_notifications_and_flags` (GET /puddle/policyData) for annuity policies with values, rates, renewal status, features.
+- **Suitability:** `get_puddle_suitability_data` (GET /puddle/suitabilityData) for suitability assessments (objectives, risk, score).
+- **Disclosures:** `get_puddle_disclosure_items` (GET /puddle/disclosureItem) for required/optional disclosure documents.
+- **Products:** `get_puddle_product_options` (GET /puddle/productOption) and `get_puddle_visualization_products` (GET /puddle/visualizationProduct) for product options and comparison/chart data.
+- **Clients:** `get_puddle_client_profiles` (GET /puddle/clientProfile) for client profiles and comparison parameters.
 
-1. **Scan Sureify APIs** for that customer's book of business using the tools provided.
-2. **List all policies** in JSON. The policy shape should be the one returned by the tools (aligned with sureify_models for the frontend).
-3. **Include notifications** applicable to each policy (from the tools).
-4. **Apply business logic** (already computed by the tools):
-   - **Replacements:** Policies where a replacement opportunity exists are marked with replacement_opportunity and replacement_reason.
-   - **Data quality:** Policies with missing/invalid data have data_quality_issues and optional data_quality_severity.
-   - **Income activation:** Policies eligible for income activation have income_activation_eligible and income_activation_reason.
-5. **Scheduled meeting:** Policies that should have a scheduled meeting with the customer are marked with schedule_meeting and schedule_meeting_reason (e.g. replacement opportunity, data quality fix, or income activation).
+Your main task is to produce the **book of business** for **Marty McFly** (or the customer identifier you are given):
+1. Use `get_book_of_business_with_notifications_and_flags` to get policies with notifications and business logic flags (replacement_opportunity, data_quality_issues, income_activation_eligible, schedule_meeting, etc.).
+2. Optionally use the Puddle tools above when the user asks for suitability, disclosures, product options, visualization data, or client profiles.
+3. Output the full JSON with "customer_identifier" and "policies" array; the frontend consumes this as-is.
 
-**Recommended approach:** Use the tool `get_book_of_business_with_notifications_and_flags` with customer_identifier "Marty McFly" to obtain the complete JSON in one call. Then present that JSON to the user (or a summary plus the JSON).
+When the user asks for a JSON schema for table design, call `get_book_of_business_json_schema`.
 
-Output format: Provide the full JSON object with key "customer_identifier" and "policies" array. Each policy in "policies" must include the raw policy fields plus: notifications, replacement_opportunity, replacement_reason, data_quality_issues, data_quality_severity, income_activation_eligible, income_activation_reason, schedule_meeting, schedule_meeting_reason. The frontend will consume this JSON as-is.
-
-When the user asks for a JSON schema to share with their database admin team (to build tables), call get_book_of_business_json_schema and provide that schema in your response so they can use it for table design.
-
-**IRI Annuity Renewal Intelligence API:** The agent can also produce and interact with data in IRI API format (renewal alerts and dashboard stats per the OpenAPI spec).
-- For renewal alerts or dashboard-style output (alerts + dashboardStats), use `get_book_of_business_as_iri_alerts` with the customer identifier. This returns JSON with "alerts" (RenewalAlert[]) and "dashboardStats" (total, high, urgent, totalValue) suitable for the IRI dashboard.
-- When the user wants to list, filter, or manage alerts from the IRI backend, use: `get_iri_alerts`, `get_iri_alert_by_id` (full AlertDetail), `snooze_iri_alert`, `dismiss_iri_alert`, `get_iri_dashboard_stats`. For Compare tab: `run_iri_comparison`, `get_iri_client_profile`, `save_iri_client_profile`. For Action tab: `save_iri_suitability`, `save_iri_disclosures`, `submit_iri_transaction`. These call the live IRI API when IRI_API_BASE_URL is set.
+**IRI API:** For renewal alerts and dashboard format use `get_book_of_business_as_iri_alerts`. For direct IRI operations use: `get_iri_alerts`, `get_iri_alert_by_id`, `snooze_iri_alert`, `dismiss_iri_alert`, `get_iri_dashboard_stats`, `run_iri_comparison`, `get_iri_client_profile`, `save_iri_client_profile`, `save_iri_suitability`, `save_iri_disclosures`, `submit_iri_transaction`.
 """
 
 
@@ -267,6 +334,11 @@ def create_agent() -> Agent:
             get_book_of_business_with_notifications_and_flags,
             get_book_of_business_json_schema,
             get_book_of_business_as_iri_alerts,
+            get_puddle_suitability_data,
+            get_puddle_disclosure_items,
+            get_puddle_product_options,
+            get_puddle_visualization_products,
+            get_puddle_client_profiles,
             get_iri_alerts,
             get_iri_alert_by_id,
             snooze_iri_alert,

@@ -9,9 +9,20 @@ Otherwise returns mock data for Marty McFly so the agent can run without the liv
 
 from __future__ import annotations
 
+# UserID header sent to Sureify API for policy/notes/products requests
+SUREIFY_USER_ID_HEADER = "1001"
+
 import asyncio
 import os
+import sys
+from datetime import date, timedelta
+from pathlib import Path
 from typing import Any
+
+# Allow api.sureify_client / api.sureify_models when run from repo root (api lives under api/src)
+_api_src = Path(__file__).resolve().parent.parent / "api" / "src"
+if _api_src.exists() and str(_api_src) not in sys.path:
+    sys.path.insert(0, str(_api_src))
 
 # ---------------------------------------------------------------------------
 # Mock data (used when Sureify API is not configured)
@@ -72,6 +83,80 @@ MOCK_POLICIES: list[dict[str, Any]] = [
     },
 ]
 
+def _mock_cd_policies_100k() -> list[dict[str, Any]]:
+    """Two CDs maturing in the next 30 days, total 100k (50k + 50k)."""
+    base = date.today()
+    mat1 = (base + timedelta(days=15)).isoformat()
+    mat2 = (base + timedelta(days=22)).isoformat()
+    return [
+        {
+            "ID": "pol-cd100k-001",
+            "policyNumber": "CD-2022-001",
+            "status": "Inforce",
+            "statusCategory": "Inforce",
+            "carrier": "SureCo",
+            "effectiveDate": "2022-03-15",
+            "productSnapshot": {
+                "name": "Certificate of Deposit 3Y",
+                "productCode": "CD3",
+                "type": {"name": "Fixed"},
+            },
+            "currentValue": {"value": 50000, "currency": "USD"},
+            "annuityValue": {"value": 50000, "currency": "USD"},
+            "maturityDate": mat1,
+            "renewalDate": mat1,
+            "currentRate": 4.25,
+            "renewalRate": 3.5,
+        },
+        {
+            "ID": "pol-cd100k-002",
+            "policyNumber": "CD-2022-002",
+            "status": "Inforce",
+            "statusCategory": "Inforce",
+            "carrier": "SureCo",
+            "effectiveDate": "2022-06-01",
+            "productSnapshot": {
+                "name": "Certificate of Deposit 3Y",
+                "productCode": "CD3",
+                "type": {"name": "Fixed"},
+            },
+            "currentValue": {"value": 50000, "currency": "USD"},
+            "annuityValue": {"value": 50000, "currency": "USD"},
+            "maturityDate": mat2,
+            "renewalDate": mat2,
+            "currentRate": 4.0,
+            "renewalRate": 3.25,
+        },
+    ]
+
+
+def _mock_cd_policies_1m() -> list[dict[str, Any]]:
+    """One CD maturing in the next 30 days, value 1M."""
+    base = date.today()
+    mat = (base + timedelta(days=10)).isoformat()
+    return [
+        {
+            "ID": "pol-cd1m-001",
+            "policyNumber": "CD-2021-100",
+            "status": "Inforce",
+            "statusCategory": "Inforce",
+            "carrier": "SureCo",
+            "effectiveDate": "2021-04-01",
+            "productSnapshot": {
+                "name": "Certificate of Deposit 5Y",
+                "productCode": "CD5",
+                "type": {"name": "Fixed"},
+            },
+            "currentValue": {"value": 1_000_000, "currency": "USD"},
+            "annuityValue": {"value": 1_000_000, "currency": "USD"},
+            "maturityDate": mat,
+            "renewalDate": mat,
+            "currentRate": 4.5,
+            "renewalRate": 3.75,
+        },
+    ]
+
+
 MOCK_NOTIFICATIONS: dict[str, list[dict[str, Any]]] = {
     "pol-marty-001": [
         {"type": "premium_due", "message": "Premium due in 30 days (Mar 1, 2025)", "severity": "info"},
@@ -83,6 +168,16 @@ MOCK_NOTIFICATIONS: dict[str, list[dict[str, Any]]] = {
     ],
     "pol-marty-003": [
         {"type": "term_conversion", "message": "Term conversion window opens in 6 months", "severity": "info"},
+    ],
+    # CD 100k customer: renewal notification added by logic when maturity in 30 days
+    "pol-cd100k-001": [
+        {"type": "cd_maturity", "message": "CD maturing in 15 days; consider replacement options", "severity": "warning"},
+    ],
+    "pol-cd100k-002": [
+        {"type": "cd_maturity", "message": "CD maturing in 22 days; consider replacement options", "severity": "warning"},
+    ],
+    "pol-cd1m-001": [
+        {"type": "cd_maturity", "message": "CD maturing in 10 days ($1M); consider replacement options", "severity": "warning"},
     ],
 }
 
@@ -116,11 +211,13 @@ MOCK_PRODUCTS: list[dict[str, Any]] = [
 
 
 def _is_sureify_configured() -> bool:
-    """True if we have enough env to use the shared Sureify API client."""
+    """True if we have enough env to use the shared Sureify API client (base URL + bearer token or client credentials)."""
     base = os.environ.get("SUREIFY_BASE_URL")
-    client_id = os.environ.get("SUREIFY_CLIENT_ID")
-    client_secret = os.environ.get("SUREIFY_CLIENT_SECRET")
-    return bool(base and client_id and client_secret)
+    if not base:
+        return False
+    if os.environ.get("SUREIFY_BEARER_TOKEN"):
+        return True
+    return bool(os.environ.get("SUREIFY_CLIENT_ID") and os.environ.get("SUREIFY_CLIENT_SECRET"))
 
 
 def _get_authenticated_client():
@@ -200,23 +297,66 @@ def _product_to_dict(product: Any) -> dict[str, Any]:
     return d
 
 
+def _product_option_to_canonical(p: dict[str, Any]) -> dict[str, Any]:
+    """
+    Normalize Puddle Data API ProductOption (GET /puddle/productOption) or legacy mock shape
+    to canonical shape for agentTwo: product_id, name, carrier, rate, term, surrenderPeriod,
+    freeWithdrawal, guaranteedMinRate, risk_profile (optional).
+    """
+    product_id = str(p.get("productId") or p.get("ID") or p.get("productCode") or "")
+    name = str(p.get("name") or "Unknown")
+    carrier = str(p.get("carrier") or p.get("carrierCode") or "")
+    rate = p.get("rate")
+    if rate is None and p.get("attributes"):
+        for a in p.get("attributes") or []:
+            if isinstance(a, dict) and (a.get("name") or a.get("key") or "").lower() == "rate":
+                rate = a.get("value") or a.get("val")
+                break
+    if rate is None:
+        rate = "N/A"
+    if rate != "N/A" and isinstance(rate, (int, float)):
+        rate = f"{rate}%"
+    attrs = p.get("attributes") or []
+    attr_map = {}
+    for a in attrs:
+        if isinstance(a, dict):
+            k = (a.get("name") or a.get("key") or "").strip().lower()
+            if k:
+                attr_map[k] = a.get("value") or a.get("val")
+    risk_profile = attr_map.get("riskprofile") or attr_map.get("risk_profile")
+    return {
+        "product_id": product_id,
+        "name": name,
+        "carrier": carrier,
+        "rate": rate,
+        "term": p.get("term"),
+        "surrenderPeriod": p.get("surrenderPeriod"),
+        "freeWithdrawal": p.get("freeWithdrawal"),
+        "guaranteedMinRate": p.get("guaranteedMinRate"),
+        "risk_profile": risk_profile,
+        "attributes_map": attr_map,
+        "states": p.get("states"),
+    }
+
+
 def get_products(customer_identifier: str) -> list[dict[str, Any]]:
     """
-    Fetch products from Sureify /puddle/products.
+    Fetch product options from Sureify Puddle Data API (GET /puddle/productOption).
 
-    Uses api.sureify_client.get_products when Sureify is configured (user_id passed
-    as customer_identifier). Otherwise returns mock products for agentTwo recommendations.
+    Uses api.sureify_client.get_product_options when Sureify is configured (Puddle Data API
+    schema). Returns canonical shape for agentTwo recommendations. Otherwise returns mock
+    products.
     """
     client = _get_authenticated_client()
     if client is not None:
         try:
-            from api.sureify_client import get_products as api_get_products
+            from api.sureify_client import get_product_options as api_get_product_options
         except ImportError:
-            from api.src.api.sureify_client import get_products as api_get_products
-        products = api_get_products(client, user_id=customer_identifier)
-        return [_product_to_dict(p) for p in products]
+            from api.src.api.sureify_client import get_product_options as api_get_product_options
+        options = api_get_product_options(client, user_id=customer_identifier or SUREIFY_USER_ID_HEADER)
+        return [_product_option_to_canonical(o) for o in options]
     if customer_identifier.lower().replace(" ", "") in ("martymcfly", "marty_mcfly", "marty-mcfly", ""):
-        return [dict(p) for p in MOCK_PRODUCTS]
+        return [_product_option_to_canonical(dict(p)) for p in MOCK_PRODUCTS]
     return []
 
 
@@ -225,7 +365,7 @@ def get_book_of_business(customer_identifier: str) -> list[dict[str, Any]]:
     Fetch the book of business (all policies) for a customer or advisor.
 
     Uses api.sureify_client.get_policies when Sureify is configured (SUREIFY_BASE_URL,
-    SUREIFY_CLIENT_ID, SUREIFY_CLIENT_SECRET). customer_identifier is passed as user_id.
+    SUREIFY_CLIENT_ID, SUREIFY_CLIENT_SECRET). Sends UserID header 1001.
     Otherwise returns mock data for Marty McFly.
     """
     client = _get_authenticated_client()
@@ -234,11 +374,16 @@ def get_book_of_business(customer_identifier: str) -> list[dict[str, Any]]:
             from api.sureify_client import get_policies
         except ImportError:
             from api.src.api.sureify_client import get_policies
-        policies = get_policies(client, user_id=customer_identifier)
+        policies = get_policies(client, user_id=SUREIFY_USER_ID_HEADER)
         return [_policy_to_dict(p) for p in policies]
-    # Mock
-    if customer_identifier.lower().replace(" ", "") in ("martymcfly", "marty_mcfly", "marty-mcfly"):
+    # Mock: Marty McFly (default), Jane Doe (2 CDs 100k maturing in 30 days), John Smith (1 CD 1M maturing in 30 days)
+    key = customer_identifier.lower().replace(" ", "").replace("-", "").replace("_", "")
+    if key in ("martymcfly", "marty_mcfly", "marty"):
         return [dict(p) for p in MOCK_POLICIES]
+    if key in ("janedoe", "jane_doe", "jane"):
+        return [dict(p) for p in _mock_cd_policies_100k()]
+    if key in ("johnsmith", "john_smith", "john"):
+        return [dict(p) for p in _mock_cd_policies_1m()]
     return []
 
 
@@ -249,8 +394,8 @@ def get_notifications_for_policies(
     """
     Fetch notifications applicable to each of the given policy IDs.
 
-    When Sureify is configured, uses api.sureify_client.get_notes (with user_id
-    when provided) and maps notes to policies by policyID. Otherwise returns mock notifications.
+    When Sureify is configured, uses api.sureify_client.get_notes with UserID header 1001
+    and maps notes to policies by policyID. Otherwise returns mock notifications.
     Returns a dict mapping policy_id -> list of { type, message, severity }.
     """
     client = _get_authenticated_client()
@@ -259,8 +404,10 @@ def get_notifications_for_policies(
             from api.sureify_client import get_notes
         except ImportError:
             from api.src.api.sureify_client import get_notes
-        kwargs = {"user_id": user_id} if user_id else {}
-        notes = get_notes(client, **kwargs)
+        try:
+            notes = get_notes(client, user_id=SUREIFY_USER_ID_HEADER)
+        except Exception:
+            notes = []
         result: dict[str, list[dict[str, Any]]] = {pid: [] for pid in policy_ids}
         for note in notes:
             pid = _policy_id_from_value(getattr(note, "policyID", None))
@@ -272,3 +419,65 @@ def get_notifications_for_policies(
     for pid in policy_ids:
         result[pid] = [dict(n) for n in MOCK_NOTIFICATIONS.get(pid, [])]
     return result
+
+
+def get_suitability_data(customer_identifier: str | None = None) -> list[dict[str, Any]]:
+    """Fetch suitability assessments from Puddle Data API (GET /puddle/suitabilityData). Returns [] when not configured. Pass customer_identifier as UserID when provided."""
+    client = _get_authenticated_client()
+    if client is None:
+        return []
+    try:
+        from api.sureify_client import get_suitability_data as api_get_suitability
+    except ImportError:
+        from api.src.api.sureify_client import get_suitability_data as api_get_suitability
+    user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
+    return api_get_suitability(client, user_id=user_id)
+
+
+def get_disclosure_items() -> list[dict[str, Any]]:
+    """Fetch disclosure items from Puddle Data API (GET /puddle/disclosureItem). Returns [] when not configured."""
+    client = _get_authenticated_client()
+    if client is None:
+        return []
+    try:
+        from api.sureify_client import get_disclosure_items as api_get_disclosures
+    except ImportError:
+        from api.src.api.sureify_client import get_disclosure_items as api_get_disclosures
+    return api_get_disclosures(client, user_id=SUREIFY_USER_ID_HEADER)
+
+
+def get_product_options() -> list[dict[str, Any]]:
+    """Fetch product options from Puddle Data API (GET /puddle/productOption). Returns [] when not configured."""
+    client = _get_authenticated_client()
+    if client is None:
+        return []
+    try:
+        from api.sureify_client import get_product_options as api_get_product_options
+    except ImportError:
+        from api.src.api.sureify_client import get_product_options as api_get_product_options
+    return api_get_product_options(client, user_id=SUREIFY_USER_ID_HEADER)
+
+
+def get_visualization_products() -> list[dict[str, Any]]:
+    """Fetch visualization products from Puddle Data API (GET /puddle/visualizationProduct). Returns [] when not configured."""
+    client = _get_authenticated_client()
+    if client is None:
+        return []
+    try:
+        from api.sureify_client import get_visualization_products as api_get_viz
+    except ImportError:
+        from api.src.api.sureify_client import get_visualization_products as api_get_viz
+    return api_get_viz(client, user_id=SUREIFY_USER_ID_HEADER)
+
+
+def get_client_profiles(customer_identifier: str | None = None) -> list[dict[str, Any]]:
+    """Fetch client profiles from Puddle Data API (GET /puddle/clientProfile). Returns [] when not configured. Pass customer_identifier as UserID when provided."""
+    client = _get_authenticated_client()
+    if client is None:
+        return []
+    try:
+        from api.sureify_client import get_client_profiles as api_get_profiles
+    except ImportError:
+        from api.src.api.sureify_client import get_client_profiles as api_get_profiles
+    user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
+    return api_get_profiles(client, user_id=user_id)
