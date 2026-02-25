@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ComparisonParameters, ComparisonData, ProductOption } from "@/types/alert-detail";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,10 +39,12 @@ export function CompareTab({ parameters, comparisonData, clientName, policyValue
   };
 
   // Auto-run comparison on first render if not already done
-  if (!hasRun && !comparisonData && !isLoading) {
-    setHasRun(true);
-    onRunComparison();
-  }
+  useEffect(() => {
+    if (!hasRun && !comparisonData && !isLoading) {
+      setHasRun(true);
+      onRunComparison();
+    }
+  }, [hasRun, comparisonData, isLoading, onRunComparison]);
 
   const handleShelfSelect = (products: ProductOption[]) => {
     onRecompareWithProducts(products);

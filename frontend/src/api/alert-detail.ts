@@ -8,6 +8,7 @@ import type {
   SubmissionData,
 } from "@/types/alert-detail";
 import { mockAlerts } from "./mock/alerts";
+import { logRequest, logResponse } from "./logger";
 import {
   getMockPolicyData,
   mockSuitabilityScore,
@@ -30,22 +31,15 @@ import {
  * GET /api/alerts/{alertId}
  */
 export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
+  logRequest("GET /api/alerts/{alertId}", { alertId });
   return new Promise((resolve) => {
     setTimeout(() => {
       const alert = mockAlerts.find((a) => a.id === alertId) ?? mockAlerts[0];
       const clientAlerts = mockAlerts.filter((a) => a.clientName === alert.clientName);
       const comparisonData = getMockComparisonData(alert);
-
-      resolve({
-        alert,
-        clientAlerts,
-        policyData: getMockPolicyData(alert),
-        aiSuitabilityScore: mockSuitabilityScore,
-        suitabilityData: mockSuitabilityData,
-        disclosureItems: mockDisclosureItems,
-        transactionOptions: getMockTransactionOptions(alert, comparisonData),
-        auditLog: mockAuditLog,
-      });
+      const r = { alert, clientAlerts, policyData: getMockPolicyData(alert), aiSuitabilityScore: mockSuitabilityScore, suitabilityData: mockSuitabilityData, disclosureItems: mockDisclosureItems, transactionOptions: getMockTransactionOptions(alert, comparisonData), auditLog: mockAuditLog };
+      logResponse("GET /api/alerts/{alertId}", r);
+      resolve(r);
     }, 300);
   });
 }
@@ -55,13 +49,12 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
  * GET /api/clients/{clientId}/profile
  */
 export async function fetchClientProfile(_clientId: string): Promise<ClientProfile> {
+  logRequest("GET /api/clients/{clientId}/profile", { clientId: _clientId });
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve({
-        clientId: _clientId,
-        clientName: "Maria Rodriguez",
-        parameters: mockComparisonParameters,
-      });
+      const r = { clientId: _clientId, clientName: "Maria Rodriguez", parameters: mockComparisonParameters };
+      logResponse("GET /api/clients/{clientId}/profile", r);
+      resolve(r);
     }, 300);
   });
 }
@@ -71,8 +64,9 @@ export async function fetchClientProfile(_clientId: string): Promise<ClientProfi
  * PUT /api/clients/{clientId}/profile
  */
 export async function saveClientProfile(_clientId: string, _parameters: ComparisonParameters): Promise<void> {
+  logRequest("PUT /api/clients/{clientId}/profile", { clientId: _clientId, parameters: _parameters });
   return new Promise((resolve) => {
-    setTimeout(() => resolve(), 300);
+    setTimeout(() => { logResponse("PUT /api/clients/{clientId}/profile", { success: true }); resolve(); }, 300);
   });
 }
 
@@ -81,12 +75,13 @@ export async function saveClientProfile(_clientId: string, _parameters: Comparis
  * POST /api/alerts/{alertId}/compare
  */
 export async function runComparison(alertId: string): Promise<ComparisonResult> {
+  logRequest("POST /api/alerts/{alertId}/compare", { alertId });
   return new Promise((resolve) => {
     setTimeout(() => {
       const alert = mockAlerts.find((a) => a.id === alertId) ?? mockAlerts[0];
-      resolve({
-        comparisonData: getMockComparisonData(alert),
-      });
+      const r = { comparisonData: getMockComparisonData(alert) };
+      logResponse("POST /api/alerts/{alertId}/compare", r);
+      resolve(r);
     }, 500);
   });
 }
@@ -96,13 +91,14 @@ export async function runComparison(alertId: string): Promise<ComparisonResult> 
  * POST /api/alerts/{alertId}/compare/products
  */
 export async function recompareWithProducts(alertId: string, selectedProducts: ProductOption[]): Promise<ComparisonResult> {
+  logRequest("POST /api/alerts/{alertId}/compare/products", { alertId, selectedProducts });
   return new Promise((resolve) => {
     setTimeout(() => {
       const alert = mockAlerts.find((a) => a.id === alertId) ?? mockAlerts[0];
       const base = getMockComparisonData(alert);
-      resolve({
-        comparisonData: { ...base, alternatives: selectedProducts },
-      });
+      const r = { comparisonData: { ...base, alternatives: selectedProducts } };
+      logResponse("POST /api/alerts/{alertId}/compare/products", r);
+      resolve(r);
     }, 400);
   });
 }
@@ -112,8 +108,9 @@ export async function recompareWithProducts(alertId: string, selectedProducts: P
  * PUT /api/alerts/{alertId}/suitability
  */
 export async function saveSuitability(_alertId: string, _data: SuitabilityData): Promise<void> {
+  logRequest("PUT /api/alerts/{alertId}/suitability", { alertId: _alertId, data: _data });
   return new Promise((resolve) => {
-    setTimeout(() => resolve(), 300);
+    setTimeout(() => { logResponse("PUT /api/alerts/{alertId}/suitability", { success: true }); resolve(); }, 300);
   });
 }
 
@@ -122,8 +119,9 @@ export async function saveSuitability(_alertId: string, _data: SuitabilityData):
  * PUT /api/alerts/{alertId}/disclosures
  */
 export async function saveDisclosures(_alertId: string, _acknowledgedIds: string[]): Promise<void> {
+  logRequest("PUT /api/alerts/{alertId}/disclosures", { alertId: _alertId, acknowledgedIds: _acknowledgedIds });
   return new Promise((resolve) => {
-    setTimeout(() => resolve(), 300);
+    setTimeout(() => { logResponse("PUT /api/alerts/{alertId}/disclosures", { success: true }); resolve(); }, 300);
   });
 }
 
@@ -135,27 +133,20 @@ export async function submitTransaction(
   _alertId: string,
   _data: { type: "renew" | "replace"; rationale: string; clientStatement: string }
 ): Promise<SubmissionData> {
+  logRequest("POST /api/alerts/{alertId}/transaction", { alertId: _alertId, data: _data });
   return new Promise((resolve) => {
     setTimeout(() => {
       const submissionId = `SUB-2026-${Math.floor(Math.random() * 10000)}`;
-      resolve({
+      const r: SubmissionData = {
         submissionId,
         submittedDate: new Date().toLocaleDateString(),
         carrier: "Great American",
         transactionType: _data.type,
-        currentStatus: {
-          status: "received",
-          timestamp: new Date().toLocaleString(),
-          notes: "Application received and queued for carrier review",
-        },
-        statusHistory: [
-          {
-            status: "received",
-            timestamp: new Date().toLocaleString(),
-            notes: "Application received and queued for carrier review",
-          },
-        ],
-      });
+        currentStatus: { status: "received", timestamp: new Date().toLocaleString(), notes: "Application received and queued for carrier review" },
+        statusHistory: [{ status: "received", timestamp: new Date().toLocaleString(), notes: "Application received and queued for carrier review" }],
+      };
+      logResponse("POST /api/alerts/{alertId}/transaction", r);
+      resolve(r);
     }, 500);
   });
 }

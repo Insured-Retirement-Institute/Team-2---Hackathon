@@ -7,12 +7,13 @@ import { ChatBot } from "./components/ChatBot";
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/alerts/:alertId" element={<AlertDetailPage />} />
-        <Route path="/api-spec" element={<ApiSpec />} />
-      </Routes>
-      <ChatBot />
+      <ChatBot>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/alerts/:alertId" element={<AlertDetailPage />} />
+          <Route path="/api-spec" element={<ApiSpec />} />
+        </Routes>
+      </ChatBot>
     </BrowserRouter>
   );
 }

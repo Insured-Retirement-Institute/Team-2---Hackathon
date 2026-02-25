@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { BellOff, Clock, AlertTriangle, CheckCircle2, ChevronDown, FileText, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { useChatContext } from "@/hooks/useChatContext";
 
 import { WorkflowStepper } from "@/components/modal/WorkflowStepper";
 import type { WorkflowStep } from "@/components/modal/WorkflowStepper";
@@ -18,6 +19,7 @@ import type { ComparisonData } from "@/types/alert-detail";
 export function AlertDetailPage() {
   const { alertId } = useParams<{ alertId: string }>();
   const navigate = useNavigate();
+  const { sendContext } = useChatContext();
 
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<AlertDetail | null>(null);
@@ -62,6 +64,7 @@ export function AlertDetailPage() {
     }
     if (step !== "compare") setEditingProfile(false);
     setActiveTab(step);
+    sendContext({ page: `/alerts/${alertId}`, alertId, activeTab: step, clientName: detail?.alert.clientName, policyId: detail?.alert.policyId });
   };
 
   const handleRunComparison = async () => {

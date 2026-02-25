@@ -1,4 +1,5 @@
-import type { ChatMessage, ChatResponse } from "@/types/chat";
+import type { ChatRequest, ChatResponse } from "@/types/chat";
+import { logRequest, logResponse } from "./logger";
 
 const MOCK_RESPONSES: Record<string, string> = {
   product: "The Pacific Life 7-Year MYGA is a Multi-Year Guaranteed Annuity offering:\n\n• Guaranteed Rate: 4.2% for 7 years\n• Minimum Premium: $25,000\n• Surrender Charge Period: 7 years (declining)\n• Free Withdrawal: Up to 10% annually\n• Rate Lock: Guaranteed for entire term\n\nIdeal for clients seeking predictable growth and principal protection.",
@@ -20,24 +21,35 @@ function getMockResponse(message: string): string {
   return "I can help with:\n\n• Product information and features\n• Renewal analysis and comparisons\n• Suitability guidance\n• Client communication tips\n• Compliance requirements\n• Rate comparisons\n\nWhat would you like to explore?";
 }
 
-export async function sendChatMessage(
-  message: string,
-  history: ChatMessage[],
-  context: { page: string; alertId?: string; activeTab?: string }
-): Promise<ChatResponse> {
-  // Mock — swap to real endpoint later:
-  // return fetch("/api/chat/message", { method: "POST", headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ message, history, context }) }).then(r => r.json());
+/**
+ * POST /api/chat/message
+ *
+ * Two use cases:
+ * 1. Context-only (no message) — navigation/tab change beacon
+ * 2. With message — user chat, includes history (last 15 Q&A pairs)
+ */
+export async function sendChat(request: ChatRequest): Promise<ChatResponse> {
+  logRequest("POST /api/chat/message", request);
+
+  // Context-only: no response needed
+  if (!request.message) {
+    const r = {};
+    logResponse("POST /api/chat/message (context)", r);
+    return new Promise((resolve) => setTimeout(() => resolve(r), 50));
+  }
+
   return new Promise((resolve) => {
     setTimeout(() => {
-      resolve({
+      const r: ChatResponse = {
         message: {
           id: `assistant-${Date.now()}`,
           role: "assistant",
-          content: getMockResponse(message),
+          content: getMockResponse(request.message!),
           timestamp: new Date().toISOString(),
         },
-      });
+      };
+      logResponse("POST /api/chat/message", r);
+      resolve(r);
     }, 600 + Math.random() * 400);
   });
 }

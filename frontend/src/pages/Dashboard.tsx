@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useChatContext } from "@/hooks/useChatContext";
 import { LayoutDashboard } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { StatsCards } from "@/components/StatsCards";
@@ -10,6 +11,7 @@ import { Toaster, toast } from "sonner";
 
 export function Dashboard() {
   const navigate = useNavigate();
+  const { sendContext } = useChatContext();
   const [alerts, setAlerts] = useState<RenewalAlert[]>([]);
   const [stats, setStats] = useState<DashboardStats>({ total: 0, high: 0, urgent: 0, totalValue: 0 });
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ export function Dashboard() {
   };
 
   const handleSelectAlert = (alert: RenewalAlert) => {
+    sendContext({ page: `/alerts/${alert.id}`, alertId: alert.id, activeTab: "overview", clientName: alert.clientName, policyId: alert.policyId });
     navigate(`/alerts/${alert.id}`);
   };
 

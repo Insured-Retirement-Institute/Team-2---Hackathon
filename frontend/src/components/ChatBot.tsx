@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
-import { X, Send, Sparkles, TrendingUp, FileText, Shield, User } from "lucide-react";
+import { X, Send, Sparkles, TrendingUp, FileText, Shield, User, Maximize2, Minimize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ChatMessage } from "@/types/chat";
-import { sendChatMessage } from "@/api/chat";
+import type { ChatMessage, ChatContext } from "@/types/chat";
+import { sendChat } from "@/api/chat";
+import { ChatAPIContext } from "@/hooks/useChatContext";
 
 function FluxCapacitorIcon({ className }: { className?: string }) {
   return (
@@ -31,21 +32,37 @@ const WELCOME: ChatMessage = {
   timestamp: new Date().toISOString(),
 };
 
-export function ChatBot() {
+const MAX_PAIRS = 15;
+
+function trimHistory(msgs: ChatMessage[]): ChatMessage[] {
+  const convo = msgs.slice(1); // exclude welcome
+  if (convo.length <= MAX_PAIRS * 2) return msgs;
+  return [msgs[0], ...convo.slice(convo.length - MAX_PAIRS * 2)];
+}
+
+export function ChatBot({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const location = useLocation();
+  const ctxRef = useRef<ChatContext>({ page: "/" });
 
-  // Build context from current route
-  const getContext = () => {
+  // Any component can call this to send a context beacon
+  const sendContext = useCallback((ctx: ChatContext) => {
+    ctxRef.current = ctx;
+    sendChat({ context: ctx });
+  }, []);
+
+  // Auto-send context on route changes
+  useEffect(() => {
     const path = location.pathname;
     const match = path.match(/\/alerts\/(.+)/);
-    return { page: path, alertId: match?.[1] };
-  };
+    sendContext({ ...ctxRef.current, page: path, alertId: match?.[1] });
+  }, [location.pathname, sendContext]);
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typing]);
   useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
@@ -55,22 +72,27 @@ export function ChatBot() {
     if (!text || typing) return;
 
     const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: "user", content: text, timestamp: new Date().toISOString() };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => trimHistory([...prev, userMsg]));
     setInput("");
     setTyping(true);
 
     try {
-      const res = await sendChatMessage(text, messages, getContext());
-      setMessages((prev) => [...prev, res.message]);
+      const history = messages.slice(1); // exclude welcome
+      const res = await sendChat({ context: ctxRef.current, message: text, history });
+      if (res.message) {
+        setMessages((prev) => trimHistory([...prev, res.message!]));
+      }
     } catch {
-      setMessages((prev) => [...prev, { id: `err-${Date.now()}`, role: "assistant", content: "Sorry, something went wrong. Please try again.", timestamp: new Date().toISOString() }]);
+      setMessages((prev) => trimHistory([...prev, { id: `err-${Date.now()}`, role: "assistant", content: "Sorry, something went wrong. Please try again.", timestamp: new Date().toISOString() }]));
     } finally {
       setTyping(false);
     }
   };
 
   return (
-    <>
+    <ChatAPIContext.Provider value={{ sendContext }}>
+      {children}
+
       {/* FAB */}
       {!open && (
         <button onClick={() => setOpen(true)}
@@ -83,7 +105,7 @@ export function ChatBot() {
 
       {/* Chat Panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 w-[420px] h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-slate-200">
+        <div className={`fixed bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-slate-200 transition-all duration-300 ${expanded ? "bottom-4 right-4 w-[700px] h-[85vh] text-base" : "bottom-6 right-6 w-[420px] h-[600px] text-sm"}`}>
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-2xl">
             <div className="flex items-center gap-3">
@@ -95,9 +117,14 @@ export function ChatBot() {
                 <p className="text-xs text-blue-100">Powered by Intelligent Insights</p>
               </div>
             </div>
-            <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors" aria-label="Close chat">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setExpanded(!expanded)} className="h-8 w-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors" aria-label={expanded ? "Collapse" : "Expand"}>
+                {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+              <button onClick={() => setOpen(false)} className="h-8 w-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors" aria-label="Close chat">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* Messages */}
@@ -109,7 +136,7 @@ export function ChatBot() {
                     <Sparkles className="h-4 w-4 text-white" />
                   </div>
                 )}
-                <div className={cn("max-w-[280px] rounded-2xl px-4 py-3 text-sm", m.role === "user" ? "bg-blue-600 text-white rounded-br-md" : "bg-white text-slate-900 border border-slate-200 rounded-bl-md")}>
+                <div className={cn("max-w-[280px] rounded-2xl px-4 py-3", expanded && "max-w-[480px]", m.role === "user" ? "bg-blue-600 text-white rounded-br-md" : "bg-white text-slate-900 border border-slate-200 rounded-bl-md")}>
                   <div className="whitespace-pre-wrap leading-relaxed">{m.content}</div>
                   <div className={cn("text-xs mt-2 opacity-70", m.role === "user" ? "text-blue-100" : "text-slate-500")}>
                     {new Date(m.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -138,7 +165,6 @@ export function ChatBot() {
               </div>
             )}
 
-            {/* Suggested prompts on first load */}
             {messages.length === 1 && !typing && (
               <div className="space-y-2 pt-2">
                 <p className="text-xs font-semibold text-slate-600 px-1">Suggested questions:</p>
@@ -180,6 +206,6 @@ export function ChatBot() {
           </div>
         </div>
       )}
-    </>
+    </ChatAPIContext.Provider>
   );
 }
