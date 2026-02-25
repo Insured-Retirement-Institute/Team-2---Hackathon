@@ -13,7 +13,10 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/alerts/:alertId" element={<AlertDetailPage />} />
           <Route path="/api-spec" element={<ApiSpec />} />
-          <Route path="/admin/responsible-ai" element={<ResponsibleAIDashboard />} />
+          <Route
+            path="/admin/responsible-ai"
+            element={<ResponsibleAIDashboard />}
+          />
         </Routes>
       </ChatBot>
     </BrowserRouter>

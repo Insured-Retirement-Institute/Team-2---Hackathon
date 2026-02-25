@@ -28,7 +28,7 @@ export function AlertsTable({ alerts }: AlertsTableProps) {
           {alerts.length} active alerts requiring attention
         </p>
       </div>
-      
+
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-slate-50 border-b border-slate-200">
@@ -85,15 +85,22 @@ export function AlertsTable({ alerts }: AlertsTableProps) {
                   {alert.currentValue}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`text-sm ${alert.daysUntilRenewal <= 15 ? 'text-red-600 font-semibold' : 'text-slate-600'}`}>
+                  <span
+                    className={`text-sm ${alert.daysUntilRenewal <= 15 ? "text-red-600 font-semibold" : "text-slate-600"}`}
+                  >
                     {alert.renewalDate}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm">
-                    <div className="text-slate-600">{alert.currentRate} → {alert.renewalRate}</div>
+                    <div className="text-slate-600">
+                      {alert.currentRate} → {alert.renewalRate}
+                    </div>
                     {alert.isMinRate && (
-                      <Badge variant="outline" className="mt-1 bg-red-50 text-red-700 border-red-200 text-xs">
+                      <Badge
+                        variant="outline"
+                        className="mt-1 bg-red-50 text-red-700 border-red-200 text-xs"
+                      >
                         Min Rate
                       </Badge>
                     )}
@@ -108,7 +115,10 @@ export function AlertsTable({ alerts }: AlertsTableProps) {
                   </Badge>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200">
+                  <Badge
+                    variant="outline"
+                    className="bg-slate-50 text-slate-700 border-slate-200"
+                  >
                     {alert.status}
                   </Badge>
                 </td>
