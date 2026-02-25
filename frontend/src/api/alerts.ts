@@ -1,5 +1,6 @@
 import type { RenewalAlert, DashboardStats } from "@/types/alerts";
 import { mockAlerts } from "./mock/alerts";
+import { logRequest, logResponse } from "./logger";
 
 /**
  * API Service Layer
@@ -12,12 +13,9 @@ import { mockAlerts } from "./mock/alerts";
  * GET /api/alerts
  */
 export async function fetchAlerts(): Promise<RenewalAlert[]> {
-  // TODO: Replace with real API call
-  // const response = await fetch(`${API_BASE_URL}/alerts`);
-  // return response.json();
-  
+  logRequest("GET /api/alerts");
   return new Promise((resolve) => {
-    setTimeout(() => resolve(mockAlerts), 300);
+    setTimeout(() => { const r = mockAlerts; logResponse("GET /api/alerts", r); resolve(r); }, 300);
   });
 }
 
@@ -26,10 +24,7 @@ export async function fetchAlerts(): Promise<RenewalAlert[]> {
  * GET /api/dashboard/stats
  */
 export async function fetchDashboardStats(): Promise<DashboardStats> {
-  // TODO: Replace with real API call
-  // const response = await fetch(`${API_BASE_URL}/dashboard/stats`);
-  // return response.json();
-  
+  logRequest("GET /api/dashboard/stats");
   return new Promise((resolve) => {
     setTimeout(() => {
       const alerts = mockAlerts;
@@ -42,6 +37,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
           return sum + value;
         }, 0)
       };
+      logResponse("GET /api/dashboard/stats", stats);
       resolve(stats);
     }, 300);
   });
@@ -52,14 +48,9 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
  * POST /api/alerts/{alertId}/snooze
  */
 export async function snoozeAlert(_alertId: string, _snoozeDays: number): Promise<void> {
-  // TODO: Replace with real API call
-  // await fetch(`${API_BASE_URL}/alerts/${alertId}/snooze`, {
-  //   method: 'POST',
-  //   body: JSON.stringify({ snoozeDays })
-  // });
-  
+  logRequest("POST /api/alerts/{alertId}/snooze", { alertId: _alertId, snoozeDays: _snoozeDays });
   return new Promise((resolve) => {
-    setTimeout(() => resolve(), 300);
+    setTimeout(() => { logResponse("POST /api/alerts/{alertId}/snooze", { success: true }); resolve(); }, 300);
   });
 }
 
@@ -68,13 +59,8 @@ export async function snoozeAlert(_alertId: string, _snoozeDays: number): Promis
  * POST /api/alerts/{alertId}/dismiss
  */
 export async function dismissAlert(_alertId: string, _reason: string): Promise<void> {
-  // TODO: Replace with real API call
-  // await fetch(`${API_BASE_URL}/alerts/${alertId}/dismiss`, {
-  //   method: 'POST',
-  //   body: JSON.stringify({ reason })
-  // });
-  
+  logRequest("POST /api/alerts/{alertId}/dismiss", { alertId: _alertId, reason: _reason });
   return new Promise((resolve) => {
-    setTimeout(() => resolve(), 300);
+    setTimeout(() => { logResponse("POST /api/alerts/{alertId}/dismiss", { success: true }); resolve(); }, 300);
   });
 }
