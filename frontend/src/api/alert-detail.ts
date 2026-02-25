@@ -10,7 +10,6 @@ import type {
   VisualizationProduct,
 } from "@/types/alert-detail";
 import { logRequest, logResponse } from "./logger";
-<<<<<<< HEAD
 import { mockAlerts } from "./mock/alerts";
 import {
   getMockPolicyData,
@@ -26,10 +25,6 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
-=======
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
->>>>>>> origin/main
 
 /**
  * Fetch alert detail with policy data
@@ -37,8 +32,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
  */
 export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
   logRequest("GET /api/alerts/{alertId}", { alertId });
-<<<<<<< HEAD
-  
+
   if (USE_MOCKS) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -61,8 +55,6 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/alerts/${alertId}`);
   if (!res.ok)
     throw new Error(`Failed to fetch alert detail: ${res.statusText}`);
@@ -79,8 +71,7 @@ export async function fetchClientProfile(
   clientId: string,
 ): Promise<ClientProfile> {
   logRequest("GET /api/clients/{clientId}/profile", { clientId });
-<<<<<<< HEAD
-  
+
   if (USE_MOCKS) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -95,8 +86,6 @@ export async function fetchClientProfile(
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`);
   if (!res.ok)
     throw new Error(`Failed to fetch client profile: ${res.statusText}`);
@@ -114,8 +103,7 @@ export async function saveClientProfile(
   parameters: ComparisonParameters,
 ): Promise<void> {
   logRequest("PUT /api/clients/{clientId}/profile", { clientId, parameters });
-<<<<<<< HEAD
-  
+
   if (USE_MOCKS) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -125,8 +113,6 @@ export async function saveClientProfile(
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -197,8 +183,7 @@ export async function saveSuitability(
   data: SuitabilityData,
 ): Promise<void> {
   logRequest("PUT /api/alerts/{alertId}/suitability", { alertId, data });
-<<<<<<< HEAD
-  
+
   if (USE_MOCKS) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -208,8 +193,6 @@ export async function saveSuitability(
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/suitability`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -406,8 +389,7 @@ export async function fetchVisualization(
  */
 export async function fetchProductShelf(): Promise<ProductOption[]> {
   logRequest("GET /passthrough/product-options");
-<<<<<<< HEAD
-  
+
   if (USE_MOCKS) {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -418,8 +400,6 @@ export async function fetchProductShelf(): Promise<ProductOption[]> {
     });
   }
 
-=======
->>>>>>> origin/main
   const res = await fetch("/passthrough/product-options");
   if (!res.ok)
     throw new Error(`Failed to fetch product shelf: ${res.statusText}`);

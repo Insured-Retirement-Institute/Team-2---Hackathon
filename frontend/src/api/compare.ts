@@ -4,16 +4,17 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
 export interface ProductOption {
+  id: string;
   name: string;
   carrier: string;
   rate: string;
-  term?: string;
+  term: string;
   premiumBonus?: string;
-  surrenderPeriod?: string;
+  surrenderPeriod: string;
   surrenderCharge?: string;
-  freeWithdrawal?: string;
-  deathBenefit?: string;
-  guaranteedMinRate?: string;
+  freeWithdrawal: string;
+  deathBenefit: string;
+  guaranteedMinRate: string;
   riders?: string[];
   features?: string[];
   liquidity?: string;
@@ -69,16 +70,19 @@ export interface VisualizationProduct {
 const mockComparison: ComparisonResult = {
   comparisonData: {
     current: {
+      id: "current-1",
       name: "SecureChoice MYGA",
       carrier: "Integrity Life",
       rate: "3.80%",
       term: "5 years",
       surrenderPeriod: "7 years",
       freeWithdrawal: "10%",
+      deathBenefit: "Return of premium",
       guaranteedMinRate: "1.50%",
     },
     alternatives: [
       {
+        id: "alt-1",
         name: "FlexGrowth Plus MYGA",
         carrier: "Great American",
         rate: "4.25%",
@@ -86,26 +90,31 @@ const mockComparison: ComparisonResult = {
         premiumBonus: "3.0%",
         surrenderPeriod: "7 years",
         freeWithdrawal: "10%",
+        deathBenefit: "Return of premium",
         guaranteedMinRate: "2.50%",
         licensingApproved: true,
       },
       {
+        id: "alt-2",
         name: "Athene Performance Elite",
         carrier: "Athene",
         rate: "4.10%",
         term: "5 years",
         surrenderPeriod: "6 years",
         freeWithdrawal: "10%",
+        deathBenefit: "Account value",
         guaranteedMinRate: "2.00%",
         licensingApproved: true,
       },
       {
+        id: "alt-3",
         name: "Nationwide Peak",
         carrier: "Nationwide",
         rate: "3.95%",
         term: "5 years",
         surrenderPeriod: "5 years",
         freeWithdrawal: "10%",
+        deathBenefit: "Account value",
         guaranteedMinRate: "2.25%",
         licensingApproved: false,
         licensingDetails: "Appointment required",
