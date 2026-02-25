@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { ComparisonData, VisualizationProduct } from "@/types/alert-detail";
+import type { VisualizationProduct } from "@/types/alert-detail";
 import { TrendingUp, Zap, DollarSign } from "lucide-react";
 import {
   Line, AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -8,74 +8,6 @@ import {
 } from "recharts";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
-
-function safeParseRate(s: string | undefined, fallback: number): number {
-  if (!s) return fallback;
-  const n = parseFloat(s.replace("%", ""));
-  return isNaN(n) ? fallback : n;
-}
-
-function safeParseInt(s: string | undefined, fallback: number): number {
-  if (!s) return fallback;
-  const n = parseInt(s);
-  return isNaN(n) ? fallback : n;
-}
-
-export function convertToVisualizationProducts(data: ComparisonData, initialValue = 150000): VisualizationProduct[] {
-  const products: VisualizationProduct[] = [];
-
-  const buildProduct = (
-    id: string, name: string, carrier: string, rate: number, minRate: number,
-    surrenderYears: number, bonus: number | undefined,
-    riders: string[] | undefined, term: string | undefined,
-    scores: { i: number; g: number; l: number; p: number },
-  ): VisualizationProduct => ({
-    id, name, carrier, currentRate: rate, guaranteedMinRate: minRate,
-    surrenderYears, initialValue, premiumBonus: bonus,
-    incomeScore: scores.i, growthScore: scores.g, liquidityScore: scores.l, protectionScore: scores.p,
-    projectedRates: Array.from({ length: 11 }, (_, i) => ({
-      year: i,
-      conservativeRate: minRate,
-      expectedRate: i === 0 ? rate : Math.max(rate - i * 0.08, minRate),
-      optimisticRate: i === 0 ? rate : Math.min(rate + i * 0.05, rate + 0.5),
-    })),
-    performanceData: Array.from({ length: 21 }, (_, i) => {
-      const yr = i === 0 ? rate : Math.max(rate - i * 0.08, minRate);
-      const bm = bonus && i === 0 ? 1 + bonus / 100 : 1;
-      const v = initialValue * bm * Math.pow(1 + yr / 100, i);
-      const income = v * 0.045;
-      return { year: i, value: Math.round(v), income: i >= 10 ? Math.round(income) : undefined };
-    }),
-    features: [
-      { name: "Surrender Period", startYear: 0, endYear: surrenderYears, category: "surrender" },
-      { name: "Rate Guarantee", startYear: 0, endYear: safeParseInt(term, 5), category: "guarantee" },
-      ...(bonus ? [{ name: "Premium Bonus", startYear: 0, endYear: 1, category: "bonus" as const }] : []),
-      ...(riders || []).map((r) => ({ name: r, startYear: 0, endYear: 20, category: "rider" as const })),
-    ],
-  });
-
-  const cr = safeParseRate(data.current.rate, 3.5);
-  const cm = safeParseRate(data.current.guaranteedMinRate, 1.5);
-  const cs = safeParseInt(data.current.surrenderPeriod, 5);
-  products.push(buildProduct("current", data.current.name, data.current.carrier, cr, cm, cs,
-    data.current.premiumBonus ? safeParseRate(data.current.premiumBonus, 0) : undefined,
-    data.current.riders, data.current.term, { i: 65, g: 70, l: 40, p: 85 }));
-
-  data.alternatives.forEach((alt, idx) => {
-    const ar = safeParseRate(alt.rate, 4.0);
-    const am = safeParseRate(alt.guaranteedMinRate, 2.0);
-    const as_ = safeParseInt(alt.surrenderPeriod, 5);
-    const i = Math.min(100, Math.max(0, 55 + idx * 10 + (alt.riders?.length || 0) * 5));
-    const g = Math.min(100, Math.max(40, 60 + (ar - cr) * 10));
-    const l = Math.min(100, Math.max(30, 80 - as_ * 3));
-    const p = Math.min(100, Math.max(0, 75 + (alt.deathBenefit?.includes("Enhanced") ? 10 : 0)));
-    products.push(buildProduct(`alt-${idx}`, alt.name, alt.carrier, ar, am, as_,
-      alt.premiumBonus ? safeParseRate(alt.premiumBonus, 0) : undefined,
-      alt.riders, alt.term, { i, g, l, p }));
-  });
-
-  return products;
-}
 
 interface Props {
   products: VisualizationProduct[];

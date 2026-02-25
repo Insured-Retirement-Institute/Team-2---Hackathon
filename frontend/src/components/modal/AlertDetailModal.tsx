@@ -11,7 +11,7 @@ import { OverviewTab } from "./OverviewTab";
 import { CompareTab } from "./CompareTab";
 import { ActionTab } from "./ActionTab";
 
-import type { AlertDetail, ComparisonParameters, ComparisonData, SuitabilityData, ProductOption } from "@/types/alert-detail";
+import type { AlertDetail, ComparisonParameters, ComparisonData, SuitabilityData } from "@/types/alert-detail";
 import { fetchAlertDetail, fetchClientProfile, saveClientProfile, runComparison, recompareWithProducts } from "@/api/alert-detail";
 
 interface AlertDetailModalProps {
@@ -55,10 +55,8 @@ export function AlertDetailModal({ open, onClose, alertId }: AlertDetailModalPro
     setDisclosuresAcknowledged(false);
 
     try {
-      const [detailData, profileData] = await Promise.all([
-        fetchAlertDetail(alertId),
-        fetchClientProfile(alertId),
-      ]);
+      const detailData = await fetchAlertDetail(alertId);
+      const profileData = await fetchClientProfile(detailData.alert.clientId);
       setDetail(detailData);
       setSuitabilityData(detailData.suitabilityData);
       setParameters(profileData.parameters);
@@ -80,8 +78,8 @@ export function AlertDetailModal({ open, onClose, alertId }: AlertDetailModalPro
   const handleRunComparison = async () => {
     setCompareLoading(true);
     try {
-      if (parameters) {
-        await saveClientProfile(alertId, parameters);
+      if (parameters && detail) {
+        await saveClientProfile(detail.alert.clientId, parameters);
       }
       const result = await runComparison(alertId);
       setComparisonData(result.comparisonData);
@@ -100,10 +98,10 @@ export function AlertDetailModal({ open, onClose, alertId }: AlertDetailModalPro
     toast.success(`Transaction ${txId} submitted successfully`);
   };
 
-  const handleRecompareWithProducts = async (products: ProductOption[]) => {
+  const handleRecompareWithProducts = async (productIds: string[]) => {
     setCompareLoading(true);
     try {
-      const result = await recompareWithProducts(alertId, products);
+      const result = await recompareWithProducts(alertId, productIds);
       setComparisonData(result.comparisonData);
     } catch {
       toast.error("Failed to update comparison");

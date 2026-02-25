@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import type { ComparisonParameters, ComparisonData, ProductOption } from "@/types/alert-detail";
+import type { ComparisonParameters, ComparisonData, ProductOption, VisualizationProduct } from "@/types/alert-detail";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -9,9 +9,10 @@ import {
   AlertTriangle, Gift, RefreshCw, FileText, Info, User, Pencil,
 } from "lucide-react";
 import { ParametersView } from "./ParametersView";
-import { InteractiveComparisonCharts, convertToVisualizationProducts } from "./InteractiveComparisonCharts";
+import { InteractiveComparisonCharts } from "./InteractiveComparisonCharts";
 import { ProductShelfModal } from "./ProductShelfModal";
 import { getMockProductShelf } from "@/api/mock/alert-detail";
+import { fetchVisualization } from "@/api/alert-detail";
 
 type CompareView = "parameters" | "overview" | "detailed";
 
@@ -23,7 +24,7 @@ interface CompareTabProps {
   isLoading: boolean;
   onParametersChange: (params: ComparisonParameters) => void;
   onRunComparison: () => void;
-  onRecompareWithProducts: (products: ProductOption[]) => void;
+  onRecompareWithProducts: (productIds: string[]) => void;
   onEditProfile?: () => void;
   startOnParameters?: boolean;
 }
@@ -47,7 +48,7 @@ export function CompareTab({ parameters, comparisonData, clientName, policyValue
   }, [hasRun, comparisonData, isLoading, onRunComparison]);
 
   const handleShelfSelect = (products: ProductOption[]) => {
-    onRecompareWithProducts(products);
+    onRecompareWithProducts(products.map((p) => p.id));
   };
 
   if (view === "parameters") {
@@ -155,7 +156,17 @@ function LATIndicator({ letter, label, isActive }: { letter: string; label: stri
 
 /* ── Products Overview (Figma match) ─────────────────────── */
 function ProductsOverview({ current, alternatives, comparisonData }: { current: ProductOption; alternatives: ProductOption[]; comparisonData: ComparisonData }) {
-  const vizProducts = convertToVisualizationProducts(comparisonData);
+  const [vizProducts, setVizProducts] = useState<VisualizationProduct[]>([]);
+  const [vizLoading, setVizLoading] = useState(true);
+
+  useEffect(() => {
+    const allProducts = [comparisonData.current, ...comparisonData.alternatives];
+    setVizLoading(true);
+    Promise.all(allProducts.map((p) => fetchVisualization(p.id))).then((results) => {
+      setVizProducts(results);
+      setVizLoading(false);
+    });
+  }, [comparisonData]);
   return (
     <div className="space-y-6">
       <div>
@@ -262,7 +273,11 @@ function ProductsOverview({ current, alternatives, comparisonData }: { current: 
       </div>
 
       {/* Interactive Charts */}
-      <InteractiveComparisonCharts products={vizProducts} />
+      {vizLoading ? (
+        <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-blue-600" /><span className="ml-2 text-sm text-slate-600">Loading visualization data...</span></div>
+      ) : (
+        <InteractiveComparisonCharts products={vizProducts} />
+      )}
     </div>
   );
 }

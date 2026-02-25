@@ -1,0 +1,847 @@
+openapi: 3.0.3
+info:
+  title: IRI Annuity Renewal Intelligence API
+  description: API specification for the IRI Dashboard backend services
+  version: 5.0.0
+  contact:
+    name: IRI Team 2
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://api.iri-hackathon.com/api
+    description: Production server
+
+paths:
+  # ── Dashboard ──────────────────────────────────────────────
+  /alerts:
+    get:
+      summary: Get all renewal alerts
+      description: Retrieves all active renewal alerts for the advisor's portfolio (lightweight list data)
+      operationId: getAlerts
+      tags: [Dashboard]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, reviewed, snoozed, dismissed]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [high, medium, low]
+        - name: carrier
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RenewalAlert'
+
+  /dashboard/stats:
+    get:
+      summary: Get dashboard statistics
+      operationId: getDashboardStats
+      tags: [Dashboard]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+
+  # ── Alert Detail ───────────────────────────────────────────
+  /alerts/{alertId}:
+    get:
+      summary: Get alert detail
+      description: Returns full alert detail including policy data, suitability score, disclosures, transaction options, and audit log. Used when advisor clicks into an alert.
+      operationId: getAlertDetail
+      tags: [Alert Detail]
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Full alert detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /alerts/{alertId}/snooze:
+    post:
+      summary: Snooze an alert
+      operationId: snoozeAlert
+      tags: [Alert Actions]
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [snoozeDays]
+              properties:
+                snoozeDays:
+                  type: integer
+                  minimum: 1
+                  maximum: 90
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Alert snoozed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  snoozeUntil: { type: string, format: date-time }
+
+  /alerts/{alertId}/dismiss:
+    post:
+      summary: Dismiss an alert
+      operationId: dismissAlert
+      tags: [Alert Actions]
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          description: Alert dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  # ── Compare Tab ────────────────────────────────────────────
+  /alerts/{alertId}/compare:
+    post:
+      summary: Run comparison analysis
+      description: Triggers product comparison using the client's saved profile parameters. Returns current product vs top 3 alternatives with rates, features, and chart data.
+      operationId: runComparison
+      tags: [Compare]
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      responses:
+        '200':
+          description: Comparison results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparisonResult'
+
+  /alerts/{alertId}/compare/products:
+    post:
+      summary: Re-run comparison with selected products
+      description: Re-runs the comparison analysis using a specific set of products chosen by the advisor from the product shelf. Replaces the alternatives in the comparison while keeping the current policy.
+      operationId: recompareWithProducts
+      tags: [Compare]
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productIds]
+              properties:
+                productIds:
+                  type: array
+                  items: { type: string }
+                  minItems: 1
+                  maxItems: 3
+                  description: Product IDs selected from the product shelf to compare against the current policy
+      responses:
+        '200':
+          description: Updated comparison results with selected products as alternatives
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparisonResult'
+
+  # ── Product Shelf ──────────────────────────────────────────
+  /products/shelf:
+    get:
+      summary: Get product shelf
+      description: Returns the full catalog of available annuity products for the advisor to browse and select from. Used by the Product Shelf modal in the Compare tab.
+      operationId: getProductShelf
+      tags: [Compare]
+      parameters:
+        - name: carrier
+          in: query
+          schema: { type: string }
+          description: Filter by carrier name
+        - name: term
+          in: query
+          schema: { type: string }
+          description: Filter by term length
+        - name: licensingApproved
+          in: query
+          schema: { type: boolean }
+          description: Filter to only products the advisor is licensed to sell
+      responses:
+        '200':
+          description: List of available products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductOption'
+
+  # ── Client Profile ─────────────────────────────────────────
+  /clients/{clientId}/profile:
+    get:
+      summary: Get client profile
+      description: Returns the client's comparison parameters (profile, suitability questionnaire, financial goals). Used to pre-populate the Compare tab form.
+      operationId: getClientProfile
+      tags: [Client]
+      parameters:
+        - $ref: '#/components/parameters/ClientId'
+      responses:
+        '200':
+          description: Client profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      summary: Save client profile
+      description: Saves/updates the client's comparison parameters. Called when advisor updates profile, suitability, or goals in the Compare tab.
+      operationId: saveClientProfile
+      tags: [Client]
+      parameters:
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComparisonParameters'
+      responses:
+        '200':
+          description: Profile saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  # ── Client Policy ──────────────────────────────────────────
+  /clients/{clientId}/policies/{policyId}:
+    get:
+      summary: Get policy data
+      description: Returns full policy data for a specific client and policy combination
+      operationId: getPolicyData
+      tags: [Client]
+      parameters:
+        - $ref: '#/components/parameters/ClientId'
+        - $ref: '#/components/parameters/PolicyId'
+      responses:
+        '200':
+          description: Policy data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyData'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Product Visualization ──────────────────────────────────
+  /products/{productId}/visualization:
+    get:
+      summary: Get product visualization data
+      description: Returns enriched product data for interactive comparison charts including projected rates, performance data, and feature timelines
+      operationId: getProductVisualization
+      tags: [Compare]
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: Visualization data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VisualizationProduct'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Action Tab ─────────────────────────────────────────────
+  /clients/{clientId}/suitability:
+    put:
+      summary: Save suitability data
+      description: Saves the suitability form data for this client
+      operationId: saveSuitability
+      tags: [Action]
+      parameters:
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuitabilityData'
+      responses:
+        '200':
+          description: Suitability saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /alerts/{alertId}/disclosures:
+    put:
+      summary: Save disclosure acknowledgments
+      description: Saves which disclosure items have been acknowledged by the advisor
+      operationId: saveDisclosures
+      tags: [Action]
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acknowledgedIds]
+              properties:
+                acknowledgedIds:
+                  type: array
+                  items: { type: string }
+                  description: IDs of acknowledged disclosure items
+                  example: ["d1", "d2", "d3", "d4", "d5"]
+      responses:
+        '200':
+          description: Disclosures saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+
+  /alerts/{alertId}/transaction:
+    post:
+      summary: Submit transaction
+      description: Submits the final transaction (renew or replace) after suitability and disclosures are complete
+      operationId: submitTransaction
+      tags: [Action]
+      parameters:
+        - $ref: '#/components/parameters/AlertId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, rationale, clientStatement]
+              properties:
+                type:
+                  type: string
+                  enum: [renew, replace]
+                rationale:
+                  type: string
+                  description: Advisor's rationale for the transaction
+                clientStatement:
+                  type: string
+                  description: Client's statement acknowledging the transaction
+      responses:
+        '200':
+          description: Transaction submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionData'
+
+  # ── Chat ───────────────────────────────────────────────────
+  /chat/message:
+    post:
+      summary: Send a chat message
+      description: Sends a user message to the AI assistant along with conversation history and current UI context. Returns an AI-generated response.
+      operationId: sendChatMessage
+      tags: [Chat]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message, context]
+              properties:
+                message:
+                  type: string
+                  description: The user's message
+                history:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ChatMessage'
+                  description: Previous messages in the conversation
+                context:
+                  type: object
+                  required: [page]
+                  properties:
+                    page:
+                      type: string
+                      description: Current route path (e.g. "/", "/alerts/alert-123")
+                    alertId:
+                      type: string
+                      description: Alert ID if on an alert detail page
+                    activeTab:
+                      type: string
+                      description: Active workflow tab (overview, compare, action)
+      responses:
+        '200':
+          description: AI assistant response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    $ref: '#/components/schemas/ChatMessage'
+
+components:
+  # ── Parameters ─────────────────────────────────────────────
+  parameters:
+    AlertId:
+      name: alertId
+      in: path
+      required: true
+      schema: { type: string }
+    ClientId:
+      name: clientId
+      in: path
+      required: true
+      schema: { type: string }
+    PolicyId:
+      name: policyId
+      in: path
+      required: true
+      schema: { type: string }
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: { type: string }
+
+  # ── Responses ──────────────────────────────────────────────
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  # ── Schemas ────────────────────────────────────────────────
+  schemas:
+    AlertType:
+      type: string
+      enum: [replacement_recommended, replacement_opportunity, missing_info, suitability_review, income_planning]
+
+    RenewalAlert:
+      type: object
+      required: [id, clientId, policyId, clientName, carrier, renewalDate, daysUntilRenewal, currentRate, renewalRate, currentValue, isMinRate, priority, hasDataException, status, alertType, alertDescription]
+      properties:
+        id: { type: string, example: "alert-ANN-2020-5621-renewal" }
+        clientId: { type: string, example: "CLI-1001" }
+        policyId: { type: string, example: "ANN-2020-5621" }
+        clientName: { type: string, example: "Maria Rodriguez" }
+        carrier: { type: string, example: "Athene" }
+        renewalDate: { type: string, example: "15 Days" }
+        daysUntilRenewal: { type: integer, example: 15 }
+        currentRate: { type: string, example: "3.8%" }
+        renewalRate: { type: string, example: "1.5%" }
+        currentValue: { type: string, example: "$180,000" }
+        isMinRate: { type: boolean, example: true }
+        priority: { type: string, enum: [high, medium, low] }
+        hasDataException: { type: boolean }
+        missingFields:
+          type: array
+          items: { type: string }
+        status: { type: string, enum: [pending, reviewed, snoozed, dismissed] }
+        alertType: { $ref: '#/components/schemas/AlertType' }
+        alertTypes:
+          type: array
+          items: { $ref: '#/components/schemas/AlertType' }
+          description: All alert types for this client (when multiple alerts are grouped)
+        alertDescription: { type: string }
+
+    DashboardStats:
+      type: object
+      required: [total, high, urgent, totalValue]
+      properties:
+        total: { type: integer, example: 10 }
+        high: { type: integer, example: 3 }
+        urgent: { type: integer, example: 4 }
+        totalValue: { type: number, format: double, example: 1839000 }
+
+    # ── Alert Detail (GET /alerts/{alertId}) ─────────────────
+    AlertDetail:
+      type: object
+      required: [alert, clientAlerts, policyData, aiSuitabilityScore, suitabilityData, disclosureItems, transactionOptions, auditLog]
+      properties:
+        alert:
+          $ref: '#/components/schemas/RenewalAlert'
+        clientAlerts:
+          type: array
+          items: { $ref: '#/components/schemas/RenewalAlert' }
+          description: All alerts for this client (for grouped review)
+        policyData:
+          $ref: '#/components/schemas/PolicyData'
+        aiSuitabilityScore:
+          $ref: '#/components/schemas/SuitabilityScore'
+        suitabilityData:
+          $ref: '#/components/schemas/SuitabilityData'
+        disclosureItems:
+          type: array
+          items: { $ref: '#/components/schemas/DisclosureItem' }
+        transactionOptions:
+          type: array
+          items: { $ref: '#/components/schemas/TransactionOption' }
+        auditLog:
+          type: array
+          items: { $ref: '#/components/schemas/AuditLogEntry' }
+
+    PolicyData:
+      type: object
+      required: [contractId, clientName, carrier, productName, issueDate, currentValue, surrenderValue, currentRate, renewalRate, guaranteedMinRate, renewalDate, isMinRateRenewal, suitabilityStatus, eligibilityStatus, features]
+      properties:
+        contractId: { type: string, example: "ANN-2020-5621" }
+        clientName: { type: string }
+        carrier: { type: string }
+        productName: { type: string, example: "SecureChoice Multi-Year Guarantee Annuity" }
+        issueDate: { type: string, example: "03/15/2018" }
+        currentValue: { type: string, example: "$180,000" }
+        surrenderValue: { type: string, example: "$176,400" }
+        currentRate: { type: string, example: "3.8%" }
+        renewalRate: { type: string, example: "1.5%" }
+        guaranteedMinRate: { type: string, example: "1.50%" }
+        renewalDate: { type: string }
+        isMinRateRenewal: { type: boolean }
+        suitabilityStatus: { type: string, enum: [complete, incomplete, not-started] }
+        eligibilityStatus: { type: string, enum: [eligible, restricted, ineligible] }
+        features:
+          $ref: '#/components/schemas/PolicyFeaturesData'
+
+    PolicyFeaturesData:
+      type: object
+      properties:
+        features:
+          type: array
+          items: { $ref: '#/components/schemas/PolicyFeature' }
+        benefits:
+          type: array
+          items: { $ref: '#/components/schemas/PolicyFeature' }
+        riders:
+          type: array
+          items: { $ref: '#/components/schemas/PolicyFeature' }
+        limitations:
+          type: array
+          items: { $ref: '#/components/schemas/PolicyFeature' }
+        surrenderCharge: { type: string, example: "2.5% (Year 7 of 10)" }
+        withdrawalAllowance: { type: string, example: "10% annually penalty-free" }
+        mvaPenalty: { type: string, example: "-3.8% if surrendered today" }
+        rateGuarantee: { type: string, example: "5 years remaining" }
+
+    PolicyFeature:
+      type: object
+      required: [name, description, included, type]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        included: { type: boolean }
+        type: { type: string, enum: [feature, benefit, rider, limitation] }
+
+    SuitabilityScore:
+      type: object
+      required: [score, reasoning, complianceNotes, missingData]
+      properties:
+        score: { type: integer, example: 85 }
+        reasoning:
+          type: array
+          items: { type: string }
+        complianceNotes:
+          type: array
+          items: { type: string }
+        missingData:
+          type: array
+          items: { type: string }
+
+    SuitabilityData:
+      type: object
+      required: [clientObjectives, riskTolerance, timeHorizon, liquidityNeeds, taxConsiderations, guaranteedIncome, rateExpectations, surrenderTimeline, livingBenefits, advisorEligibility, score, isPrefilled]
+      properties:
+        clientObjectives: { type: string }
+        riskTolerance: { type: string }
+        timeHorizon: { type: string }
+        liquidityNeeds: { type: string }
+        taxConsiderations: { type: string }
+        guaranteedIncome: { type: string }
+        rateExpectations: { type: string }
+        surrenderTimeline: { type: string }
+        livingBenefits:
+          type: array
+          items: { type: string }
+        advisorEligibility: { type: string }
+        score: { type: integer }
+        isPrefilled: { type: boolean }
+
+    DisclosureItem:
+      type: object
+      required: [id, required]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        title: { type: string }
+        description: { type: string }
+        documentName: { type: string }
+        required: { type: boolean }
+        link: { type: string }
+
+    TransactionOption:
+      type: object
+      required: [type, label, description, requirements, isAvailable]
+      properties:
+        type: { type: string, enum: [renew, replace] }
+        label: { type: string }
+        description: { type: string }
+        requirements:
+          type: array
+          items: { type: string }
+        warnings:
+          type: array
+          items: { type: string }
+        isAvailable: { type: boolean }
+        unavailableReason: { type: string }
+        pros:
+          type: array
+          items: { type: string }
+        cons:
+          type: array
+          items: { type: string }
+
+    AuditLogEntry:
+      type: object
+      required: [timestamp, user, action, details]
+      properties:
+        timestamp: { type: string }
+        user: { type: string }
+        action: { type: string }
+        details: { type: string }
+
+    # ── Compare ──────────────────────────────────────────────
+    ComparisonResult:
+      type: object
+      required: [comparisonData]
+      properties:
+        comparisonData:
+          $ref: '#/components/schemas/ComparisonData'
+
+    ComparisonData:
+      type: object
+      required: [current, alternatives, missingData]
+      properties:
+        current:
+          $ref: '#/components/schemas/ProductOption'
+        alternatives:
+          type: array
+          items: { $ref: '#/components/schemas/ProductOption' }
+          maxItems: 3
+        missingData: { type: boolean }
+
+    ProductOption:
+      type: object
+      required: [id, name, carrier, rate, term, surrenderPeriod, freeWithdrawal, deathBenefit, guaranteedMinRate]
+      properties:
+        id: { type: string, example: "prod-flexgrowth" }
+        name: { type: string, example: "FlexGrowth Plus MYGA" }
+        carrier: { type: string, example: "Great American" }
+        rate: { type: string, example: "4.25%" }
+        term: { type: string, example: "7 years" }
+        premiumBonus: { type: string, example: "3.0%" }
+        surrenderPeriod: { type: string, example: "7" }
+        surrenderCharge: { type: string, example: "7% (declining)" }
+        freeWithdrawal: { type: string, example: "10%" }
+        deathBenefit: { type: string, example: "Enhanced" }
+        guaranteedMinRate: { type: string, example: "2.50%" }
+        riders:
+          type: array
+          items: { type: string }
+        features:
+          type: array
+          items: { type: string }
+        liquidity: { type: string }
+        mvaPenalty: { type: string }
+        licensingApproved: { type: boolean, description: "Whether the advisor is licensed to sell this product" }
+        licensingDetails: { type: string, description: "Details about licensing status (e.g. appointment needed)" }
+
+    VisualizationProduct:
+      type: object
+      description: Enriched product data used for interactive comparison charts. Derived from ProductOption on the frontend.
+      required: [id, name, carrier, currentRate, guaranteedMinRate, surrenderYears, initialValue, incomeScore, growthScore, liquidityScore, protectionScore, projectedRates, performanceData, features]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        carrier: { type: string }
+        currentRate: { type: number, format: double }
+        guaranteedMinRate: { type: number, format: double }
+        surrenderYears: { type: integer }
+        initialValue: { type: number, format: double }
+        premiumBonus: { type: number, format: double }
+        incomeScore: { type: integer, minimum: 0, maximum: 100 }
+        growthScore: { type: integer, minimum: 0, maximum: 100 }
+        liquidityScore: { type: integer, minimum: 0, maximum: 100 }
+        protectionScore: { type: integer, minimum: 0, maximum: 100 }
+        projectedRates:
+          type: array
+          items:
+            type: object
+            required: [year, conservativeRate, expectedRate, optimisticRate]
+            properties:
+              year: { type: integer }
+              conservativeRate: { type: number, format: double }
+              expectedRate: { type: number, format: double }
+              optimisticRate: { type: number, format: double }
+        performanceData:
+          type: array
+          items:
+            type: object
+            required: [year, value]
+            properties:
+              year: { type: integer }
+              value: { type: number, format: double }
+              income: { type: number, format: double }
+        features:
+          type: array
+          items:
+            type: object
+            required: [name, startYear, endYear, category]
+            properties:
+              name: { type: string }
+              startYear: { type: integer }
+              endYear: { type: integer }
+              category: { type: string, enum: [surrender, bonus, rider, guarantee] }
+
+    # ── Client Profile ───────────────────────────────────────
+    ClientProfile:
+      type: object
+      required: [clientId, clientName, parameters]
+      properties:
+        clientId: { type: string }
+        clientName: { type: string }
+        parameters:
+          $ref: '#/components/schemas/ComparisonParameters'
+
+    ComparisonParameters:
+      type: object
+      properties:
+        # Profile
+        residesInNursingHome: { type: string, enum: ["yes", "no"] }
+        hasLongTermCareInsurance: { type: string, enum: ["yes", "no"] }
+        hasMedicareSupplemental: { type: string, enum: ["yes", "no"] }
+        # Financial
+        grossIncome: { type: string, example: "85000" }
+        disposableIncome: { type: string, example: "45000" }
+        taxBracket: { type: string, example: "22%" }
+        householdLiquidAssets: { type: string, example: "250000" }
+        monthlyLivingExpenses: { type: string, example: "4500" }
+        totalAnnuityValue: { type: string, example: "180000" }
+        householdNetWorth: { type: string, example: "650000" }
+        # Anticipated Changes
+        anticipateExpenseIncrease: { type: string, enum: ["yes", "no"] }
+        anticipateIncomeDecrease: { type: string, enum: ["yes", "no"] }
+        anticipateLiquidAssetDecrease: { type: string, enum: ["yes", "no"] }
+        # Objectives & Planning
+        financialObjectives: { type: string }
+        distributionPlan: { type: string }
+        ownedAssets: { type: string }
+        timeToFirstDistribution: { type: string }
+        expectedHoldingPeriod: { type: string }
+        sourceOfFunds: { type: string }
+        employmentStatus: { type: string }
+        applyToMeansTestedBenefits: { type: string, enum: ["yes", "no"] }
+
+    # ── Submission ───────────────────────────────────────────
+    SubmissionData:
+      type: object
+      required: [submissionId, submittedDate, carrier, transactionType, currentStatus, statusHistory]
+      properties:
+        submissionId: { type: string, example: "SUB-2026-1234" }
+        submittedDate: { type: string }
+        carrier: { type: string }
+        transactionType: { type: string, enum: [renew, replace] }
+        currentStatus:
+          $ref: '#/components/schemas/SubmissionStatus'
+        statusHistory:
+          type: array
+          items: { $ref: '#/components/schemas/SubmissionStatus' }
+        nigoIssues:
+          type: array
+          items:
+            type: object
+            properties:
+              issue: { type: string }
+              remediation: { type: string }
+              resolved: { type: boolean }
+
+    SubmissionStatus:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status: { type: string, enum: [received, in-review, nigo, approved, issued] }
+        timestamp: { type: string }
+        notes: { type: string }
+
+    ChatMessage:
+      type: object
+      required: [id, role, content, timestamp]
+      properties:
+        id: { type: string, example: "msg-1234567890" }
+        role: { type: string, enum: [user, assistant] }
+        content: { type: string }
+        timestamp: { type: string, format: date-time }
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, example: "NOT_FOUND" }
+        message: { type: string, example: "Alert not found" }
+        details:
+          type: object
+          additionalProperties: true
