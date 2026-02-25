@@ -17,7 +17,7 @@ SELECT
     alert_type as "alertType",
     alert_types as "alertTypes",
     alert_description as "alertDescription"
-FROM renewal_alerts
+FROM alerts
 WHERE
     ($1::varchar IS NULL OR status = $1)
     AND ($2::varchar IS NULL OR priority = $2)
