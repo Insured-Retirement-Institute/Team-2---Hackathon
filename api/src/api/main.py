@@ -6,7 +6,13 @@ from fastapi import FastAPI
 
 from api import database
 from api.database import close_db, init_db
-from api.routers import passthrough, policies
+from api.routers import passthrough, policies, profiles, alerts, responsible_ai
+
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -51,7 +57,8 @@ async def readiness():
     except Exception as e:
         return {"status": "not_ready", "reason": str(e)}
 
-
 app.include_router(passthrough.router)
 app.include_router(policies.router)
+app.include_router(alerts.router)
+app.include_router(profiles.router)
 app.include_router(responsible_ai.router)
