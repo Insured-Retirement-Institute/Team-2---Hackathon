@@ -71,6 +71,19 @@ class ProfileChangesInput(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+# ---- Reasons to switch products (pros + cons for display) ----
+class ReasonsToSwitch(BaseModel):
+    """Reasons why it makes sense to switch products. Display with + for pros, − for cons."""
+    pros: list[str] = Field(
+        default_factory=list,
+        description="Benefits of switching (e.g. no new underwriting, surrender expired)",
+    )
+    cons: list[str] = Field(
+        default_factory=list,
+        description="Drawbacks or considerations (e.g. rate drop, missing higher rates)",
+    )
+
+
 # ---- Product recommendation output (one product option) ----
 class ProductRecommendation(BaseModel):
     """A single product recommendation for the client."""
@@ -130,6 +143,10 @@ class AgentTwoStorablePayload(BaseModel):
         ...,
         description="Recommended products with match_reason per item",
     )
+    reasons_to_switch: ReasonsToSwitch | None = Field(
+        None,
+        description="Pros (+) and cons (−) for why it makes sense to switch products",
+    )
     merged_profile_summary: dict[str, Any] | None = Field(
         None,
         description="Merged suitability + goals/profile used for recommendations (audit)",
@@ -151,6 +168,10 @@ class ProductRecommendationsOutput(BaseModel):
     explanation: ChoiceExplanation | None = Field(
         None,
         description="Structured explanation of agentTwo's choices (summary, data sources, criteria)",
+    )
+    reasons_to_switch: ReasonsToSwitch | None = Field(
+        None,
+        description="Pros (+) and cons (−) for why it makes sense to switch products",
     )
     storable_payload: AgentTwoStorablePayload | None = Field(
         None,

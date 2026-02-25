@@ -3,10 +3,17 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api import database
 from api.database import close_db, init_db
-from api.routers import passthrough, policies
+from api.routers import passthrough, policies, profiles, alerts, compare, responsible_ai
+
+logging.basicConfig(
+    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -33,6 +40,14 @@ app = FastAPI(
     swagger_ui_parameters={"url": f"{root_path}/openapi.json"} if root_path else None,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.get("/health")
 async def health():
@@ -51,7 +66,9 @@ async def readiness():
     except Exception as e:
         return {"status": "not_ready", "reason": str(e)}
 
-
 app.include_router(passthrough.router)
 app.include_router(policies.router)
+app.include_router(alerts.router)
+app.include_router(profiles.router)
+app.include_router(compare.router)
 app.include_router(responsible_ai.router)

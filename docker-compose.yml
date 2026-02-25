@@ -26,11 +26,31 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/main
       QUERIES_DIR: /app/queries
+      AGENTS_URL: http://agents:8000
     depends_on:
       db:
         condition: service_healthy
+      agents:
+        condition: service_healthy
     volumes:
       - ./api/queries:/app/queries:ro
+
+  agents:
+    build:
+      context: .
+      dockerfile: agents/Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/main
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:

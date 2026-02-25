@@ -3,21 +3,25 @@
 __version__ = "0.1.0"
 
 from api.sureify_models import (
-    Policy,
-    Annuity,
-    Life,
-    Case,
-    PolicySearchResult,
-    CaseSearchResult,
-    Person,
+    PolicyData,
+    PolicyFeaturesData,
+    PolicyFeature,
+    SuitabilityData,
+    DisclosureItem,
+    ProductOption,
+    VisualizationProduct,
+    ClientProfile,
+    ComparisonParameters,
 )
 
 __all__ = [
-    "Policy",
-    "Annuity",
-    "Life",
-    "Case",
-    "PolicySearchResult",
-    "CaseSearchResult",
-    "Person",
+    "PolicyData",
+    "PolicyFeaturesData",
+    "PolicyFeature",
+    "SuitabilityData",
+    "DisclosureItem",
+    "ProductOption",
+    "VisualizationProduct",
+    "ClientProfile",
+    "ComparisonParameters",
 ]

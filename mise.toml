@@ -3,7 +3,7 @@
 
 [tasks.generate-models]
 description = "Generate Pydantic models from sureify.json OpenAPI spec"
-run = "uv run datamodel-codegen --input sureify.json --output-model-type pydantic_v2.BaseModel --output api/src/api/sureify_models.py"
+run = "uv run datamodel-codegen --input sureify.yaml --output-model-type pydantic_v2.BaseModel --output api/src/api/sureify_models.py"
 
 # =============================================================================
 # pgschema Tasks
@@ -616,3 +616,77 @@ run = """
 set -euo pipefail
 kubectl logs -l app=agents --tail=100 -f
 """
+
+# =============================================================================
+# Unified Deploy/Update Tasks
+# =============================================================================
+
+[tasks."deploy:build-all"]
+description = "Build all Docker images (api, frontend, agents)"
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Building all images for linux/amd64..."
+
+# Build in parallel
+docker build --platform linux/amd64 -t "hack2future:$TAG" -f api/Dockerfile . &
+docker build --platform linux/amd64 -t "hack2future-frontend:$TAG" -f frontend/Dockerfile . &
+docker build --platform linux/amd64 -t "hack2future-agents:$TAG" -f agents/Dockerfile . &
+wait
+
+echo "Tagging images..."
+docker tag "hack2future:$TAG" "$REGISTRY/hack2future:$TAG"
+docker tag "hack2future-frontend:$TAG" "$REGISTRY/hack2future-frontend:$TAG"
+docker tag "hack2future-agents:$TAG" "$REGISTRY/hack2future-agents:$TAG"
+
+echo "All images built and tagged!"
+"""
+
+[tasks."deploy:push-all"]
+description = "Push all Docker images to ECR"
+depends = ["ecr:login", "deploy:build-all"]
+run = """
+#!/bin/bash
+set -euo pipefail
+AWS_REGION="${AWS_REGION:-us-east-1}"
+AWS_ACCOUNT_ID="${AWS_ACCOUNT_ID:-$(aws sts get-caller-identity --query Account --output text)}"
+TAG="${IMAGE_TAG:-latest}"
+REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+
+echo "Pushing all images..."
+docker push "$REGISTRY/hack2future:$TAG" &
+docker push "$REGISTRY/hack2future-frontend:$TAG" &
+docker push "$REGISTRY/hack2future-agents:$TAG" &
+wait
+
+echo "All images pushed!"
+"""
+
+[tasks."deploy:restart"]
+description = "Restart all deployments to pull latest images"
+depends = ["deploy:push-all"]
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Restarting deployments..."
+kubectl rollout restart deployment/hack2future deployment/hack2future-frontend deployment/agents
+
+echo "Waiting for rollouts to complete..."
+kubectl rollout status deployment/hack2future --timeout=120s &
+kubectl rollout status deployment/hack2future-frontend --timeout=120s &
+kubectl rollout status deployment/agents --timeout=120s &
+wait
+
+echo "All deployments restarted!"
+kubectl get pods -l 'app in (hack2future, hack2future-frontend, agents)'
+"""
+
+[tasks."deploy:update"]
+description = "Build, push, and restart all services (full deploy cycle)"
+depends = ["deploy:restart"]

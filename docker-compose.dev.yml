@@ -31,11 +31,37 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/main
       PYTHONPATH: /app/src
+      AGENTS_URL: http://agents:8000
+    depends_on:
+      db:
+        condition: service_healthy
+      agents:
+        condition: service_started
+    volumes:
+      - ./api:/app
+      - /app/.venv
+
+  agents:
+    image: ghcr.io/astral-sh/uv:debian
+    working_dir: /app
+    command: >
+      sh -c "
+      pip install uv &&
+      uv venv &&
+      . .venv/bin/activate &&
+      uv pip install -e . &&
+      uvicorn agents.server:app --host 0.0.0.0 --port 8000 --reload
+      "
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/main
+      PYTHONPATH: /app
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - ./api:/app
+      - ./agents:/app
       - /app/.venv
 
   frontend:

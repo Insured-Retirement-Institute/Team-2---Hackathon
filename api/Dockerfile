@@ -7,14 +7,15 @@ WORKDIR /app
 COPY uv.lock pyproject.toml ./
 COPY api/pyproject.toml api/
 COPY api/src/ api/src/
+COPY schemas/ schemas/
 
-# Create venv and install the api package
+# Create venv and install the api package (and schemas dependency)
 RUN uv venv /.venv
 ENV PATH="/.venv/bin:$PATH"
-RUN uv pip install ./api
+RUN uv pip install ./schemas ./api
 
 # Build wheels
-RUN mkdir -p /wheels && cd api && uv build -o /wheels
+RUN mkdir -p /wheels && cd schemas && uv build -o /wheels && cd ../api && uv build -o /wheels
 
 FROM python:3.13-slim-trixie AS app
 
