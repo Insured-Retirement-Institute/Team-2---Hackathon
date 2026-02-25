@@ -25,7 +25,10 @@ async def lifespan(_app: FastAPI):
     logger.info("Application shutdown complete")
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    root_path=os.environ.get("ROOT_PATH", ""),
+)
 
 
 @app.get("/health")
