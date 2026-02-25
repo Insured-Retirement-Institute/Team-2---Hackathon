@@ -1,0 +1,1090 @@
+openapi: 3.0.3
+info:
+  title: Puddle Data API
+  description: |
+    Read-only API providing annuity policy data, client profiles, product options,
+    suitability assessments, disclosure documents, and enriched visualization data.
+
+    All endpoints return the complete set of records the authenticated user is
+    authorized to access. Results are scoped by the caller's authorization context.
+  version: 1.0.0
+  contact:
+    name: Hackathon Team
+
+servers:
+  - url: https://hackathon-dev-api.sureify.com/puddle
+    description: Development
+
+security:
+  - bearerAuth: []
+
+paths:
+  /policyData:
+    get:
+      summary: List all policy data
+      description: |
+        Returns every annuity policy record the caller is authorized to view,
+        including current contract values, rate information, renewal status,
+        and the full set of policy features, benefits, riders, and limitations.
+      operationId: getPolicyData
+      tags: [Policies]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [policyData]
+                properties:
+                  policyData:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PolicyData'
+              example:
+                policyData:
+                  - ID: "dGVzdC1wb2xpY3ktZGF0YS0x"
+                    contractId: "ANN-2020-5621"
+                    clientName: "Margaret A. Whitfield"
+                    carrier: "Integrity Life Insurance"
+                    productName: "SecureChoice Multi-Year Guarantee Annuity"
+                    issueDate: "03/15/2018"
+                    currentValue: "$180,000"
+                    surrenderValue: "$176,400"
+                    currentRate: "3.80%"
+                    renewalRate: "1.50%"
+                    guaranteedMinRate: "1.50%"
+                    renewalDate: "03/15/2026"
+                    isMinRateRenewal: true
+                    suitabilityStatus: "complete"
+                    eligibilityStatus: "eligible"
+                    features:
+                      surrenderCharge: "2.5% (Year 7 of 10)"
+                      withdrawalAllowance: "10% annually penalty-free"
+                      mvaPenalty: "-3.8% if surrendered today"
+                      rateGuarantee: "5 years remaining"
+                      features:
+                        - name: "Tax-Deferred Growth"
+                          description: "Interest compounds tax-deferred until withdrawal"
+                          included: true
+                          type: "feature"
+                        - name: "Nursing Home Waiver"
+                          description: "Surrender charges waived after 90-day qualifying stay"
+                          included: true
+                          type: "feature"
+                      benefits:
+                        - name: "Guaranteed Minimum Rate"
+                          description: "Rate will never fall below 1.50% regardless of market conditions"
+                          included: true
+                          type: "benefit"
+                        - name: "Death Benefit"
+                          description: "Full accumulated value paid to beneficiaries upon death"
+                          included: true
+                          type: "benefit"
+                      riders:
+                        - name: "Guaranteed Lifetime Withdrawal Benefit"
+                          description: "Provides guaranteed income payments for life starting at age 65"
+                          included: true
+                          type: "rider"
+                      limitations:
+                        - name: "Market Value Adjustment"
+                          description: "Surrender value subject to MVA during surrender charge period"
+                          included: true
+                          type: "limitation"
+                        - name: "Early Withdrawal Penalty"
+                          description: "10% IRS penalty applies to withdrawals before age 59 1/2"
+                          included: true
+                          type: "limitation"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /suitabilityData:
+    get:
+      summary: List all suitability assessments
+      description: |
+        Returns all suitability assessment records. Each record captures a client's
+        financial objectives, risk profile, time horizon, and liquidity requirements
+        as gathered during the suitability review process. Includes a composite
+        suitability score.
+      operationId: getSuitabilityData
+      tags: [Suitability]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suitabilityData]
+                properties:
+                  suitabilityData:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SuitabilityData'
+              example:
+                suitabilityData:
+                  - ID: "c3VpdGFiaWxpdHktMDAxMDAx"
+                    clientObjectives: "Preserve principal with modest growth; generate guaranteed retirement income starting in 5 years"
+                    riskTolerance: "Conservative"
+                    timeHorizon: "5-10 years"
+                    liquidityNeeds: "Low -- has separate emergency fund covering 12 months of expenses"
+                    taxConsiderations: "Currently in 22% bracket; expects 12% bracket in retirement. Tax deferral is valuable."
+                    guaranteedIncome: "Desires guaranteed income floor of $2,000/month to supplement Social Security"
+                    rateExpectations: "Willing to accept lower current rate for longer rate guarantee period"
+                    surrenderTimeline: "No anticipated need to surrender within the next 7 years"
+                    livingBenefits:
+                      - "Nursing home waiver"
+                      - "Terminal illness benefit"
+                      - "Guaranteed lifetime withdrawal"
+                    advisorEligibility: "Series 6, state insurance license -- all appointments current"
+                    score: 82
+                    isPrefilled: false
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /disclosureItem:
+    get:
+      summary: List all disclosure items
+      description: |
+        Returns all disclosure and regulatory document records. Each item
+        represents a required or optional disclosure that must be presented
+        to or acknowledged by the client during the sales or servicing process.
+      operationId: getDisclosureItems
+      tags: [Disclosures]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [disclosureItems]
+                properties:
+                  disclosureItems:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DisclosureItem'
+              example:
+                disclosureItems:
+                  - ID: "ZGlzY2xvc3VyZS1pdGVtLTE"
+                    disclosureId: "DISC-MYGA-001"
+                    label: "Rate Guarantee"
+                    title: "Multi-Year Rate Guarantee Disclosure"
+                    description: "This disclosure explains the guaranteed interest rate period, conditions under which the rate may change at renewal, and the guaranteed minimum rate floor."
+                    documentName: "MYGA_Rate_Guarantee_Disclosure_2025.pdf"
+                    required: true
+                    link: "https://docs.example.com/disclosures/MYGA_Rate_Guarantee_Disclosure_2025.pdf"
+                  - ID: "ZGlzY2xvc3VyZS1pdGVtLTI"
+                    disclosureId: "DISC-MVA-002"
+                    label: "MVA Notice"
+                    title: "Market Value Adjustment Disclosure"
+                    description: "Explains how the market value adjustment is calculated and its potential impact on surrender values during the surrender charge period."
+                    documentName: "MVA_Disclosure_Notice.pdf"
+                    required: true
+                    link: "https://docs.example.com/disclosures/MVA_Disclosure_Notice.pdf"
+                  - ID: "ZGlzY2xvc3VyZS1pdGVtLTM"
+                    disclosureId: "DISC-1035-003"
+                    label: "1035 Exchange"
+                    title: "1035 Exchange Suitability Acknowledgment"
+                    description: "Outlines the implications of a 1035 tax-free exchange, including potential surrender charges on the existing contract and new surrender charge periods."
+                    documentName: "1035_Exchange_Acknowledgment.pdf"
+                    required: false
+                    link: null
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /productOption:
+    get:
+      summary: List all product options
+      description: |
+        Returns all annuity product options available in the system. Each
+        record describes a product's rate, term, surrender schedule, withdrawal
+        provisions, death benefit type, available riders, and the advisor's
+        current licensing status for the product.
+      operationId: getProductOptions
+      tags: [Products]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [productOptions]
+                properties:
+                  productOptions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductOption'
+              example:
+                productOptions:
+                  - ID: "cHJvZHVjdC1vcHRpb24tMQ"
+                    name: "FlexGrowth Plus MYGA"
+                    carrier: "Great American"
+                    rate: "4.25%"
+                    term: "7 years"
+                    premiumBonus: "3.0%"
+                    surrenderPeriod: "7"
+                    surrenderCharge: "7% (declining 1% annually)"
+                    freeWithdrawal: "10%"
+                    deathBenefit: "Enhanced -- return of premium plus interest"
+                    guaranteedMinRate: "2.50%"
+                    riders:
+                      - "Guaranteed Lifetime Withdrawal Benefit"
+                      - "Nursing Home Confinement Waiver"
+                      - "Terminal Illness Waiver"
+                    features:
+                      - "Tax-deferred accumulation"
+                      - "Penalty-free systematic withdrawals"
+                      - "Flexible premium payments"
+                    liquidity: "10% annual free withdrawal; full liquidity after surrender period"
+                    mvaPenalty: "Subject to MVA during surrender period"
+                    licensingApproved: true
+                    licensingDetails: null
+                  - ID: "cHJvZHVjdC1vcHRpb24tMg"
+                    name: "SafeHarbor Fixed Annuity"
+                    carrier: "Athene"
+                    rate: "3.75%"
+                    term: "5 years"
+                    premiumBonus: null
+                    surrenderPeriod: "5"
+                    surrenderCharge: "5% (declining 1% annually)"
+                    freeWithdrawal: "10%"
+                    deathBenefit: "Standard -- accumulated contract value"
+                    guaranteedMinRate: "2.00%"
+                    riders:
+                      - "Nursing Home Confinement Waiver"
+                    features:
+                      - "Tax-deferred accumulation"
+                      - "No market value adjustment"
+                    liquidity: "10% annual free withdrawal; RMD-friendly"
+                    mvaPenalty: null
+                    licensingApproved: false
+                    licensingDetails: "Appointment with Athene required -- apply at carrier portal"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /visualizationProduct:
+    get:
+      summary: List all visualization products
+      description: |
+        Returns enriched product data designed for interactive comparison charts
+        and analytics. Each record includes scored dimensions (income, growth,
+        liquidity, protection), multi-year projected rate scenarios, historical
+        performance data, and time-bounded product feature windows.
+      operationId: getVisualizationProducts
+      tags: [Products]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [visualizationProducts]
+                properties:
+                  visualizationProducts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VisualizationProduct'
+              example:
+                visualizationProducts:
+                  - ID: "dml6LXByb2R1Y3QtMDAxMDA"
+                    productId: "PROD-FLEX-MYGA-7"
+                    name: "FlexGrowth Plus MYGA"
+                    carrier: "Great American"
+                    currentRate: 4.25
+                    guaranteedMinRate: 2.50
+                    surrenderYears: 7
+                    initialValue: 100000
+                    premiumBonus: 3.0
+                    incomeScore: 72
+                    growthScore: 85
+                    liquidityScore: 45
+                    protectionScore: 88
+                    projectedRates:
+                      - year: 1
+                        conservativeRate: 4.25
+                        expectedRate: 4.25
+                        optimisticRate: 4.25
+                      - year: 2
+                        conservativeRate: 4.25
+                        expectedRate: 4.25
+                        optimisticRate: 4.25
+                      - year: 5
+                        conservativeRate: 2.50
+                        expectedRate: 3.40
+                        optimisticRate: 4.80
+                      - year: 8
+                        conservativeRate: 2.50
+                        expectedRate: 3.60
+                        optimisticRate: 5.10
+                      - year: 10
+                        conservativeRate: 2.50
+                        expectedRate: 3.75
+                        optimisticRate: 5.25
+                    performanceData:
+                      - year: 1
+                        value: 107325.00
+                        income: 0
+                      - year: 3
+                        value: 121450.80
+                        income: 0
+                      - year: 5
+                        value: 135200.50
+                        income: 0
+                      - year: 7
+                        value: 148910.25
+                        income: 5400.00
+                      - year: 10
+                        value: 168750.00
+                        income: 6750.00
+                    features:
+                      - name: "Surrender Charge Period"
+                        startYear: 1
+                        endYear: 7
+                        category: "surrender"
+                      - name: "Premium Bonus Vesting"
+                        startYear: 1
+                        endYear: 10
+                        category: "bonus"
+                      - name: "GLWB Rider"
+                        startYear: 1
+                        endYear: 30
+                        category: "rider"
+                      - name: "Guaranteed Minimum Rate"
+                        startYear: 1
+                        endYear: 30
+                        category: "guarantee"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /clientProfile:
+    get:
+      summary: List all client profiles
+      description: |
+        Returns all client profile records including financial situation,
+        risk parameters, employment and income details, asset information,
+        and anticipated changes to the client's financial position. The
+        parameters sub-object captures the full comparison parameter set.
+      operationId: getClientProfiles
+      tags: [Clients]
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clientProfiles]
+                properties:
+                  clientProfiles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClientProfile'
+              example:
+                clientProfiles:
+                  - ID: "Y2xpZW50LXByb2ZpbGUtMQ"
+                    clientId: "CLT-2024-00412"
+                    clientName: "Margaret A. Whitfield"
+                    parameters:
+                      residesInNursingHome: "no"
+                      hasLongTermCareInsurance: "yes"
+                      hasMedicareSupplemental: "yes"
+                      grossIncome: "85000"
+                      disposableIncome: "45000"
+                      taxBracket: "22%"
+                      householdLiquidAssets: "250000"
+                      monthlyLivingExpenses: "4500"
+                      totalAnnuityValue: "180000"
+                      householdNetWorth: "650000"
+                      anticipateExpenseIncrease: "no"
+                      anticipateIncomeDecrease: "yes"
+                      anticipateLiquidAssetDecrease: "no"
+                      financialObjectives: "Supplement Social Security with guaranteed income; preserve assets for estate"
+                      distributionPlan: "Systematic withdrawals beginning at age 67"
+                      ownedAssets: "Primary residence (paid off), 401(k), Roth IRA, existing fixed annuity"
+                      timeToFirstDistribution: "5 years"
+                      expectedHoldingPeriod: "10+ years"
+                      sourceOfFunds: "1035 exchange from existing annuity and savings account"
+                      employmentStatus: "Employed full-time, plans to retire in 5 years"
+                      applyToMeansTestedBenefits: "no"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        OAuth 2.0 client credentials token. Obtain a token from the Cognito
+        token endpoint using `grant_type=client_credentials`.
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+
+  schemas:
+    PolicyData:
+      type: object
+      description: A snapshot of an annuity policy including contract values, interest rates, renewal status, and associated features.
+      required:
+        - ID
+        - contractId
+        - clientName
+        - carrier
+        - productName
+        - issueDate
+        - currentValue
+        - surrenderValue
+        - currentRate
+        - renewalRate
+        - guaranteedMinRate
+        - renewalDate
+        - isMinRateRenewal
+        - suitabilityStatus
+        - eligibilityStatus
+        - features
+      properties:
+        ID:
+          type: string
+          description: Internal record identifier (base64-encoded UUID).
+        contractId:
+          type: string
+          description: Carrier-assigned contract or policy number.
+          example: "ANN-2020-5621"
+        clientName:
+          type: string
+          description: Full name of the policy owner.
+          example: "Margaret A. Whitfield"
+        carrier:
+          type: string
+          description: Issuing insurance carrier.
+          example: "Integrity Life Insurance"
+        productName:
+          type: string
+          description: Name of the annuity product.
+          example: "SecureChoice Multi-Year Guarantee Annuity"
+        issueDate:
+          type: string
+          description: Date the contract was issued.
+          example: "03/15/2018"
+        currentValue:
+          type: string
+          description: Current accumulated contract value, formatted with currency symbol.
+          example: "$180,000"
+        surrenderValue:
+          type: string
+          description: Current cash surrender value after applicable charges.
+          example: "$176,400"
+        currentRate:
+          type: string
+          description: Interest rate currently being credited.
+          example: "3.80%"
+        renewalRate:
+          type: string
+          description: Rate that will apply at the next renewal period.
+          example: "1.50%"
+        guaranteedMinRate:
+          type: string
+          description: Contractual guaranteed minimum interest rate.
+          example: "1.50%"
+        renewalDate:
+          type: string
+          description: Date of the next rate renewal.
+          example: "03/15/2026"
+        isMinRateRenewal:
+          type: boolean
+          description: Whether the renewal rate equals the guaranteed minimum.
+        suitabilityStatus:
+          type: string
+          description: Current state of the suitability review for this policy.
+          enum: [complete, incomplete, not-started]
+        eligibilityStatus:
+          type: string
+          description: Whether the policy is eligible for renewal or exchange activity.
+          enum: [eligible, restricted, ineligible]
+        features:
+          $ref: '#/components/schemas/PolicyFeaturesData'
+
+    PolicyFeaturesData:
+      type: object
+      description: Feature, benefit, rider, and limitation details associated with a policy, plus summary contract provisions.
+      properties:
+        surrenderCharge:
+          type: string
+          nullable: true
+          description: Current surrender charge percentage and schedule position.
+          example: "2.5% (Year 7 of 10)"
+        withdrawalAllowance:
+          type: string
+          nullable: true
+          description: Penalty-free withdrawal provision.
+          example: "10% annually penalty-free"
+        mvaPenalty:
+          type: string
+          nullable: true
+          description: Current market value adjustment impact if surrendered today.
+          example: "-3.8% if surrendered today"
+        rateGuarantee:
+          type: string
+          nullable: true
+          description: Remaining duration of the current rate guarantee period.
+          example: "5 years remaining"
+        features:
+          type: array
+          description: Product features included with the contract.
+          items:
+            $ref: '#/components/schemas/PolicyFeature'
+        benefits:
+          type: array
+          description: Contractual benefits provided by the policy.
+          items:
+            $ref: '#/components/schemas/PolicyFeature'
+        riders:
+          type: array
+          description: Optional riders attached to the policy.
+          items:
+            $ref: '#/components/schemas/PolicyFeature'
+        limitations:
+          type: array
+          description: Contractual restrictions and limitations.
+          items:
+            $ref: '#/components/schemas/PolicyFeature'
+
+    PolicyFeature:
+      type: object
+      description: A single feature, benefit, rider, or limitation associated with a policy.
+      required: [name, description, included, type]
+      properties:
+        name:
+          type: string
+          description: Display name of the feature.
+          example: "Nursing Home Waiver"
+        description:
+          type: string
+          description: Explanation of the feature and its terms.
+          example: "Surrender charges waived after 90-day qualifying stay"
+        included:
+          type: boolean
+          description: Whether this feature is active on the policy.
+        type:
+          type: string
+          description: Classification of the feature.
+          enum: [feature, benefit, rider, limitation]
+
+    SuitabilityData:
+      type: object
+      description: A suitability assessment capturing a client's financial objectives, risk tolerance, time horizon, liquidity needs, and composite suitability score.
+      required:
+        - ID
+        - clientObjectives
+        - riskTolerance
+        - timeHorizon
+        - liquidityNeeds
+        - taxConsiderations
+        - guaranteedIncome
+        - rateExpectations
+        - surrenderTimeline
+        - livingBenefits
+        - advisorEligibility
+        - score
+        - isPrefilled
+      properties:
+        ID:
+          type: string
+          description: Internal record identifier (base64-encoded UUID).
+        clientObjectives:
+          type: string
+          description: Summary of the client's stated financial objectives.
+          example: "Preserve principal with modest growth; generate guaranteed retirement income starting in 5 years"
+        riskTolerance:
+          type: string
+          description: Client's self-assessed risk tolerance level.
+          example: "Conservative"
+        timeHorizon:
+          type: string
+          description: Expected investment time horizon.
+          example: "5-10 years"
+        liquidityNeeds:
+          type: string
+          description: Assessment of the client's need for accessible funds.
+          example: "Low -- has separate emergency fund covering 12 months of expenses"
+        taxConsiderations:
+          type: string
+          description: Relevant tax situation and planning considerations.
+          example: "Currently in 22% bracket; expects 12% bracket in retirement"
+        guaranteedIncome:
+          type: string
+          description: Client's desired guaranteed income provisions.
+          example: "Desires guaranteed income floor of $2,000/month to supplement Social Security"
+        rateExpectations:
+          type: string
+          description: Client's rate and return expectations or preferences.
+          example: "Willing to accept lower current rate for longer rate guarantee period"
+        surrenderTimeline:
+          type: string
+          description: Whether or when the client anticipates surrendering the contract.
+          example: "No anticipated need to surrender within the next 7 years"
+        livingBenefits:
+          type: array
+          description: Living benefit features important to the client.
+          items:
+            type: string
+          example:
+            - "Nursing home waiver"
+            - "Terminal illness benefit"
+            - "Guaranteed lifetime withdrawal"
+        advisorEligibility:
+          type: string
+          description: Advisor licensing and appointment status relevant to the assessment.
+          example: "Series 6, state insurance license -- all appointments current"
+        score:
+          type: integer
+          description: Composite suitability score (0-100).
+          example: 82
+        isPrefilled:
+          type: boolean
+          description: Whether the assessment was pre-populated from existing data.
+
+    DisclosureItem:
+      type: object
+      description: A regulatory or informational disclosure document that may be required during the sales or servicing process.
+      required: [ID, disclosureId, required]
+      properties:
+        ID:
+          type: string
+          description: Internal record identifier (base64-encoded UUID).
+        disclosureId:
+          type: string
+          description: Business identifier for the disclosure document.
+          example: "DISC-MYGA-001"
+        label:
+          type: string
+          nullable: true
+          description: Short label used for display in lists and navigation.
+          example: "Rate Guarantee"
+        title:
+          type: string
+          nullable: true
+          description: Full title of the disclosure document.
+          example: "Multi-Year Rate Guarantee Disclosure"
+        description:
+          type: string
+          nullable: true
+          description: Summary of what the disclosure covers and why it is relevant.
+          example: "Explains the guaranteed interest rate period and conditions under which the rate may change at renewal."
+        documentName:
+          type: string
+          nullable: true
+          description: Filename of the associated document.
+          example: "MYGA_Rate_Guarantee_Disclosure_2025.pdf"
+        required:
+          type: boolean
+          description: Whether the client must acknowledge this disclosure before proceeding.
+        link:
+          type: string
+          nullable: true
+          description: URL where the full disclosure document can be retrieved.
+          example: "https://docs.example.com/disclosures/MYGA_Rate_Guarantee_Disclosure_2025.pdf"
+
+    ProductOption:
+      type: object
+      description: An available annuity product with rate, term, surrender schedule, benefit provisions, and the advisor's licensing status.
+      required:
+        - ID
+        - name
+        - carrier
+        - rate
+        - term
+        - surrenderPeriod
+        - freeWithdrawal
+        - deathBenefit
+        - guaranteedMinRate
+      properties:
+        ID:
+          type: string
+          description: Internal record identifier (base64-encoded UUID).
+        name:
+          type: string
+          description: Product marketing name.
+          example: "FlexGrowth Plus MYGA"
+        carrier:
+          type: string
+          description: Issuing insurance carrier.
+          example: "Great American"
+        rate:
+          type: string
+          description: Current credited interest rate.
+          example: "4.25%"
+        term:
+          type: string
+          description: Rate guarantee term length.
+          example: "7 years"
+        premiumBonus:
+          type: string
+          nullable: true
+          description: First-year premium bonus percentage, if offered.
+          example: "3.0%"
+        surrenderPeriod:
+          type: string
+          description: Number of years the surrender charge schedule applies.
+          example: "7"
+        surrenderCharge:
+          type: string
+          nullable: true
+          description: Current surrender charge schedule.
+          example: "7% (declining 1% annually)"
+        freeWithdrawal:
+          type: string
+          description: Annual penalty-free withdrawal percentage.
+          example: "10%"
+        deathBenefit:
+          type: string
+          description: Type of death benefit provided.
+          example: "Enhanced -- return of premium plus interest"
+        guaranteedMinRate:
+          type: string
+          description: Contractual guaranteed minimum interest rate.
+          example: "2.50%"
+        riders:
+          type: array
+          nullable: true
+          description: Optional riders available or attached.
+          items:
+            type: string
+          example:
+            - "Guaranteed Lifetime Withdrawal Benefit"
+            - "Nursing Home Confinement Waiver"
+        features:
+          type: array
+          nullable: true
+          description: Included product features.
+          items:
+            type: string
+          example:
+            - "Tax-deferred accumulation"
+            - "Penalty-free systematic withdrawals"
+        liquidity:
+          type: string
+          nullable: true
+          description: Summary of the product's liquidity provisions.
+          example: "10% annual free withdrawal; full liquidity after surrender period"
+        mvaPenalty:
+          type: string
+          nullable: true
+          description: Whether the product is subject to a market value adjustment.
+          example: "Subject to MVA during surrender period"
+        licensingApproved:
+          type: boolean
+          nullable: true
+          description: Whether the requesting advisor is licensed and appointed to sell this product.
+        licensingDetails:
+          type: string
+          nullable: true
+          description: Additional licensing status details or required actions.
+          example: "Appointment with carrier required -- apply at carrier portal"
+
+    VisualizationProduct:
+      type: object
+      description: |
+        Enriched product data for interactive comparison charts. Includes
+        scored dimensions, multi-scenario rate projections, projected
+        account performance, and time-bounded feature windows.
+      required:
+        - ID
+        - productId
+        - name
+        - carrier
+        - currentRate
+        - guaranteedMinRate
+        - surrenderYears
+        - initialValue
+        - incomeScore
+        - growthScore
+        - liquidityScore
+        - protectionScore
+        - projectedRates
+        - performanceData
+        - features
+      properties:
+        ID:
+          type: string
+          description: Internal record identifier (base64-encoded UUID).
+        productId:
+          type: string
+          description: Business identifier for the product.
+          example: "PROD-FLEX-MYGA-7"
+        name:
+          type: string
+          description: Product marketing name.
+          example: "FlexGrowth Plus MYGA"
+        carrier:
+          type: string
+          description: Issuing insurance carrier.
+          example: "Great American"
+        currentRate:
+          type: number
+          format: double
+          description: Current credited interest rate as a decimal percentage.
+          example: 4.25
+        guaranteedMinRate:
+          type: number
+          format: double
+          description: Contractual guaranteed minimum rate as a decimal percentage.
+          example: 2.50
+        surrenderYears:
+          type: integer
+          description: Number of years in the surrender charge period.
+          example: 7
+        initialValue:
+          type: number
+          format: double
+          description: Starting contract value used for projections.
+          example: 100000
+        premiumBonus:
+          type: number
+          format: double
+          nullable: true
+          description: First-year premium bonus as a decimal percentage.
+          example: 3.0
+        incomeScore:
+          type: integer
+          description: Relative income generation score (0-100).
+          minimum: 0
+          maximum: 100
+          example: 72
+        growthScore:
+          type: integer
+          description: Relative growth potential score (0-100).
+          minimum: 0
+          maximum: 100
+          example: 85
+        liquidityScore:
+          type: integer
+          description: Relative liquidity and access score (0-100).
+          minimum: 0
+          maximum: 100
+          example: 45
+        protectionScore:
+          type: integer
+          description: Relative downside protection score (0-100).
+          minimum: 0
+          maximum: 100
+          example: 88
+        projectedRates:
+          type: array
+          description: Multi-scenario rate projections across the contract life.
+          items:
+            $ref: '#/components/schemas/ProjectedRate'
+        performanceData:
+          type: array
+          description: Projected account value and income over time.
+          items:
+            $ref: '#/components/schemas/PerformanceDataPoint'
+        features:
+          type: array
+          description: Time-bounded product feature windows for timeline visualization.
+          items:
+            $ref: '#/components/schemas/VisualizationFeature'
+
+    ProjectedRate:
+      type: object
+      description: Rate projection for a single year under conservative, expected, and optimistic scenarios.
+      required: [year, conservativeRate, expectedRate, optimisticRate]
+      properties:
+        year:
+          type: integer
+          description: Contract year.
+          example: 5
+        conservativeRate:
+          type: number
+          format: double
+          description: Conservative (floor) rate projection.
+          example: 2.50
+        expectedRate:
+          type: number
+          format: double
+          description: Expected (base case) rate projection.
+          example: 3.40
+        optimisticRate:
+          type: number
+          format: double
+          description: Optimistic (upside) rate projection.
+          example: 4.80
+
+    PerformanceDataPoint:
+      type: object
+      description: Projected account value and optional income for a given contract year.
+      required: [year, value]
+      properties:
+        year:
+          type: integer
+          description: Contract year.
+          example: 7
+        value:
+          type: number
+          format: double
+          description: Projected account value at the end of the year.
+          example: 148910.25
+        income:
+          type: number
+          format: double
+          description: Projected income distributed during the year, if applicable.
+          example: 5400.00
+
+    VisualizationFeature:
+      type: object
+      description: A product feature with a defined start and end year, used for timeline-based visualizations.
+      required: [name, startYear, endYear, category]
+      properties:
+        name:
+          type: string
+          description: Display name of the feature.
+          example: "Surrender Charge Period"
+        startYear:
+          type: integer
+          description: Contract year the feature begins.
+          example: 1
+        endYear:
+          type: integer
+          description: Contract year the feature ends.
+          example: 7
+        category:
+          type: string
+          description: Classification for grouping and color-coding.
+          enum: [surrender, bonus, rider, guarantee]
+
+    ClientProfile:
+      type: object
+      description: A client's identifying information and comprehensive financial profile used for comparison and assessment.
+      required: [ID, clientId, clientName, parameters]
+      properties:
+        ID:
+          type: string
+          description: Internal record identifier (base64-encoded UUID).
+        clientId:
+          type: string
+          description: Business identifier for the client.
+          example: "CLT-2024-00412"
+        clientName:
+          type: string
+          description: Full name of the client.
+          example: "Margaret A. Whitfield"
+        parameters:
+          $ref: '#/components/schemas/ComparisonParameters'
+
+    ComparisonParameters:
+      type: object
+      description: |
+        Financial situation, anticipated changes, objectives, and planning
+        parameters for a client. All fields are optional and represented as
+        strings for display flexibility.
+      properties:
+        residesInNursingHome:
+          type: string
+          nullable: true
+          description: Whether the client currently resides in a nursing home.
+          enum: ["yes", "no"]
+        hasLongTermCareInsurance:
+          type: string
+          nullable: true
+          description: Whether the client has long-term care insurance.
+          enum: ["yes", "no"]
+        hasMedicareSupplemental:
+          type: string
+          nullable: true
+          description: Whether the client has Medicare supplemental coverage.
+          enum: ["yes", "no"]
+        grossIncome:
+          type: string
+          nullable: true
+          description: Annual gross income.
+          example: "85000"
+        disposableIncome:
+          type: string
+          nullable: true
+          description: Annual disposable income after essential expenses and taxes.
+          example: "45000"
+        taxBracket:
+          type: string
+          nullable: true
+          description: Current federal income tax bracket.
+          example: "22%"
+        householdLiquidAssets:
+          type: string
+          nullable: true
+          description: Total liquid assets (cash, savings, money market).
+          example: "250000"
+        monthlyLivingExpenses:
+          type: string
+          nullable: true
+          description: Average monthly living expenses.
+          example: "4500"
+        totalAnnuityValue:
+          type: string
+          nullable: true
+          description: Total value of all annuity contracts held.
+          example: "180000"
+        householdNetWorth:
+          type: string
+          nullable: true
+          description: Total household net worth.
+          example: "650000"
+        anticipateExpenseIncrease:
+          type: string
+          nullable: true
+          description: Whether the client anticipates a significant expense increase.
+          enum: ["yes", "no"]
+        anticipateIncomeDecrease:
+          type: string
+          nullable: true
+          description: Whether the client anticipates an income decrease (e.g., retirement).
+          enum: ["yes", "no"]
+        anticipateLiquidAssetDecrease:
+          type: string
+          nullable: true
+          description: Whether the client anticipates a decrease in liquid assets.
+          enum: ["yes", "no"]
+        financialObjectives:
+          type: string
+          nullable: true
+          description: Client's stated financial goals and objectives.
+          example: "Supplement Social Security with guaranteed income; preserve assets for estate"
+        distributionPlan:
+          type: string
+          nullable: true
+          description: Planned distribution or withdrawal strategy.
+          example: "Systematic withdrawals beginning at age 67"
+        ownedAssets:
+          type: string
+          nullable: true
+          description: Summary of major owned assets.
+          example: "Primary residence (paid off), 401(k), Roth IRA, existing fixed annuity"
+        timeToFirstDistribution:
+          type: string
+          nullable: true
+          description: Expected time until the first distribution from the annuity.
+          example: "5 years"
+        expectedHoldingPeriod:
+          type: string
+          nullable: true
+          description: Expected total holding period for the annuity.
+          example: "10+ years"
+        sourceOfFunds:
+          type: string
+          nullable: true
+          description: Source of funds for the annuity purchase.
+          example: "1035 exchange from existing annuity and savings account"
+        employmentStatus:
+          type: string
+          nullable: true
+          description: Current employment status and retirement plans.
+          example: "Employed full-time, plans to retire in 5 years"
+        applyToMeansTestedBenefits:
+          type: string
+          nullable: true
+          description: Whether the client expects to apply for means-tested government benefits.
+          enum: ["yes", "no"]
