@@ -31,6 +31,10 @@ iam:
       serviceAccountName: ebs-csi-controller-sa
       permissionPolicyARNs:
         - arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+    - namespace: kube-system
+      serviceAccountName: aws-load-balancer-controller
+      wellKnownPolicies:
+        awsLoadBalancerController: true
 
 addons:
   - name: aws-ebs-csi-driver

@@ -142,8 +142,8 @@ kubectl config current-context
 # =============================================================================
 
 [tasks."eks:deploy"]
-description = "Deploy everything to EKS (CNPG + DB + App)"
-depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app"]
+description = "Deploy everything to EKS (CNPG + DB + App + Gateway)"
+depends = ["eks:deploy:cnpg", "eks:deploy:db", "eks:deploy:app", "eks:deploy:gateway"]
 
 [tasks."eks:deploy:cnpg"]
 description = "Install CloudNativePG operator"
@@ -199,6 +199,123 @@ kubectl rollout status deployment/hack2future --timeout=120s
 
 echo  "API deployed!"
 kubectl get pods -l app=hack2future
+"""
+
+[tasks."eks:deploy:lbc"]
+description = "Install AWS Load Balancer Controller with Gateway API support"
+run = """
+#!/bin/bash
+set -euo pipefail
+LBC_VERSION="${LBC_VERSION:-3.1.0}"
+CLUSTER_NAME="${CLUSTER_NAME:-hackathon}"
+AWS_REGION="${AWS_REGION:-us-east-1}"
+POLICY_NAME="AWSLoadBalancerControllerIAMPolicy"
+
+echo "Getting VPC ID and Account ID..."
+VPC_ID=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.resourcesVpcConfig.vpcId' --output text)
+AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+echo "VPC ID: $VPC_ID"
+echo "Account: $AWS_ACCOUNT_ID"
+
+# Create IAM policy if it doesn't exist
+echo "Checking IAM policy..."
+POLICY_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:policy/${POLICY_NAME}"
+if ! aws iam get-policy --policy-arn "$POLICY_ARN" &>/dev/null; then
+  echo "Creating IAM policy..."
+  curl -sS -o /tmp/iam-policy.json \
+    "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v${LBC_VERSION}/docs/install/iam_policy.json"
+  aws iam create-policy --policy-name "$POLICY_NAME" --policy-document file:///tmp/iam-policy.json
+else
+  echo "IAM policy already exists"
+fi
+
+# Create Pod Identity association with the policy
+echo "Setting up Pod Identity..."
+eksctl create podidentityassociation \
+  --cluster "$CLUSTER_NAME" \
+  --region "$AWS_REGION" \
+  --namespace kube-system \
+  --service-account-name aws-load-balancer-controller \
+  --permission-policy-arns "$POLICY_ARN" \
+  2>/dev/null || echo "Pod Identity association exists, updating..."
+
+# If association exists, ensure the policy is attached to the role
+ASSOC_ROLE=$(aws eks list-pod-identity-associations --cluster-name "$CLUSTER_NAME" --region "$AWS_REGION" \
+  --query "associations[?serviceAccount=='aws-load-balancer-controller'].associationId" --output text)
+if [[ -n "$ASSOC_ROLE" ]]; then
+  ROLE_ARN=$(aws eks describe-pod-identity-association --cluster-name "$CLUSTER_NAME" --association-id "$ASSOC_ROLE" --region "$AWS_REGION" \
+    --query 'association.roleArn' --output text)
+  ROLE_NAME=$(basename "$ROLE_ARN")
+  echo "Ensuring policy is attached to role: $ROLE_NAME"
+  aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$POLICY_ARN" 2>/dev/null || true
+fi
+
+echo "Adding EKS Helm repo..."
+helm repo add eks https://aws.github.io/eks-charts 2>/dev/null || true
+helm repo update
+
+echo "Installing Gateway API CRDs..."
+kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml"
+
+echo "Installing LBC Gateway API CRDs..."
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/main/config/crd/gateway/gateway-crds.yaml"
+
+echo "Installing AWS Load Balancer Controller v${LBC_VERSION} with Gateway API..."
+helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName="$CLUSTER_NAME" \
+  --set region="$AWS_REGION" \
+  --set vpcId="$VPC_ID" \
+  --set serviceAccount.create=true \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set "controllerConfig.featureGates.ALBGatewayAPI=true" \
+  --set "controllerConfig.featureGates.NLBGatewayAPI=true" \
+  --set defaultTargetType=ip \
+  --wait
+
+echo "AWS Load Balancer Controller installed!"
+kubectl get deployment -n kube-system aws-load-balancer-controller
+"""
+
+[tasks."eks:deploy:gateway"]
+description = "Deploy Gateway API for ALB"
+depends = ["eks:deploy:lbc"]
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Deploying Gateway API resources..."
+kubectl apply -f k8s/gateway.yaml
+
+echo "Waiting for ALB provisioning (takes ~2 minutes)..."
+for i in {1..24}; do
+  ALB_DNS=$(kubectl get gateway hack2future-gateway -o jsonpath='{.status.addresses[0].value}' 2>/dev/null || true)
+  if [[ -n "$ALB_DNS" ]]; then
+    echo ""
+    echo "ALB DNS: $ALB_DNS"
+    echo "API URL: http://$ALB_DNS"
+    exit 0
+  fi
+  echo -n "."
+  sleep 5
+done
+
+echo ""
+echo "ALB still provisioning. Check status with:"
+echo "  kubectl get gateway hack2future-gateway"
+"""
+
+[tasks."eks:gateway:status"]
+description = "Get Gateway status and URL"
+run = """
+#!/bin/bash
+set -euo pipefail
+kubectl get gateway hack2future-gateway
+kubectl get httproute hack2future-route
+echo ""
+echo "ALB DNS:"
+kubectl get gateway hack2future-gateway -o jsonpath='{.status.addresses[0].value}'
+echo ""
 """
 
 [tasks."eks:deploy:ack-iam"]

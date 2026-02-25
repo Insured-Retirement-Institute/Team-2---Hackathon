@@ -45,6 +45,8 @@ spec:
               value: hackathon
             - name: LOG_LEVEL
               value: "DEBUG"
+            - name: ROOT_PATH
+              value: "/api"
           resources:
             requests:
               memory: "128Mi"
