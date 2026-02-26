@@ -42,7 +42,7 @@ export function WorkflowStepper({
 }: WorkflowStepperProps) {
   const currentIdx = STEPS.findIndex((s) => s.id === currentStep);
   const canGoBack = currentIdx > 0;
-  const canGoForward = currentIdx < STEPS.length - 1 && completedSteps.has(currentStep);
+  const canGoForward = currentIdx < STEPS.length - 1;
 
   const handlePrevious = () => {
     if (canGoBack) onStepClick(STEPS[currentIdx - 1].id);
@@ -74,7 +74,7 @@ export function WorkflowStepper({
             const isCurrent = currentStep === step.id;
             const isCompleted = completedSteps.has(step.id);
             const isPast = idx < currentIdx;
-            const canClick = isPast || isCurrent;
+            const canClick = isPast || isCurrent || isCompleted;
             const Icon = step.icon;
 
             return (

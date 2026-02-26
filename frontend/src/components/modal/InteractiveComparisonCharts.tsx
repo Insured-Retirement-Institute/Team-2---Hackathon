@@ -20,22 +20,23 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
 
 interface Props {
   products: VisualizationProduct[];
+  primaryGoal?: string;
 }
 
-export function InteractiveComparisonCharts({ products }: Props) {
+export function InteractiveComparisonCharts({ products, primaryGoal }: Props) {
   const [selected, setSelected] = useState<string[]>(
-    products.slice(0, 4).map((p) => p.id),
+    products.slice(0, 4).map((p) => p.ID),
   );
   const [chartMode, setChartMode] = useState<"value" | "rates">("value");
 
   // Sync selection when products change (e.g. shelf swap)
   useEffect(() => {
-    const validIds = new Set(products.map((p) => p.id));
+    const validIds = new Set(products.map((p) => p.ID));
     setSelected((prev) => {
       const filtered = prev.filter((id) => validIds.has(id));
       return filtered.length > 0
         ? filtered
-        : products.slice(0, 4).map((p) => p.id);
+        : products.slice(0, 4).map((p) => p.ID);
     });
   }, [products]);
 
@@ -48,18 +49,18 @@ export function InteractiveComparisonCharts({ products }: Props) {
   };
 
   const getColor = (id: string) =>
-    COLORS[products.findIndex((p) => p.id === id) % COLORS.length];
+    COLORS[products.findIndex((p) => p.ID === id) % COLORS.length];
 
   // Filter to only valid selected IDs
   const validSelected = selected.filter((id) =>
-    products.some((p) => p.id === id),
+    products.some((p) => p.ID === id),
   );
 
   // Build chart data
   const perfData = Array.from({ length: 21 }, (_, i) => {
     const pt: Record<string, number> = { year: i };
     validSelected.forEach((id) => {
-      const p = products.find((x) => x.id === id);
+      const p = products.find((x) => x.ID === id);
       if (!p) return;
       const d = p.performanceData.find((x) => x.year === i);
       if (d) pt[`${p.name}_value`] = d.value;
@@ -70,7 +71,7 @@ export function InteractiveComparisonCharts({ products }: Props) {
   const rateData = Array.from({ length: 11 }, (_, i) => {
     const pt: Record<string, number> = { year: i };
     validSelected.forEach((id) => {
-      const p = products.find((x) => x.id === id);
+      const p = products.find((x) => x.ID === id);
       if (!p) return;
       const d = p.projectedRates.find((x) => x.year === i);
       if (d) pt[`${p.name}_expected`] = d.expectedRate;
@@ -79,7 +80,7 @@ export function InteractiveComparisonCharts({ products }: Props) {
   });
 
   const selectedProducts = validSelected
-    .map((id) => products.find((p) => p.id === id))
+    .map((id) => products.find((p) => p.ID === id))
     .filter(Boolean) as typeof products;
 
   // Income milestones for bar chart
@@ -101,16 +102,16 @@ export function InteractiveComparisonCharts({ products }: Props) {
           Interactive Product Comparison
         </h3>
         <p className="text-sm text-slate-600 mb-4">
-          Select up to 4 products to compare
+          Select up to 4 products to compare • Primary Goal: <span className="font-medium text-slate-900 capitalize">{primaryGoal || "Not specified"}</span>
         </p>
         <div className="flex flex-wrap gap-2">
           {products.map((p) => {
-            const sel = selected.includes(p.id);
-            const color = getColor(p.id);
+            const sel = selected.includes(p.ID);
+            const color = getColor(p.ID);
             return (
               <button
-                key={p.id}
-                onClick={() => toggle(p.id)}
+                key={p.ID}
+                onClick={() => toggle(p.ID)}
                 className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${sel ? "shadow-md" : "border-slate-200 hover:border-slate-300 bg-white text-slate-700"}`}
                 style={
                   sel
@@ -199,11 +200,11 @@ export function InteractiveComparisonCharts({ products }: Props) {
               <Legend formatter={(v: string) => v.replace("_value", "")} />
               {selectedProducts.map((p) => (
                 <Line
-                  key={p.id}
+                  key={p.ID}
                   type="monotone"
                   dataKey={`${p.name}_value`}
                   name={`${p.name}_value`}
-                  stroke={getColor(p.id)}
+                  stroke={getColor(p.ID)}
                   strokeWidth={3}
                   dot={false}
                   activeDot={{ r: 6 }}
@@ -232,12 +233,12 @@ export function InteractiveComparisonCharts({ products }: Props) {
               <Legend formatter={(v: string) => v.replace("_expected", "")} />
               {selectedProducts.map((p) => (
                 <Area
-                  key={p.id}
+                  key={p.ID}
                   type="monotone"
                   dataKey={`${p.name}_expected`}
                   name={`${p.name}_expected`}
-                  stroke={getColor(p.id)}
-                  fill={getColor(p.id)}
+                  stroke={getColor(p.ID)}
+                  fill={getColor(p.ID)}
                   fillOpacity={0.15}
                   strokeWidth={2}
                 />
@@ -284,10 +285,10 @@ export function InteractiveComparisonCharts({ products }: Props) {
             <Legend />
             {selectedProducts.map((p) => (
               <Bar
-                key={p.id}
+                key={p.ID}
                 dataKey={p.name}
                 name={p.name}
-                fill={getColor(p.id)}
+                fill={getColor(p.ID)}
                 radius={[4, 4, 0, 0]}
               />
             ))}

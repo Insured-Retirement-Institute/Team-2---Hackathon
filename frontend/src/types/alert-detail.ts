@@ -1,5 +1,6 @@
 export type VisualizationProduct = {
-  id: string;
+  ID: string;
+  productId: string;
   name: string;
   carrier: string;
   currentRate: number;
@@ -63,23 +64,26 @@ export type PolicyData = {
 };
 
 export type ProductOption = {
-  id: string;
+  ID?: string;
+  productId?: string;
+  id?: string;
   name: string;
   carrier: string;
   rate: string;
-  term: string;
-  premiumBonus?: string;
-  surrenderPeriod: string;
+  term?: string;
+  premiumBonus?: string | null;
+  surrenderPeriod?: string;
   surrenderCharge?: string;
-  freeWithdrawal: string;
-  deathBenefit: string;
-  guaranteedMinRate: string;
+  freeWithdrawal?: string;
+  deathBenefit?: string;
+  guaranteedMinRate?: string;
   riders?: string[];
   features?: string[];
+  cons?: string[];
   liquidity?: string;
-  mvaPenalty?: string;
+  mvaPenalty?: string | null;
   licensingApproved?: boolean;
-  licensingDetails?: string;
+  licensingDetails?: string | null;
 };
 
 export type ComparisonData = {

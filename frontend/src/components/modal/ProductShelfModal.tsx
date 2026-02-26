@@ -77,7 +77,7 @@ export function ProductShelfModal({
   const uniqueCarriers = Array.from(
     new Set(products.map((p) => p.carrier)),
   ).sort();
-  const uniqueTerms = Array.from(new Set(products.map((p) => p.term))).sort(
+  const uniqueTerms = Array.from(new Set(products.map((p) => p.term).filter((t): t is string => !!t))).sort(
     (a, b) => parseInt(a) - parseInt(b),
   );
 
@@ -103,9 +103,9 @@ export function ProductShelfModal({
       case "carrier":
         return a.carrier.localeCompare(b.carrier);
       case "term-asc":
-        return parseInt(a.term) - parseInt(b.term);
+        return parseInt(a.term || "0") - parseInt(b.term || "0");
       case "term-desc":
-        return parseInt(b.term) - parseInt(a.term);
+        return parseInt(b.term || "0") - parseInt(a.term || "0");
       default:
         return 0;
     }
@@ -293,25 +293,25 @@ export function ProductShelfModal({
                         icon={Shield}
                         color="text-green-600"
                         label="Guaranteed Min"
-                        value={product.guaranteedMinRate}
+                        value={product.guaranteedMinRate || "N/A"}
                       />
                       <MetricRow
                         icon={Calendar}
                         color="text-blue-600"
                         label="Term"
-                        value={product.term}
+                        value={product.term || "N/A"}
                       />
                       <MetricRow
                         icon={DollarSign}
                         color="text-emerald-600"
                         label="Free Withdrawal"
-                        value={product.freeWithdrawal}
+                        value={product.freeWithdrawal || "N/A"}
                       />
                       <MetricRow
                         icon={Zap}
                         color="text-purple-600"
                         label="Surrender Period"
-                        value={`${product.surrenderPeriod} years`}
+                        value={product.surrenderPeriod ? `${product.surrenderPeriod} years` : "N/A"}
                       />
                     </div>
 

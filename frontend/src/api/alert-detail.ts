@@ -301,10 +301,15 @@ export async function fetchVisualization(
   });
   return new Promise((resolve) => {
     setTimeout(() => {
-      // Mock: generate a visualization product based on the first alert's comparison data
+      // Mock: generate a visualization product based on productId
       const alert = mockAlerts[0];
       const comparison = getMockComparisonData(alert);
-      const product = comparison.alternatives[0] ?? comparison.current;
+      const allProducts = [comparison.current, ...comparison.alternatives];
+      
+      // Find the product by matching name or use index
+      const productIndex = allProducts.findIndex(p => p.name === _productId || p.id === _productId);
+      const product = productIndex >= 0 ? allProducts[productIndex] : allProducts[0];
+      
       const rate = parseFloat(product.rate?.replace("%", "") || "4.0");
       const minRate = parseFloat(
         product.guaranteedMinRate?.replace("%", "") || "2.0",
@@ -315,7 +320,8 @@ export async function fetchVisualization(
         : undefined;
       const initialValue = 150000;
       const r: VisualizationProduct = {
-        id: _productId,
+        ID: _productId,
+        productId: _productId,
         name: product.name,
         carrier: product.carrier,
         currentRate: rate,
@@ -323,9 +329,9 @@ export async function fetchVisualization(
         surrenderYears,
         initialValue,
         premiumBonus: bonus,
-        incomeScore: 70,
-        growthScore: 75,
-        liquidityScore: 60,
+        incomeScore: 70 + (productIndex * 5),
+        growthScore: 75 + (productIndex * 3),
+        liquidityScore: 60 + (productIndex * 2),
         protectionScore: 80,
         projectedRates: Array.from({ length: 11 }, (_, i) => ({
           year: i,

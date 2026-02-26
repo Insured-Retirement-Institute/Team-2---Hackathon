@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useChatContext } from "@/hooks/useChatContext";
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard } from "lucide-react";
+import { LayoutDashboard, Shield } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { StatsCards } from "@/components/StatsCards";
 import { GroupedAlertsTable } from "@/components/GroupedAlertsTable";
 import type { RenewalAlert, DashboardStats } from "@/types/alerts";
@@ -93,6 +94,15 @@ export function Dashboard() {
                 </p>
               </div>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/admin")}
+              className="gap-2"
+            >
+              <Shield className="h-4 w-4" />
+              Admin Dashboard
+            </Button>
           </div>
         </div>
       </div>
