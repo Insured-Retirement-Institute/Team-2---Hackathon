@@ -4,5 +4,5 @@ import { useNavigate } from "react-router-dom";
 export function AdminDashboard() {
   const navigate = useNavigate();
   
-  return <AIAuditDashboard onClose={() => navigate("/")} />;
+  return <AIAuditDashboard onClose={() => navigate("/dashboard")} />;
 }

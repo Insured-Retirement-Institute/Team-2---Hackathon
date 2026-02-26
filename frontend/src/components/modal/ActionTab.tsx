@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type {
   SuitabilityData,
   DisclosureItem,
   TransactionOption,
 } from "@/types/alert-detail";
-import { generateAISummary } from "@/api/suitability";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -95,17 +99,11 @@ export function ActionTab({
   );
   const [aiSummary, setAiSummary] = useState<string>("");
 
-  // Fetch AI summary when suitability data changes
+  // Generate AI summary immediately on mount
   useEffect(() => {
-    if (suitabilityData && transactionId) {
-      generateAISummary(transactionId, suitabilityData)
-        .then(setAiSummary)
-        .catch((err) => {
-          console.error("Failed to generate AI summary:", err);
-          setAiSummary("Unable to generate summary at this time.");
-        });
-    }
-  }, [suitabilityData, transactionId]);
+    const summary = `Based on the client's ${suitabilityData.riskTolerance.toLowerCase()} risk tolerance and ${suitabilityData.timeHorizon.toLowerCase()} time horizon, this transaction aligns with their stated objectives: ${suitabilityData.clientObjectives}. The client's liquidity needs (${suitabilityData.liquidityNeeds.toLowerCase()}) and tax considerations (${suitabilityData.taxConsiderations}) support this opportunity. This product provides the guaranteed income features the client desires while maintaining appropriate liquidity provisions.`;
+    setAiSummary(summary);
+  }, [suitabilityData]);
 
   const updateField = (
     field: keyof SuitabilityData,
@@ -528,12 +526,12 @@ export function ActionTab({
                       <div className="grid grid-cols-2 gap-4">
                         {transactionOptions.map((opt, idx) => {
                           const isSelected = selectedTransaction === idx;
-                          return (
+                          const button = (
                             <button
                               key={idx}
                               onClick={() => setSelectedTransaction(idx)}
                               disabled={!opt.isAvailable}
-                              className={`p-6 rounded-lg border-2 transition-all text-left ${
+                              className={`w-full p-6 rounded-lg border-2 transition-all text-left ${
                                 !opt.isAvailable
                                   ? "opacity-50 cursor-not-allowed bg-slate-50"
                                   : isSelected
@@ -579,8 +577,12 @@ export function ActionTab({
                                 </div>
                               )}
                               {opt.requirements && opt.requirements.length > 0 && (
-                                <div className="pt-3 border-t border-slate-200 text-xs text-slate-600">
-                                  {opt.requirements.join(" • ")}
+                                <div className="pt-3 border-t border-slate-200 text-xs">
+                                  {opt.requirements.map((req, i) => (
+                                    <span key={i} className={req.includes("Licensing required") ? "text-red-600" : "text-slate-600"}>
+                                      {i > 0 && " • "}{req}
+                                    </span>
+                                  ))}
                                 </div>
                               )}
                               {!opt.isAvailable && opt.unavailableReason && (
@@ -591,6 +593,17 @@ export function ActionTab({
                               )}
                             </button>
                           );
+                          
+                          return !opt.isAvailable ? (
+                            <Popover key={idx}>
+                              <PopoverTrigger asChild>
+                                <div>{button}</div>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-64">
+                                <p className="text-sm">You are not licensed to sell this product</p>
+                              </PopoverContent>
+                            </Popover>
+                          ) : button;
                         })}
                       </div>
 

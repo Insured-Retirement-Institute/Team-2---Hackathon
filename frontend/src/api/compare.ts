@@ -1,5 +1,6 @@
 import { logRequest, logResponse } from "./logger";
 import { config } from "@/config";
+import { mockAlerts } from "./mock/alerts";
 
 export interface ProductOption {
   ID?: string;
@@ -72,14 +73,16 @@ const mockComparison: ComparisonResult = {
   comparisonData: {
     current: {
       id: "current-1",
-      name: "SecureChoice MYGA",
-      carrier: "Integrity Life",
+      name: "SecureChoice Multi-Year Guarantee Annuity",
+      carrier: "Brighthouse",
       rate: "3.80%",
-      term: "5 years",
+      term: "7 years",
       surrenderPeriod: "7 years",
+      surrenderCharge: "7% (declining 1% annually)",
       freeWithdrawal: "10%",
       deathBenefit: "Return of premium",
       guaranteedMinRate: "1.50%",
+      licensingApproved: true,
       features: [
         "Established carrier relationship",
         "Familiar product structure",
@@ -95,7 +98,7 @@ const mockComparison: ComparisonResult = {
       {
         id: "alt-1",
         name: "FlexGrowth Plus MYGA",
-        carrier: "Great American",
+        carrier: "Symetra",
         rate: "4.25%",
         term: "7 years",
         premiumBonus: "3.0%",
@@ -117,7 +120,7 @@ const mockComparison: ComparisonResult = {
       },
       {
         id: "alt-2",
-        name: "Athene Performance Elite",
+        name: "SafeHarbor Fixed Annuity",
         carrier: "Athene",
         rate: "4.10%",
         term: "5 years",
@@ -125,21 +128,21 @@ const mockComparison: ComparisonResult = {
         freeWithdrawal: "10%",
         deathBenefit: "Account value",
         guaranteedMinRate: "2.00%",
-        licensingApproved: true,
+        licensingApproved: false,
         features: [
           "Balanced rate and term (4.10%, 5 years)",
           "Moderate surrender period",
           "Strong carrier reputation",
         ],
         cons: [
+          "Appointment and training required",
           "Mid-tier rate compared to alternatives",
           "MVA penalty still applies",
-          "Standard liquidity provisions only",
         ],
       },
       {
         id: "alt-3",
-        name: "Nationwide Peak",
+        name: "Eagle Shield 5 MYGA",
         carrier: "Nationwide",
         rate: "3.95%",
         term: "5 years",
@@ -147,17 +150,16 @@ const mockComparison: ComparisonResult = {
         freeWithdrawal: "10%",
         deathBenefit: "Account value",
         guaranteedMinRate: "2.25%",
-        licensingApproved: false,
-        licensingDetails: "Appointment required",
+        licensingApproved: true,
         features: [
           "Shortest surrender period (5 years)",
           "Enhanced liquidity (15% free withdrawal)",
           "Lower MVA penalty risk",
         ],
         cons: [
-          "Appointment and training required",
           "Lower rate than top alternative",
           "No premium bonus offered",
+          "Standard death benefit only",
         ],
       },
     ],
@@ -165,12 +167,13 @@ const mockComparison: ComparisonResult = {
   },
 };
 
+// Map real products to visualization format
 const mockVisualizationProducts: VisualizationProduct[] = [
   {
-    ID: "viz-1",
+    ID: "7g9dJwD8SIuFx6927vhTCw", // SecureChoice Multi-Year Guarantee Annuity
     productId: "PROD-CURRENT",
-    name: "SecureChoice MYGA",
-    carrier: "Integrity Life",
+    name: "SecureChoice Multi-Year Guarantee Annuity",
+    carrier: "Brighthouse",
     currentRate: 3.8,
     guaranteedMinRate: 1.5,
     surrenderYears: 7,
@@ -199,10 +202,10 @@ const mockVisualizationProducts: VisualizationProduct[] = [
     ],
   },
   {
-    ID: "viz-2",
+    ID: "1vko-Q47SFSe6EEoQHvptQ", // FlexGrowth Plus MYGA
     productId: "PROD-FLEX",
     name: "FlexGrowth Plus MYGA",
-    carrier: "Great American",
+    carrier: "Symetra",
     currentRate: 4.25,
     guaranteedMinRate: 2.5,
     surrenderYears: 7,
@@ -233,9 +236,9 @@ const mockVisualizationProducts: VisualizationProduct[] = [
     ],
   },
   {
-    ID: "viz-3",
+    ID: "PLQQkwX7TSGw9Ha0j3iMQg", // SafeHarbor Fixed Annuity
     productId: "PROD-ATHENE",
-    name: "Athene Performance Elite",
+    name: "SafeHarbor Fixed Annuity",
     carrier: "Athene",
     currentRate: 4.10,
     guaranteedMinRate: 2.0,
@@ -265,9 +268,9 @@ const mockVisualizationProducts: VisualizationProduct[] = [
     ],
   },
   {
-    ID: "viz-4",
+    ID: "inEFLia9RySGVS4H-lLwrg", // Eagle Shield 5 MYGA
     productId: "PROD-NATIONWIDE",
-    name: "Nationwide Peak",
+    name: "Eagle Shield 5 MYGA",
     carrier: "Nationwide",
     currentRate: 3.95,
     guaranteedMinRate: 2.25,
@@ -305,8 +308,20 @@ export async function runComparison(alertId: string): Promise<ComparisonResult> 
   if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
-        logResponse(`POST /api/alerts/${alertId}/compare (mock)`, mockComparison);
-        resolve(mockComparison);
+        const alert = mockAlerts.find((a) => a.id === alertId) ?? mockAlerts[0];
+        const result = {
+          ...mockComparison,
+          comparisonData: {
+            ...mockComparison.comparisonData,
+            current: {
+              ...mockComparison.comparisonData.current,
+              carrier: alert.carrier,
+              rate: alert.renewalRate,
+            },
+          },
+        };
+        logResponse(`POST /api/alerts/${alertId}/compare (mock)`, result);
+        resolve(result);
       }, 800);
     });
   }

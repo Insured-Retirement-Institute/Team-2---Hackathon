@@ -299,13 +299,6 @@ export function CompareTab({
                 <td key={idx} className="p-4 border-l text-sm">{product.surrenderPeriod || "—"}</td>
               ))}
             </tr>
-            {/* Surrender Charge */}
-            <tr className="border-b hover:bg-slate-50 transition-colors">
-              <td className="p-4 text-sm font-medium text-slate-700">Surrender Charge Schedule</td>
-              {allProducts.map((product, idx) => (
-                <td key={idx} className="p-4 border-l text-sm">{product.surrenderCharge || "—"}</td>
-              ))}
-            </tr>
             {/* Free Withdrawal */}
             <tr className="border-b hover:bg-slate-50 transition-colors">
               <td className="p-4 text-sm font-medium text-slate-700">Penalty-Free Withdrawal</td>
@@ -325,35 +318,6 @@ export function CompareTab({
               <td className="p-4 text-sm font-medium text-slate-700">Guaranteed Minimum Rate</td>
               {allProducts.map((product, idx) => (
                 <td key={idx} className="p-4 border-l text-sm">{product.guaranteedMinRate || "—"}</td>
-              ))}
-            </tr>
-            {/* Liquidity */}
-            <tr className="border-b hover:bg-slate-50 transition-colors">
-              <td className="p-4 text-sm font-medium text-slate-700">Liquidity Features</td>
-              {allProducts.map((product, idx) => (
-                <td key={idx} className="p-4 border-l text-sm">{product.liquidity || "—"}</td>
-              ))}
-            </tr>
-            {/* MVA Penalty */}
-            <tr className="border-b hover:bg-slate-50 transition-colors">
-              <td className="p-4 text-sm font-medium text-slate-700">Market Value Adjustment</td>
-              {allProducts.map((product, idx) => (
-                <td key={idx} className="p-4 border-l text-sm">{product.mvaPenalty || "—"}</td>
-              ))}
-            </tr>
-            {/* Riders */}
-            <tr className="border-b hover:bg-slate-50 transition-colors">
-              <td className="p-4 text-sm font-medium text-slate-700">Available Riders</td>
-              {allProducts.map((product, idx) => (
-                <td key={idx} className="p-4 border-l text-sm">
-                  {product.riders && product.riders.length > 0 ? (
-                    <ul className="space-y-0.5">
-                      {product.riders.map((rider, i) => (
-                        <li key={i} className="text-xs">• {rider}</li>
-                      ))}
-                    </ul>
-                  ) : "—"}
-                </td>
               ))}
             </tr>
             {/* Licensing/Appointment - Highlighted */}

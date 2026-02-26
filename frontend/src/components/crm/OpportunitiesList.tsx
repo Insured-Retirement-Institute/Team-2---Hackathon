@@ -1,67 +1,64 @@
 import { useState } from 'react';
 import { OpportunityCard, type Opportunity } from './OpportunityCard';
+import policyDataFile from '../../../.iri/context/policyData.json';
 
 interface OpportunitiesListProps {
   onViewAll?: () => void;
 }
 
-const mockOpportunities: Opportunity[] = [
-  {
-    id: '1',
-    name: 'Robert Chen',
-    priority: 'HIGH',
-    accountNumber: '000000311837',
-    description: 'CD maturing in 8 days - urgent reinvestment decision required',
-    amount: 245000,
-    dueDate: '2026-03-06',
-    daysRemaining: 8,
-    icon: 'up',
-  },
-  {
-    id: '2',
-    name: 'Jennifer Martinez',
-    priority: 'HIGH',
-    accountNumber: '000000239784',
-    description: 'Significant excess cash in low-yield account - substantial opportunity to improve returns',
-    amount: 180000,
-    dueDate: '2026-02-28',
-    daysRemaining: 2,
-    icon: 'up',
-  },
-  {
-    id: '3',
-    name: 'Sarah Williams',
-    priority: 'MEDIUM',
-    accountNumber: '000000154992',
-    description: 'Current product underperforming - replacement opportunity available',
-    amount: 325000,
-    dueDate: '2026-03-15',
-    daysRemaining: 17,
-    icon: 'warning',
-  },
-  {
-    id: '4',
-    name: 'David Thompson',
-    priority: 'MEDIUM',
-    accountNumber: '000000276381',
-    description: 'Annuity renewal in 45 days - rate drop from 5.2% to 3.8%',
-    amount: 150000,
-    dueDate: '2026-04-12',
-    daysRemaining: 45,
-    icon: 'down',
-  },
-  {
-    id: '5',
-    name: 'Emily Rodriguez',
-    priority: 'MEDIUM',
-    accountNumber: '000000298453',
-    description: 'CD maturing soon - client may need to reinvest funds or take distribution',
-    amount: 95000,
-    dueDate: '2026-03-30',
-    daysRemaining: 32,
-    icon: 'up',
-  },
-];
+// Generate opportunities from real policy data
+function generateOpportunitiesFromPolicyData(): Opportunity[] {
+  const opportunities: Opportunity[] = [];
+
+  policyDataFile.policyData.forEach((policy) => {
+    // Calculate days until renewal
+    const parts = policy.renewalDate.split("/");
+    const renewal = new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+    const today = new Date();
+    const daysRemaining = Math.ceil((renewal.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Only include eligible policies renewing within 90 days
+    if (daysRemaining > 0 && daysRemaining <= 90 && policy.eligibilityStatus === "eligible") {
+      const currentRate = parseFloat(policy.currentRate.replace("%", ""));
+      const renewalRate = parseFloat(policy.renewalRate.replace("%", ""));
+      const rateDrop = currentRate - renewalRate;
+      
+      let description = '';
+      let priority: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM';
+      let icon: 'up' | 'down' | 'warning' = 'warning';
+
+      if (policy.isMinRateRenewal) {
+        description = `Renewal at minimum rate ${policy.renewalRate} - replacement analysis recommended`;
+        priority = 'HIGH';
+        icon = 'down';
+      } else if (rateDrop > 0.5) {
+        description = `Annuity renewal in ${daysRemaining} days - rate drop from ${policy.currentRate} to ${policy.renewalRate}`;
+        priority = daysRemaining <= 30 ? 'HIGH' : 'MEDIUM';
+        icon = 'down';
+      } else {
+        description = `Renewal opportunity - current rate ${policy.currentRate} renewing at ${policy.renewalRate}`;
+        priority = daysRemaining <= 30 ? 'HIGH' : 'MEDIUM';
+        icon = 'up';
+      }
+
+      opportunities.push({
+        id: policy.contractId,
+        name: policy.clientName,
+        priority,
+        accountNumber: policy.contractId,
+        description,
+        amount: parseFloat(policy.currentValue.replace(/[$,]/g, '')),
+        dueDate: policy.renewalDate,
+        daysRemaining,
+        icon,
+      });
+    }
+  });
+
+  return opportunities.sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 5);
+}
+
+const mockOpportunities: Opportunity[] = generateOpportunitiesFromPolicyData();
 
 export function OpportunitiesList({ onViewAll }: OpportunitiesListProps) {
   const [searchQuery, setSearchQuery] = useState('');

@@ -111,7 +111,7 @@ export function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
         <div>
-          <h2 className="text-3xl font-bold text-slate-900">My Dashboard</h2>
+          <h2 className="text-3xl font-bold text-slate-900">Welcome, Marty</h2>
           <p className="text-base text-slate-600 mt-2">
             Key portfolio metrics and alerts at a glance
           </p>

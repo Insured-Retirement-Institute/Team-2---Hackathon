@@ -26,6 +26,7 @@ import type {
   SuitabilityData,
   ComparisonData,
   ProductOption,
+  TransactionOption,
 } from "@/types/alert-detail";
 import {
   fetchAlertDetail,
@@ -34,6 +35,7 @@ import {
   saveSuitability,
 } from "@/api/alert-detail";
 import { runComparison, recompareWithProducts } from "@/api/compare";
+import { getMockTransactionOptions } from "@/api/mock/alert-detail";
 
 export function AlertDetailPage() {
   const { alertId } = useParams<{ alertId: string }>();
@@ -59,6 +61,7 @@ export function AlertDetailPage() {
     useState<SuitabilityData | null>(null);
   const [disclosuresAcknowledged, setDisclosuresAcknowledged] = useState(false);
   const [transactionId, setTransactionId] = useState("");
+  const [transactionOptions, setTransactionOptions] = useState<TransactionOption[]>([]);
 
   const [auditLogExpanded, setAuditLogExpanded] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -75,6 +78,7 @@ export function AlertDetailPage() {
       setDetail(detailData);
       setSuitabilityData(detailData.suitabilityData);
       setParameters(profileData.parameters);
+      setTransactionOptions(detailData.transactionOptions);
     } catch {
       toast.error("Failed to load alert details");
     } finally {
@@ -106,6 +110,7 @@ export function AlertDetailPage() {
         await saveSuitability(detail.alert.id, suitabilityData);
       const result = await runComparison(alertId!);
       setComparisonData(result.comparisonData);
+      setTransactionOptions(getMockTransactionOptions(detail!.alert, result.comparisonData));
       setCompletedSteps((prev) => new Set(prev).add("compare"));
     } catch {
       toast.error("Failed to run comparison");
@@ -133,7 +138,7 @@ export function AlertDetailPage() {
     }
   };
 
-  const goBack = () => navigate("/");
+  const goBack = () => navigate("/dashboard");
 
   if (loading || !detail) {
     return (
@@ -148,7 +153,6 @@ export function AlertDetailPage() {
     clientAlerts,
     policyData,
     disclosureItems,
-    transactionOptions,
     auditLog,
   } = detail;
 

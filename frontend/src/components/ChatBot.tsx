@@ -6,13 +6,12 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import {
   X,
   Send,
   Sparkles,
-  TrendingUp,
-  FileText,
-  Shield,
   User,
   Maximize2,
   Minimize2,
@@ -41,42 +40,11 @@ function FluxCapacitorIcon({ className }: { className?: string }) {
   );
 }
 
-const SUGGESTED_PROMPTS = [
-  {
-    icon: FileText,
-    label: "Tell me about this product",
-    prompt:
-      "Can you explain the key features and benefits of the current policy?",
-    category: "Product Info",
-  },
-  {
-    icon: TrendingUp,
-    label: "Compare renewal options",
-    prompt:
-      "What are the main differences between the current policy and the recommended renewal options?",
-    category: "Analysis",
-  },
-  {
-    icon: Shield,
-    label: "Suitability considerations",
-    prompt:
-      "What factors should I consider for suitability when recommending this renewal?",
-    category: "Compliance",
-  },
-  {
-    icon: User,
-    label: "Client communication tips",
-    prompt:
-      "How should I explain the rate change to my client in simple terms?",
-    category: "Communication",
-  },
-];
-
 const WELCOME: ChatMessage = {
   id: "welcome",
   role: "assistant",
   content:
-    "Hello! I'm your AI Assistant for Fixed Annuity Renewals. I can help you understand products, analyze suitability, compare options, and answer compliance questions. How can I assist you today?",
+    "Hello! I'm your AI Assistant for Replacement Reviews. I can help you understand products, analyze suitability, compare options, and answer compliance questions. How can I assist you today?",
   timestamp: new Date().toISOString(),
 };
 
@@ -90,7 +58,7 @@ function trimHistory(msgs: ChatMessage[]): ChatMessage[] {
 
 export function ChatBot({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
@@ -115,8 +83,17 @@ export function ChatBot({ children }: { children: ReactNode }) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
+  
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (open) {
+      inputRef.current?.focus();
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [open]);
 
   const send = async (content?: string) => {
@@ -133,28 +110,62 @@ export function ChatBot({ children }: { children: ReactNode }) {
     setInput("");
     setTyping(true);
 
+    const assistantId = `assistant-${Date.now()}`;
+
     try {
       const history = messages.slice(1); // exclude welcome
-      const res = await sendChat({
-        context: ctxRef.current,
-        message: text,
-        history,
-      });
-      if (res.message) {
-        setMessages((prev) => trimHistory([...prev, res.message!]));
-      }
+      let firstChunk = true;
+      await sendChat(
+        {
+          context: ctxRef.current,
+          message: text,
+          history,
+        },
+        (chunk: string) => {
+          // On first chunk, create the message and hide typing indicator
+          if (firstChunk) {
+            firstChunk = false;
+            setTyping(false);
+            const assistantMsg: ChatMessage = {
+              id: assistantId,
+              role: "assistant",
+              content: chunk,
+              timestamp: new Date().toISOString(),
+            };
+            setMessages((prev) => trimHistory([...prev, assistantMsg]));
+          } else {
+            // Update streaming content
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantId
+                  ? { ...msg, content: msg.content + chunk }
+                  : msg
+              )
+            );
+          }
+        }
+      );
     } catch {
-      setMessages((prev) =>
-        trimHistory([
-          ...prev,
-          {
-            id: `err-${Date.now()}`,
+      setMessages((prev) => {
+        const hasMessage = prev.some(msg => msg.id === assistantId);
+        if (hasMessage) {
+          return prev.map((msg) =>
+            msg.id === assistantId
+              ? {
+                  ...msg,
+                  content: "Sorry, something went wrong. Please try again.",
+                }
+              : msg
+          );
+        } else {
+          return trimHistory([...prev, {
+            id: assistantId,
             role: "assistant",
             content: "Sorry, something went wrong. Please try again.",
             timestamp: new Date().toISOString(),
-          },
-        ]),
-      );
+          }]);
+        }
+      });
     } finally {
       setTyping(false);
     }
@@ -178,8 +189,21 @@ export function ChatBot({ children }: { children: ReactNode }) {
 
       {/* Chat Panel */}
       {open && (
-        <div
-          className={`fixed bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-slate-200 transition-all duration-300 ${expanded ? "bottom-4 right-4 w-[700px] h-[85vh] text-base" : "bottom-6 right-6 w-[420px] h-[600px] text-sm"}`}
+        <>
+          {/* Backdrop for expanded mode */}
+          {expanded && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+              onClick={() => setExpanded(false)}
+            />
+          )}
+          
+          <div
+            className={`fixed bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-slate-200 transition-all duration-300 overflow-hidden ${
+              expanded
+                ? "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-[1200px] h-[90vh]"
+                : "bottom-6 right-6 w-[420px] h-[600px] text-sm"
+            }`}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-t-2xl">
@@ -233,15 +257,16 @@ export function ChatBot({ children }: { children: ReactNode }) {
                 )}
                 <div
                   className={cn(
-                    "max-w-[280px] rounded-2xl px-4 py-3",
-                    expanded && "max-w-[480px]",
+                    "rounded-2xl px-4 py-3",
                     m.role === "user"
-                      ? "bg-blue-600 text-white rounded-br-md"
-                      : "bg-white text-slate-900 border border-slate-200 rounded-bl-md",
+                      ? "bg-blue-600 text-white rounded-br-md max-w-fit"
+                      : "bg-white text-slate-900 border border-slate-200 rounded-bl-md w-full",
                   )}
                 >
-                  <div className="whitespace-pre-wrap leading-relaxed">
-                    {m.content}
+                  <div className="prose prose-sm max-w-none prose-slate prose-headings:font-semibold prose-p:leading-relaxed prose-ul:my-2 prose-li:my-1 prose-code:bg-slate-100 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-table:border-collapse prose-table:w-full prose-th:border prose-th:border-slate-300 prose-th:bg-slate-100 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-td:border prose-td:border-slate-300 prose-td:px-3 prose-td:py-2">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {m.content}
+                    </ReactMarkdown>
                   </div>
                   <div
                     className={cn(
@@ -287,38 +312,6 @@ export function ChatBot({ children }: { children: ReactNode }) {
               </div>
             )}
 
-            {messages.length === 1 && !typing && (
-              <div className="space-y-2 pt-2">
-                <p className="text-xs font-semibold text-slate-600 px-1">
-                  Suggested questions:
-                </p>
-                {SUGGESTED_PROMPTS.map((p, i) => {
-                  const Icon = p.icon;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => send(p.prompt)}
-                      className="w-full text-left px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50 transition-all group"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="h-8 w-8 rounded-lg bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center shrink-0 transition-colors">
-                          <Icon className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900 group-hover:text-blue-900">
-                            {p.label}
-                          </p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {p.category}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
             <div ref={endRef} />
           </div>
 
@@ -353,6 +346,7 @@ export function ChatBot({ children }: { children: ReactNode }) {
             </p>
           </div>
         </div>
+        </>
       )}
     </ChatAPIContext.Provider>
   );
