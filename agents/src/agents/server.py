@@ -39,10 +39,14 @@ class HealthCheckFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
 
+import os as _os
+_root_path = _os.environ.get("ROOT_PATH", "")
+
 app = FastAPI(
     title="Agents API",
     description="HTTP wrapper for agent_one, agent_two, and agent_three",
     version="0.1.0",
+    root_path=_root_path,
 )
 
 

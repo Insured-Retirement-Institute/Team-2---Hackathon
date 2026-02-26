@@ -322,6 +322,9 @@ async def get_alert_detail(alert_id: str) -> AlertDetail:
     # If alert_detail JSON exists, use it for full detail
     if alert_row.get("alert_detail"):
         detail_json = alert_row["alert_detail"]
+        # Handle case where alert_detail is stored as JSON string
+        if isinstance(detail_json, str):
+            detail_json = json.loads(detail_json)
         # Return AlertDetail with data from alert_detail JSONB
         return AlertDetail(
             alert=renewal_alert,
@@ -444,6 +447,10 @@ async def save_suitability(
             status_code=400,
             detail=f"Alert {alert_id} has no alert_detail data"
         )
+
+    # Handle case where alert_detail is stored as JSON string
+    if isinstance(alert_detail, str):
+        alert_detail = json.loads(alert_detail)
 
     policy_data = alert_detail.get('policy', {})
     client_id = policy_data.get('clientId')

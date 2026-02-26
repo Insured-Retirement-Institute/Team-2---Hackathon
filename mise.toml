@@ -690,3 +690,116 @@ kubectl get pods -l 'app in (hack2future, hack2future-frontend, agents)'
 [tasks."deploy:update"]
 description = "Build, push, and restart all services (full deploy cycle)"
 depends = ["deploy:restart"]
+
+# =============================================================================
+# Hotfix Tasks (fast dev iteration without rebuilding images)
+# =============================================================================
+
+[tasks."hotfix:enable"]
+description = "Enable hot-reload mode on api and agents deployments for fast dev iteration"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Enabling --reload on hack2future (api) deployment..."
+kubectl patch deployment hack2future --type='json' -p='[
+  {"op": "replace", "path": "/spec/template/spec/containers/0/command",
+   "value": ["uv", "run", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]}
+]'
+
+echo "Enabling --reload on agents deployment..."
+kubectl patch deployment agents --type='json' -p='[
+  {"op": "replace", "path": "/spec/template/spec/containers/0/command",
+   "value": ["uv", "run", "uvicorn", "agents.server:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]}
+]'
+
+echo "Waiting for rollouts..."
+kubectl rollout status deployment/hack2future --timeout=120s &
+kubectl rollout status deployment/agents --timeout=120s &
+wait
+
+echo ""
+echo "Hot-reload enabled! Use 'mise run hotfix:api' or 'mise run hotfix:agents' to push changes."
+"""
+
+[tasks."hotfix:disable"]
+description = "Disable hot-reload mode (revert to normal startup)"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+echo "Removing custom command from hack2future (api) deployment..."
+kubectl patch deployment hack2future --type='json' -p='[
+  {"op": "remove", "path": "/spec/template/spec/containers/0/command"}
+]' 2>/dev/null || echo "No custom command to remove"
+
+echo "Removing custom command from agents deployment..."
+kubectl patch deployment agents --type='json' -p='[
+  {"op": "remove", "path": "/spec/template/spec/containers/0/command"}
+]' 2>/dev/null || echo "No custom command to remove"
+
+echo "Restarting deployments..."
+kubectl rollout restart deployment/hack2future deployment/agents
+
+echo "Waiting for rollouts..."
+kubectl rollout status deployment/hack2future --timeout=120s &
+kubectl rollout status deployment/agents --timeout=120s &
+wait
+
+echo "Hot-reload disabled. Normal startup restored."
+"""
+
+[tasks."hotfix:api"]
+description = "Copy local api changes to running pod (use after hotfix:enable)"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+POD=$(kubectl get pods -l app=hack2future --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+if [ -z "$POD" ]; then
+  echo "ERROR: No running hack2future pod found"
+  exit 1
+fi
+echo "Target pod: $POD"
+
+# Create a tarball and pipe it into the pod (faster than individual kubectl cp)
+# COPYFILE_DISABLE=1 prevents macOS from including ._* metadata files
+echo "Creating tarball of api source files..."
+COPYFILE_DISABLE=1 tar -cf - \
+  api/src/api/routers/*.py \
+  api/src/api/*.py \
+  api/src/api/queries/*.sql \
+  2>/dev/null | kubectl exec -i "$POD" -c api -- tar -xf - -C /app --verbose
+
+echo ""
+echo "Files copied! Uvicorn should auto-reload if hotfix:enable was run."
+echo "If not, restart manually: kubectl exec $POD -c api -- pkill -f uvicorn"
+"""
+
+[tasks."hotfix:agents"]
+description = "Copy local agents changes to running pod (use after hotfix:enable)"
+run = """
+#!/bin/bash
+set -euo pipefail
+
+POD=$(kubectl get pods -l app=agents --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+if [ -z "$POD" ]; then
+  echo "ERROR: No running agents pod found"
+  exit 1
+fi
+echo "Target pod: $POD"
+
+# Create a tarball and pipe it into the pod (faster than individual kubectl cp)
+# COPYFILE_DISABLE=1 prevents macOS from including ._* metadata files
+echo "Creating tarball of agents source files..."
+COPYFILE_DISABLE=1 tar -cf - \
+  agents/src/agents/*.py \
+  agents/src/agents/agent_one/*.py \
+  agents/src/agents/agent_two/*.py \
+  agents/src/agents/agent_three/*.py \
+  2>/dev/null | kubectl exec -i "$POD" -c agents -- tar -xf - -C /app --verbose
+
+echo ""
+echo "Files copied! Uvicorn should auto-reload if hotfix:enable was run."
+echo "If not, restart manually: kubectl exec $POD -c agents -- pkill -f uvicorn"
+"""

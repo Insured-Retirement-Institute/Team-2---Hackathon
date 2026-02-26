@@ -6,7 +6,7 @@ import json
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from api.database import pool
+from api import database
 from agents.agent_two.main import generate_product_recommendations
 
 router = APIRouter(prefix="/alerts", tags=["Action"])
@@ -54,7 +54,7 @@ async def save_disclosures(
     Saves which disclosure items have been acknowledged by the advisor.
     """
     # Verify alert exists
-    alert_row = await pool.fetchrow(
+    alert_row = await database.pool.fetchrow(
         "SELECT id FROM hackathon.alerts WHERE id = $1",
         alert_id
     )
@@ -66,7 +66,7 @@ async def save_disclosures(
         )
 
     # Store acknowledged disclosure IDs in alert_detail JSONB
-    await pool.execute(
+    await database.pool.execute(
         """
         UPDATE hackathon.alerts
         SET alert_detail = COALESCE(alert_detail, '{}'::jsonb) ||
@@ -95,7 +95,7 @@ async def submit_transaction(
     submission ID, status tracking, and any NIGO (Not In Good Order) issues.
     """
     # 1. Get alert data
-    alert_row = await pool.fetchrow(
+    alert_row = await database.pool.fetchrow(
         """
         SELECT policy_id, client_name, carrier, alert_detail
         FROM hackathon.alerts
@@ -117,6 +117,10 @@ async def submit_transaction(
             status_code=400,
             detail=f"Alert {alert_id} has no alert_detail data"
         )
+
+    # Handle case where alert_detail is stored as JSON string
+    if isinstance(alert_detail, str):
+        alert_detail = json.loads(alert_detail)
 
     policy_data = alert_detail.get('policy', {})
     client_id = policy_data.get('clientId')

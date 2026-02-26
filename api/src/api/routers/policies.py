@@ -8,4 +8,5 @@ router = APIRouter(prefix="/v2", tags=["policies"])
 
 @router.post("/policies")
 async def get_policy(req: PolicyRequest, db: DbConnection):
+    return "HELLO WORLD? THIS IS A TEST!"
     return await fetch_rows(db, "get_policy", req.policy_number)

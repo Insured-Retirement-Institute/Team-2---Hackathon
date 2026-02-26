@@ -4,11 +4,10 @@ Product comparison endpoints - triggers agent_two for product recommendations.
 import os
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from api.database import pool
-from api.sureify_client import SureifyClient, SureifyAuthConfig
+from api import database
 
 import api.routers.profiles as profiles_module
 
@@ -76,7 +75,7 @@ def _convert_recommendation_to_product_option(rec: dict) -> ProductOption:
 
 async def _get_alert_and_client(alert_id: str) -> tuple[dict, str]:
     """Get alert data and extract client_id from alert_detail.policy.clientId"""
-    alert_row = await pool.fetchrow(
+    alert_row = await database.pool.fetchrow(
         """
         SELECT customer_identifier, policy_id, client_name, carrier,
                current_value, current_rate, renewal_rate, alert_detail
@@ -96,6 +95,11 @@ async def _get_alert_and_client(alert_id: str) -> tuple[dict, str]:
             detail=f"Alert {alert_id} has no alert_detail data"
         )
 
+    # Handle case where alert_detail is stored as JSON string
+    if isinstance(alert_detail, str):
+        import json
+        alert_detail = json.loads(alert_detail)
+
     policy_data = alert_detail.get('policy', {})
     client_id = policy_data.get('clientId')
 
@@ -109,7 +113,7 @@ async def _get_alert_and_client(alert_id: str) -> tuple[dict, str]:
 
 
 @router.post("/{alert_id}/compare", response_model=ComparisonResult)
-async def run_comparison(alert_id: str):
+async def run_comparison(alert_id: str, request: Request):
     """
     Run comparison analysis using agent_two.
 
@@ -118,13 +122,8 @@ async def run_comparison(alert_id: str):
     """
     alert_data, client_id = await _get_alert_and_client(alert_id)
 
-    config = SureifyAuthConfig()
-    sureify = SureifyClient(config)
-    await sureify.authenticate()
-    try:
-        await profiles_module.get_client_profile(client_id, sureify)
-    finally:
-        await sureify.close()
+    # Ensure client profile exists in DB (fetches from Sureify if needed)
+    await profiles_module.get_client_profile(client_id, request)
 
     if not AGENTS_URL:
         raise HTTPException(status_code=503, detail="AGENTS_URL environment variable is not configured")

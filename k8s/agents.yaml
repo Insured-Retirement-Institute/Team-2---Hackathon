@@ -23,6 +23,8 @@ spec:
             - containerPort: 8000
               name: http
           env:
+            - name: ROOT_PATH
+              value: /agents/
             # Database connection (from CNPG hackdb-app secret)
             - name: PGHOST
               valueFrom:
@@ -89,6 +91,9 @@ spec:
             # Logging level (DEBUG, INFO, WARNING, ERROR)
             - name: LOG_LEVEL
               value: DEBUG
+            # Root path for gateway URL rewriting (affects OpenAPI docs URLs)
+            - name: ROOT_PATH
+              value: "/agents"
           resources:
             requests:
               memory: "256Mi"
