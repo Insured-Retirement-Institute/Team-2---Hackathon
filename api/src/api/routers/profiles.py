@@ -206,7 +206,8 @@ async def get_client_profile(
     try:
         import asyncio
         # Build URL for passthrough endpoint (internal call)
-        base_url = str(request.base_url).rstrip('/')
+        root_path = request.scope.get("root_path", "")
+        base_url = str(request.base_url).rstrip('/') + root_path
 
         async with httpx.AsyncClient(timeout=90.0) as client:
             # Fetch client profiles and suitability data IN PARALLEL
@@ -491,7 +492,8 @@ async def get_policy_data(
     """
     try:
         # Build URL for passthrough endpoint (internal call)
-        base_url = str(request.base_url).rstrip('/')
+        root_path = request.scope.get("root_path", "")
+        base_url = str(request.base_url).rstrip('/') + root_path
 
         async with httpx.AsyncClient(timeout=90.0) as client:
             # Fetch all policy data from passthrough

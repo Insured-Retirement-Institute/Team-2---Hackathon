@@ -1,6 +1,9 @@
 import logging
 import os
+<<<<<<< Updated upstream
 from enum import Enum
+=======
+>>>>>>> Stashed changes
 from typing import Any
 
 import httpx
@@ -8,6 +11,7 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
+<<<<<<< Updated upstream
 from api.sureify_models import PolicyData
 
 
@@ -38,6 +42,13 @@ Application = dict[str, Any]
 Case = dict[str, Any]
 Commission = dict[str, Any]
 CommissionStatement = dict[str, Any]
+=======
+from api.sureify_models import (
+    ClientProfile,
+    PolicyData,
+    ProductOption,
+)
+>>>>>>> Stashed changes
 
 
 def _env(key: str, default: str = "") -> str:
@@ -150,25 +161,37 @@ class SureifyClient:
         data = await self._get("/puddle/policyData", "policyData")
         return [PolicyData(**item) for item in data]
 
+<<<<<<< Updated upstream
+=======
+    async def get_suitability_data(self) -> list[dict]:
+        return await self._get("/puddle/suitabilityData", "suitabilityData")
+
+    async def get_disclosure_items(self) -> list[dict]:
+        return await self._get("/puddle/disclosureItem", "disclosureItems")
+
+    async def get_product_options(self) -> list[ProductOption]:
+        data = await self._get("/puddle/productOption", "productOptions")
+        return [ProductOption(**item) for item in data]
+
+    async def get_visualization_products(self) -> list[dict]:
+        return await self._get("/puddle/visualizationProduct", "visualizationProducts")
+
+>>>>>>> Stashed changes
     async def get_documents(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[Document]:
-        data = await self._get("/puddle/documents", user_id, persona, keycard)
-        return [Document(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/documents", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_document_by_id(
         self,
         document_id: str,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
     ) -> bytes:
         params = {}
-        if persona:
-            params["persona"] = persona.value
         if keycard:
             params["keycard"] = keycard
         response = await self._client.get(
@@ -182,130 +205,117 @@ class SureifyClient:
     async def get_financial_activities(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[FinancialActivity]:
-        data = await self._get("/puddle/financialActivities", user_id, persona, keycard)
-        return [FinancialActivity(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/financialActivities", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_fund_allocations(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[FundAllocation]:
-        data = await self._get("/puddle/fundAllocations", user_id, persona, keycard)
-        return [FundAllocation(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/fundAllocations", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_keycards(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[Keycard]:
-        data = await self._get("/puddle/keycards", user_id, persona, keycard)
-        return [Keycard(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/keycards", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_notes(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[Note]:
-        data = await self._get("/puddle/notes", user_id, persona, keycard)
-        return [Note(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/notes", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_payment_methods(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
     ) -> list[dict]:
-        return await self._get("/puddle/paymentMethods", user_id, persona, keycard)
+        return await self._get("/puddle/paymentMethods", user_id, keycard)
 
     async def get_policies(
         self,
         user_id: str | None = None,
-        persona: Persona | None = Persona.agent,
         keycard: str | None = None,
-    ) -> list[Policy] | list[dict]:
+    ) -> list[dict] | list[dict]:
         """GET /puddle/policyData. Puddle Data API requires persona=agent and UserID header."""
-        data = await self._get("/puddle/policyData", user_id, persona, keycard)
+        data = await self._get("/puddle/policyData", user_id, keycard)
         if isinstance(data, dict) and "policyData" in data:
             return data["policyData"]
-        return [Policy(**item) for item in data]
+        return data if isinstance(data, list) else []
 
     async def get_products(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[Product]:
-        data = await self._get("/puddle/products", user_id, persona, keycard)
-        return [Product(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/products", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_qualifications(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
     ) -> list[dict]:
-        return await self._get("/puddle/qualifications", user_id, persona, keycard)
+        return await self._get("/puddle/qualifications", user_id, keycard)
 
     async def get_quotes(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[Quote]:
-        data = await self._get("/puddle/quotes", user_id, persona, keycard)
+    ) -> list[dict]:
+        data = await self._get("/puddle/quotes", user_id, keycard)
         return [QuoteIllustrationBase(**item) for item in data]
 
     async def get_requirements(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[Requirement]:
-        data = await self._get("/puddle/requirements", user_id, persona, keycard)
-        return [Requirement(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/requirements", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_riders(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[Rider]:
-        data = await self._get("/puddle/riders", user_id, persona, keycard)
-        return [Rider(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/riders", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     async def get_roles(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
     ) -> list[dict]:
-        return await self._get("/puddle/roles", user_id, persona, keycard)
+        return await self._get("/puddle/roles", user_id, keycard)
 
     async def get_profiles(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
     ) -> list[dict]:
-        return await self._get("/puddle/profiles", user_id, persona, keycard)
+        return await self._get("/puddle/profiles", user_id, keycard)
 
     async def get_users(
         self,
         user_id: str | None = None,
-        persona: Persona | None = None,
         keycard: str | None = None,
-    ) -> list[User]:
-        data = await self._get("/puddle/users", user_id, persona, keycard)
-        return [User(**item) for item in data]
+    ) -> list[dict]:
+        data = await self._get("/puddle/users", user_id, keycard)
+        return data if isinstance(data, list) else []
 
     # --- Puddle Data API (OpenAPI 1.0.0: suitabilityData, disclosureItem, productOption, visualizationProduct, clientProfile) ---
 
+<<<<<<< Updated upstream
     async def get_suitability_data(self) -> list[dict]:
         return await self._get("/puddle/suitabilityData", "suitabilityData")
 
@@ -320,9 +330,60 @@ class SureifyClient:
 
     async def get_client_profiles(self) -> list[dict]:
         return await self._get("/puddle/clientProfile", "clientProfiles")
+=======
+    async def get_suitability_data(
+        self,
+        user_id: str | None = None,
+        keycard: str | None = None,
+    ) -> list[dict]:
+        data = await self._get("/puddle/suitabilityData", user_id, keycard)
+        if isinstance(data, dict) and "suitabilityData" in data:
+            return data["suitabilityData"]
+        return data if isinstance(data, list) else []
+
+    async def get_disclosure_items(
+        self,
+        user_id: str | None = None,
+        keycard: str | None = None,
+    ) -> list[dict]:
+        data = await self._get("/puddle/disclosureItem", user_id, keycard)
+        if isinstance(data, dict) and "disclosureItems" in data:
+            return data["disclosureItems"]
+        return data if isinstance(data, list) else []
+
+    async def get_product_options(
+        self,
+        user_id: str | None = None,
+        keycard: str | None = None,
+    ) -> list[dict]:
+        data = await self._get("/puddle/productOption", user_id, keycard)
+        if isinstance(data, dict) and "productOptions" in data:
+            return data["productOptions"]
+        return data if isinstance(data, list) else []
+
+    async def get_visualization_products(
+        self,
+        user_id: str | None = None,
+        keycard: str | None = None,
+    ) -> list[dict]:
+        data = await self._get("/puddle/visualizationProduct", user_id, keycard)
+        if isinstance(data, dict) and "visualizationProducts" in data:
+            return data["visualizationProducts"]
+        return data if isinstance(data, list) else []
+
+    async def get_client_profiles(
+        self,
+        user_id: str | None = None,
+        keycard: str | None = None,
+    ) -> list[dict]:
+        data = await self._get("/puddle/clientProfile", user_id, keycard)
+        if isinstance(data, dict) and "clientProfiles" in data:
+            return data["clientProfiles"]
+        return data if isinstance(data, list) else []
+>>>>>>> Stashed changes
 
 
-def _parse_contact(data: dict) -> Contact:
+def _parse_contact(data: dict) -> dict:
     contact_type = data.get("type") or data.get("contactType")
     if contact_type == "Person":
         return Person(**data)
@@ -337,32 +398,32 @@ def _parse_contact(data: dict) -> Contact:
     return Person(**data)
 
 
-def get_applications(client: SureifyClient, **kwargs) -> list[Application]:
+def get_applications(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_applications(**kwargs))
 
 
-def get_cases(client: SureifyClient, **kwargs) -> list[Case]:
+def get_cases(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_cases(**kwargs))
 
 
-def get_commissions(client: SureifyClient, **kwargs) -> list[Commission]:
+def get_commissions(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_commissions(**kwargs))
 
 
-def get_commission_statements(client: SureifyClient, **kwargs) -> list[CommissionStatement]:
+def get_commission_statements(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_commission_statements(**kwargs))
 
 
-def get_contacts(client: SureifyClient, **kwargs) -> list[Contact]:
+def get_contacts(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_contacts(**kwargs))
 
 
-def get_documents(client: SureifyClient, **kwargs) -> list[Document]:
+def get_documents(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_documents(**kwargs))
 
@@ -374,22 +435,22 @@ def get_document_by_id(client: SureifyClient, document_id: str, **kwargs) -> byt
     )
 
 
-def get_financial_activities(client: SureifyClient, **kwargs) -> list[FinancialActivity]:
+def get_financial_activities(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_financial_activities(**kwargs))
 
 
-def get_fund_allocations(client: SureifyClient, **kwargs) -> list[FundAllocation]:
+def get_fund_allocations(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_fund_allocations(**kwargs))
 
 
-def get_keycards(client: SureifyClient, **kwargs) -> list[Keycard]:
+def get_keycards(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_keycards(**kwargs))
 
 
-def get_notes(client: SureifyClient, **kwargs) -> list[Note]:
+def get_notes(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_notes(**kwargs))
 
@@ -399,12 +460,12 @@ def get_payment_methods(client: SureifyClient, **kwargs) -> list[dict]:
     return asyncio.get_event_loop().run_until_complete(client.get_payment_methods(**kwargs))
 
 
-def get_policies(client: SureifyClient, **kwargs) -> list[Policy]:
+def get_policies(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_policies(**kwargs))
 
 
-def get_products(client: SureifyClient, **kwargs) -> list[Product]:
+def get_products(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_products(**kwargs))
 
@@ -414,17 +475,17 @@ def get_qualifications(client: SureifyClient, **kwargs) -> list[dict]:
     return asyncio.get_event_loop().run_until_complete(client.get_qualifications(**kwargs))
 
 
-def get_quotes(client: SureifyClient, **kwargs) -> list[Quote]:
+def get_quotes(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_quotes(**kwargs))
 
 
-def get_requirements(client: SureifyClient, **kwargs) -> list[Requirement]:
+def get_requirements(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_requirements(**kwargs))
 
 
-def get_riders(client: SureifyClient, **kwargs) -> list[Rider]:
+def get_riders(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_riders(**kwargs))
 
@@ -439,7 +500,7 @@ def get_profiles(client: SureifyClient, **kwargs) -> list[dict]:
     return asyncio.get_event_loop().run_until_complete(client.get_profiles(**kwargs))
 
 
-def get_users(client: SureifyClient, **kwargs) -> list[User]:
+def get_users(client: SureifyClient, **kwargs) -> list[dict]:
     import asyncio
     return asyncio.get_event_loop().run_until_complete(client.get_users(**kwargs))
 
