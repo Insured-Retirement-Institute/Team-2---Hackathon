@@ -82,7 +82,7 @@ def persist_event(event: AgentRunEvent) -> bool:
                         event.choice_criteria,
                         event.input_validation_passed,
                         event.guardrail_triggered,
-                        uuid.UUID(event.payload_ref) if event.payload_ref else None,
+                        event.payload_ref,  # Already a string UUID
                     ),
                 )
             conn.commit()

@@ -204,17 +204,25 @@ async def get_client_profile(
 
     # 3. No data in DB - fetch from passthrough endpoints (which work!)
     try:
+        import asyncio
         # Build URL for passthrough endpoint (internal call)
         base_url = str(request.base_url).rstrip('/')
 
         async with httpx.AsyncClient(timeout=90.0) as client:
-            # Fetch all client profiles from passthrough
-            profiles_response = await client.get(f"{base_url}/passthrough/client-profiles")
+            # Fetch client profiles and suitability data IN PARALLEL
+            profiles_task = client.get(f"{base_url}/passthrough/client-profiles")
+            suitability_task = client.get(f"{base_url}/passthrough/suitability-data")
+            profiles_response, suitability_response = await asyncio.gather(
+                profiles_task, suitability_task
+            )
+
             if profiles_response.status_code != 200:
                 raise HTTPException(status_code=profiles_response.status_code,
                                   detail="Failed to fetch client profiles from Sureify")
 
             profiles_data = profiles_response.json()
+            suitability_list = suitability_response.json() if suitability_response.status_code == 200 else []
+
             # Try exact clientId match first
             client_data = next((p for p in profiles_data if p.get('clientId') == clientId), None)
 
@@ -233,9 +241,7 @@ async def get_client_profile(
             if not client_data:
                 raise HTTPException(status_code=404, detail=f"Client {clientId} not found in Sureify")
 
-            # Fetch suitability data from passthrough
-            suitability_response = await client.get(f"{base_url}/passthrough/suitability-data")
-            suitability_list = suitability_response.json() if suitability_response.status_code == 200 else []
+            # Find matching suitability data
             suitability_data = next((s for s in suitability_list if s.get('clientId') == clientId), None)
 
         # Build response objects from JSON data

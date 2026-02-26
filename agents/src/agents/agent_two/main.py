@@ -55,17 +55,24 @@ if not _API_BASE:
     raise RuntimeError("API_BASE_URL environment variable is required but not set")
 
 
-def _api_get(path: str) -> list | dict:
-    """GET helper for the API server passthrough endpoints."""
+async def _api_get_async(path: str) -> list | dict:
+    """Async GET helper for the API server passthrough endpoints."""
     import time
     url = f"{_API_BASE}{path}"
     logger.info("API GET %s starting...", url)
     start = time.time()
-    r = httpx.get(url, timeout=90)
+    async with httpx.AsyncClient(timeout=90) as client:
+        r = await client.get(url)
     elapsed = time.time() - start
     logger.info("API GET %s -> %d in %.2fs", url, r.status_code, elapsed)
     r.raise_for_status()
     return r.json()
+
+
+def _api_get(path: str) -> list | dict:
+    """Sync GET helper - wraps async version."""
+    import asyncio
+    return asyncio.run(_api_get_async(path))
 
 
 def _client_profile_characteristics(merged: dict) -> list[str]:
@@ -254,18 +261,31 @@ def _build_best_interest_and_eapp(
     return best_interest, final_eapp
 
 
-def _get_sureify_context(customer_identifier: str) -> dict:
-    """Fetch context from passthrough APIs and the client profile endpoint."""
-    policies = _api_get("/passthrough/policy-data")
-    products = _api_get("/passthrough/product-options")
-    alerts = _api_get("/api/alerts")
+async def _get_sureify_context_async(customer_identifier: str) -> dict:
+    """Async fetch context from passthrough APIs and the client profile endpoint."""
+    import asyncio
+    import time
 
-    # Fetch structured client profile (DB-first with Sureify fallback)
-    try:
-        client_profile = _api_get(f"/api/clients/{customer_identifier}/profile")
-    except Exception:
-        logger.warning("Failed to fetch client profile for %s, falling back to empty", customer_identifier)
-        client_profile = {}
+    start = time.time()
+    logger.info("Fetching Sureify context in parallel for %s", customer_identifier)
+
+    async def fetch_profile():
+        try:
+            return await _api_get_async(f"/api/clients/{customer_identifier}/profile")
+        except Exception:
+            logger.warning("Failed to fetch client profile for %s, falling back to empty", customer_identifier)
+            return {}
+
+    # Execute all API calls in parallel using asyncio.gather
+    policies, products, alerts, client_profile = await asyncio.gather(
+        _api_get_async("/passthrough/policy-data"),
+        _api_get_async("/passthrough/product-options"),
+        _api_get_async("/api/alerts"),
+        fetch_profile(),
+    )
+
+    elapsed = time.time() - start
+    logger.info("Fetched Sureify context in %.2fs (parallel)", elapsed)
 
     # Extract suitability from profile response for backward compatibility
     suitability_data = client_profile.get("suitability") or {}
@@ -282,6 +302,12 @@ def _get_sureify_context(customer_identifier: str) -> dict:
         "sureify_suitability_data": suitability_data,
         "client_profile": client_profile,
     }
+
+
+def _get_sureify_context(customer_identifier: str) -> dict:
+    """Sync wrapper for _get_sureify_context_async."""
+    import asyncio
+    return asyncio.run(_get_sureify_context_async(customer_identifier))
 
 
 @tool
