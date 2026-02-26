@@ -1,9 +1,11 @@
 import logging
 import os
+import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from api import database
 from api.database import close_db, init_db
@@ -33,6 +35,19 @@ app = FastAPI(
     swagger_ui_parameters={"url": f"{root_path}/openapi.json"} if root_path else None,
 )
 
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Skip health checks
+        if request.url.path in ("/health", "/health/ready"):
+            return await call_next(request)
+        start = time.time()
+        logger.info("[API] --> %s %s", request.method, request.url.path)
+        response = await call_next(request)
+        elapsed = time.time() - start
+        logger.info("[API] <-- %s %s -> %d (%.2fs)", request.method, request.url.path, response.status_code, elapsed)
+        return response
+
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

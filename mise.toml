@@ -1,5 +1,6 @@
 [tools]
 "github:pgschema/pgschema" = "1.7.2"
+node = "22"
 
 [tasks.generate-models]
 description = "Generate Pydantic models from sureify.json OpenAPI spec"
@@ -750,8 +751,8 @@ echo "Hot-reload disabled. Normal startup restored."
 """
 
 [tasks."hotfix:all"]
-description = "Copy local changes to both api and agents pods"
-depends = ["hotfix:api", "hotfix:agents"]
+description = "Copy local changes to api, agents, and frontend pods"
+depends = ["hotfix:api", "hotfix:agents", "hotfix:frontend"]
 
 [tasks."hotfix:api"]
 description = "Copy local api changes to running pod (use after hotfix:enable)"
@@ -807,3 +808,56 @@ echo ""
 echo "Files copied! Uvicorn should auto-reload if hotfix:enable was run."
 echo "If not, restart manually: kubectl exec $POD -c agents -- pkill -f uvicorn"
 """
+
+[tasks."hotfix:frontend"]
+description = "Build frontend locally and copy to running pod (no Docker rebuild needed)"
+depends = ["frontend:build-local"]
+run = """
+#!/bin/bash
+set -euo pipefail
+
+POD=$(kubectl get pods -l app=hack2future-frontend --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+if [ -z "$POD" ]; then
+  echo "ERROR: No running hack2future-frontend pod found"
+  exit 1
+fi
+echo "Target pod: $POD"
+
+# Create a tarball and pipe it into the pod (faster than individual kubectl cp)
+# COPYFILE_DISABLE=1 prevents macOS from including ._* metadata files
+# Exclude config.js because it's generated at runtime from env vars
+echo "Creating tarball of frontend dist files..."
+COPYFILE_DISABLE=1 tar -C frontend/dist -cf - --exclude='config.js' . | \
+  kubectl exec -i "$POD" -c frontend -- tar -xf - -C /usr/share/nginx/html --verbose
+
+echo ""
+echo "Frontend files copied! Nginx will serve the updated files immediately."
+echo "Verify with: kubectl exec $POD -c frontend -- ls -la /usr/share/nginx/html"
+"""
+
+# =============================================================================
+# Frontend Local Development Tasks
+# =============================================================================
+
+[tasks."frontend:install"]
+description = "Install frontend dependencies"
+dir = "frontend"
+run = "npm install"
+
+[tasks."frontend:dev"]
+description = "Run frontend dev server"
+depends = ["frontend:install"]
+dir = "frontend"
+run = "npm run dev"
+
+[tasks."frontend:build-local"]
+description = "Build frontend locally"
+depends = ["frontend:install"]
+dir = "frontend"
+run = "npm run build"
+
+[tasks."frontend:preview"]
+description = "Preview production build locally"
+depends = ["frontend:build-local"]
+dir = "frontend"
+run = "npm run preview"

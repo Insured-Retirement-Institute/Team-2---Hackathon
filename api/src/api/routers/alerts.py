@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from api import database
@@ -299,7 +299,7 @@ async def get_dashboard_stats() -> DashboardStats:
 
 
 @router.get("/alerts/{alert_id}", response_model=AlertDetail)
-async def get_alert_detail(alert_id: str) -> AlertDetail:
+async def get_alert_detail(alert_id: str, request: Request) -> AlertDetail:
     """
     Get detailed information about a specific alert.
 
@@ -328,20 +328,37 @@ async def get_alert_detail(alert_id: str) -> AlertDetail:
         # Return AlertDetail with data from alert_detail JSONB
         return AlertDetail(
             alert=renewal_alert,
-            clientAlerts=detail_json.get("clientAlerts"),
+            clientAlerts=detail_json.get("clientAlerts") or [],
             policyData=detail_json.get("policyData"),
             aiSuitabilityScore=detail_json.get("aiSuitabilityScore"),
             suitabilityData=detail_json.get("suitabilityData"),
-            disclosureItems=detail_json.get("disclosureItems"),
-            transactionOptions=detail_json.get("transactionOptions"),
-            auditLog=detail_json.get("auditLog"),
+            disclosureItems=detail_json.get("disclosureItems") or [],
+            transactionOptions=detail_json.get("transactionOptions") or [],
+            auditLog=detail_json.get("auditLog") or [],
         )
 
-    # Otherwise return basic AlertDetail with just the alert
+    # No alert_detail - try to build policyData from Sureify
+    import httpx
+    policy_data = None
+    try:
+        base_url = str(request.base_url).rstrip('/')
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Get policy data from passthrough
+            response = await client.get(f"{base_url}/passthrough/policy-data")
+            if response.status_code == 200:
+                policy_list = response.json()
+                # Find matching policy by contractId (policyId)
+                policy_data = next(
+                    (p for p in policy_list if p.get('contractId') == renewal_alert.policyId),
+                    None
+                )
+    except Exception as e:
+        print(f"Error fetching policy data: {e}")
+
     return AlertDetail(
         alert=renewal_alert,
         clientAlerts=[],
-        policyData=None,
+        policyData=policy_data,
         aiSuitabilityScore=None,
         suitabilityData=None,
         disclosureItems=[],

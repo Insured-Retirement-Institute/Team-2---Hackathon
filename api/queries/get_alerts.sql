@@ -1,6 +1,7 @@
 -- Get all renewal alerts with optional filters
 SELECT
     id,
+    customer_identifier as "clientId",
     policy_id as "policyId",
     client_name as "clientName",
     carrier,

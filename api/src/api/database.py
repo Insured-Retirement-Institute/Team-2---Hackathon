@@ -88,7 +88,11 @@ async def fetch_rows(query_name_or_conn: Connection | str, query_name: str | Non
     if isinstance(query_name_or_conn, str):
         # Called without connection: fetch_rows("query_name", arg1, arg2)
         actual_query_name = query_name_or_conn
-        actual_args = (query_name,) + args
+        # Only skip query_name if no args were passed at all
+        if query_name is None and len(args) == 0:
+            actual_args = ()
+        else:
+            actual_args = (query_name,) + args
         if pool is None or pool._closed:
             raise HTTPException(status_code=503, detail="Database not available")
         async with pool.acquire() as conn:

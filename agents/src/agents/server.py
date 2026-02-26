@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import traceback
 from pathlib import Path
 from typing import Any
@@ -29,6 +30,7 @@ logger = get_logger(__name__)
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 
 # Suppress noisy health check access logs
@@ -48,6 +50,21 @@ app = FastAPI(
     version="0.1.0",
     root_path=_root_path,
 )
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Skip health checks
+        if request.url.path in ("/health", "/health/ready"):
+            return await call_next(request)
+        start = time.time()
+        logger.info("[AGENTS] --> %s %s", request.method, request.url.path)
+        response = await call_next(request)
+        elapsed = time.time() - start
+        logger.info("[AGENTS] <-- %s %s -> %d (%.2fs)", request.method, request.url.path, response.status_code, elapsed)
+        return response
+
+app.add_middleware(RequestLoggingMiddleware)
 
 
 @app.exception_handler(RequestValidationError)

@@ -27,19 +27,29 @@ export function Dashboard() {
   }, []);
 
   const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [alertsData, statsData] = await Promise.all([
-        fetchAlerts(),
-        fetchDashboardStats(),
-      ]);
-      setAlerts(alertsData);
-      setStats(statsData);
-    } catch {
-      toast.error("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
+    setLoading(true);
+    const [alertsResult, statsResult] = await Promise.allSettled([
+      fetchAlerts(),
+      fetchDashboardStats(),
+    ]);
+
+    if (alertsResult.status === "fulfilled") {
+      console.log("[Dashboard] Alerts received:", alertsResult.value?.length);
+      setAlerts(alertsResult.value);
+    } else {
+      console.error("[Dashboard] Failed to load alerts:", alertsResult.reason);
+      toast.error("Failed to load alerts");
     }
+
+    if (statsResult.status === "fulfilled") {
+      console.log("[Dashboard] Stats received:", statsResult.value);
+      setStats(statsResult.value);
+    } else {
+      console.error("[Dashboard] Failed to load stats:", statsResult.reason);
+      toast.error("Failed to load dashboard stats");
+    }
+
+    setLoading(false);
   };
 
   const handleSelectAlert = (alert: RenewalAlert) => {

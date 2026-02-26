@@ -318,9 +318,10 @@ components:
 
     RenewalAlert:
       type: object
-      required: [id, policyId, clientName, carrier, renewalDate, daysUntilRenewal, currentRate, renewalRate, currentValue, isMinRate, priority, hasDataException, status, alertType, alertDescription]
+      required: [id, clientId, policyId, clientName, carrier, renewalDate, daysUntilRenewal, currentRate, renewalRate, currentValue, isMinRate, priority, hasDataException, status, alertType, alertDescription]
       properties:
         id: { type: string, example: "alert-ANN-2020-5621-renewal" }
+        clientId: { type: string, example: "CLI-1001" }
         policyId: { type: string, example: "ANN-2020-5621" }
         clientName: { type: string, example: "Maria Rodriguez" }
         carrier: { type: string, example: "Athene" }

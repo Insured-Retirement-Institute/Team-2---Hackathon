@@ -66,34 +66,34 @@ export function PolicySummary({ policy }: PolicySummaryProps) {
       </div>
 
       {/* Key policy metrics */}
-      {(policy.features.surrenderCharge ||
-        policy.features.withdrawalAllowance) && (
+      {(policy.features?.surrenderCharge ||
+        policy.features?.withdrawalAllowance) && (
         <>
           <Separator />
           <div className="space-y-3">
             <h4 className="text-sm font-semibold text-slate-700">
               Key Metrics
             </h4>
-            {policy.features.surrenderCharge && (
+            {policy.features?.surrenderCharge && (
               <Row
                 label="Surrender Charge"
                 value={policy.features.surrenderCharge}
               />
             )}
-            {policy.features.withdrawalAllowance && (
+            {policy.features?.withdrawalAllowance && (
               <Row
                 label="Free Withdrawal"
                 value={policy.features.withdrawalAllowance}
               />
             )}
-            {policy.features.mvaPenalty && (
+            {policy.features?.mvaPenalty && (
               <Row
                 label="MVA Penalty"
                 value={policy.features.mvaPenalty}
                 highlight="red"
               />
             )}
-            {policy.features.rateGuarantee && (
+            {policy.features?.rateGuarantee && (
               <Row
                 label="Rate Guarantee"
                 value={policy.features.rateGuarantee}

@@ -232,7 +232,7 @@ def _request(
         logger.info("IRI API request: %s %s", method, url)
         req = urllib.request.Request(url, data=data, method=method)
         req.add_header("Content-Type", "application/json")
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=90) as resp:
             response_data = json.loads(resp.read().decode())
             logger.info("IRI API response: %s %s -> %s", method, path, resp.status)
             return response_data

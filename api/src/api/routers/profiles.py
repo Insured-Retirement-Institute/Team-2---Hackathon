@@ -215,7 +215,20 @@ async def get_client_profile(
                                   detail="Failed to fetch client profiles from Sureify")
 
             profiles_data = profiles_response.json()
+            # Try exact clientId match first
             client_data = next((p for p in profiles_data if p.get('clientId') == clientId), None)
+
+            # If not found and clientId looks like a numeric customer_identifier,
+            # we need to look up by alert's clientName instead
+            if not client_data:
+                # Get clientName from alerts table using customer_identifier
+                alert_row = await database.pool.fetchrow(
+                    "SELECT client_name FROM hackathon.alerts WHERE customer_identifier = $1 LIMIT 1",
+                    clientId
+                )
+                if alert_row:
+                    client_name = alert_row['client_name']
+                    client_data = next((p for p in profiles_data if p.get('clientName') == client_name), None)
 
             if not client_data:
                 raise HTTPException(status_code=404, detail=f"Client {clientId} not found in Sureify")

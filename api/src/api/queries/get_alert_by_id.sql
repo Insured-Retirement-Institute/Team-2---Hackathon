@@ -1,6 +1,7 @@
 -- Get a single alert by ID with full details
 SELECT
     id,
+    customer_identifier as "clientId",
     policy_id as "policyId",
     client_name as "clientName",
     carrier,

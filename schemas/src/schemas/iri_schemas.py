@@ -37,6 +37,7 @@ class Status(Enum):
 
 class RenewalAlert(BaseModel):
     id: str = Field(..., examples=['alert-ANN-2020-5621-renewal'])
+    clientId: str = Field(..., examples=['CLI-1001'])
     policyId: str = Field(..., examples=['ANN-2020-5621'])
     clientName: str = Field(..., examples=['Maria Rodriguez'])
     carrier: str = Field(..., examples=['Athene'])

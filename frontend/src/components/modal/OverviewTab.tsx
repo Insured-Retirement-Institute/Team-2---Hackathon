@@ -188,37 +188,47 @@ export function OverviewTab({
       <Separator />
 
       {/* Policy Features */}
-      <div>
-        <h4 className="font-bold text-slate-900 mb-4">
-          Complete Policy Details
-        </h4>
-        <div className="grid grid-cols-2 gap-4">
-          <FeatureSection
-            title="Features"
-            icon={Star}
-            items={features.features}
-            color="blue"
-          />
-          <FeatureSection
-            title="Benefits"
-            icon={Shield}
-            items={features.benefits}
-            color="green"
-          />
-          <FeatureSection
-            title="Riders"
-            icon={FileText}
-            items={features.riders}
-            color="purple"
-          />
-          <FeatureSection
-            title="Limitations"
-            icon={Lock}
-            items={features.limitations}
-            color="amber"
-          />
+      {features && (
+        <div>
+          <h4 className="font-bold text-slate-900 mb-4">
+            Complete Policy Details
+          </h4>
+          <div className="grid grid-cols-2 gap-4">
+            {features.features && (
+              <FeatureSection
+                title="Features"
+                icon={Star}
+                items={features.features}
+                color="blue"
+              />
+            )}
+            {features.benefits && (
+              <FeatureSection
+                title="Benefits"
+                icon={Shield}
+                items={features.benefits}
+                color="green"
+              />
+            )}
+            {features.riders && (
+              <FeatureSection
+                title="Riders"
+                icon={FileText}
+                items={features.riders}
+                color="purple"
+              />
+            )}
+            {features.limitations && (
+              <FeatureSection
+                title="Limitations"
+                icon={Lock}
+                items={features.limitations}
+                color="amber"
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Next Button */}
       {onNext && (

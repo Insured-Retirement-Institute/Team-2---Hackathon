@@ -145,11 +145,11 @@ export function AlertDetailPage() {
 
   const {
     alert,
-    clientAlerts,
+    clientAlerts = [],
     policyData,
-    disclosureItems,
-    transactionOptions,
-    auditLog,
+    disclosureItems = [],
+    transactionOptions = [],
+    auditLog = [],
   } = detail;
 
   return (
@@ -200,7 +200,11 @@ export function AlertDetailPage() {
         {/* Left: Policy Summary */}
         <div className="w-[400px] border-r border-slate-200 bg-slate-50 shrink-0 overflow-y-auto">
           <div className="p-6">
-            <PolicySummary policy={policyData} />
+            {policyData ? (
+              <PolicySummary policy={policyData} />
+            ) : (
+              <div className="text-sm text-slate-500">Loading policy data...</div>
+            )}
           </div>
         </div>
 
@@ -208,7 +212,7 @@ export function AlertDetailPage() {
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Banners */}
           <div className="px-8 pt-6 space-y-3">
-            {policyData.isMinRateRenewal && (
+            {policyData?.isMinRateRenewal && (
               <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <AlertTriangle className="h-5 w-5 text-red-600 shrink-0" />
                 <span className="text-sm text-red-800 font-medium">
@@ -239,7 +243,7 @@ export function AlertDetailPage() {
                 <OverviewTab
                   alert={alert}
                   clientAlerts={clientAlerts}
-                  features={policyData.features}
+                  features={policyData?.features}
                   onEditProfile={() => {
                     setEditingProfile(true);
                     setActiveTab("compare");
@@ -314,16 +318,16 @@ export function AlertDetailPage() {
                     <div key={idx} className="px-6 py-3 hover:bg-slate-50">
                       <div className="flex items-center justify-between text-xs mb-1">
                         <span className="text-slate-600 font-mono">
-                          {log.timestamp}
+                          {log.timestamp || "N/A"}
                         </span>
-                        <span className="text-slate-500">{log.user}</span>
+                        <span className="text-slate-500">{log.user || "System"}</span>
                       </div>
                       <div className="text-sm">
                         <span className="font-semibold text-slate-900">
-                          {log.action}
+                          {log.action || "Action"}
                         </span>
                         <span className="text-slate-600 ml-2">
-                          — {log.details}
+                          — {log.details || "No details"}
                         </span>
                       </div>
                     </div>
