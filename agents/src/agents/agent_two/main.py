@@ -50,7 +50,9 @@ from agents.db_reader import get_current_database_context as fetch_db_context
 from agents.recommendations import generate_recommendations
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 
-_API_BASE = os.environ.get("API_BASE_URL", "http://localhost:8000")
+_API_BASE = os.environ.get("API_BASE_URL", "")
+if not _API_BASE:
+    raise RuntimeError("API_BASE_URL environment variable is required but not set")
 
 
 def _api_get(path: str) -> list | dict:
@@ -247,12 +249,21 @@ def _build_best_interest_and_eapp(
 
 
 def _get_sureify_context(customer_identifier: str) -> dict:
-    """Fetch context from passthrough APIs (policy, product, suitability, client) and alerts."""
+    """Fetch context from passthrough APIs and the client profile endpoint."""
     policies = _api_get("/passthrough/policy-data")
     products = _api_get("/passthrough/product-options")
-    suitability_data = _api_get("/passthrough/suitability-data")
-    client_profiles = _api_get("/passthrough/client-profiles")
     alerts = _api_get("/api/alerts")
+
+    # Fetch structured client profile (DB-first with Sureify fallback)
+    try:
+        client_profile = _api_get(f"/api/clients/{customer_identifier}/profile")
+    except Exception:
+        logger.warning("Failed to fetch client profile for %s, falling back to empty", customer_identifier)
+        client_profile = {}
+
+    # Extract suitability from profile response for backward compatibility
+    suitability_data = client_profile.get("suitability") or {}
+
     notifications_by_policy: dict[str, list] = {}
     for a in alerts:
         pid = a.get("policyId") or a.get("policy_id") or ""
@@ -263,7 +274,7 @@ def _get_sureify_context(customer_identifier: str) -> dict:
         "sureify_notifications_by_policy": notifications_by_policy,
         "sureify_products": products,
         "sureify_suitability_data": suitability_data,
-        "sureify_client_profiles": client_profiles,
+        "client_profile": client_profile,
     }
 
 
@@ -271,21 +282,23 @@ def _get_sureify_context(customer_identifier: str) -> dict:
 def get_current_database_context(client_id: str = "") -> str:
     """
     Read all current information: from the database (clients, suitability profiles,
-    contract_summary, products) and from Sureify Puddle Data API (policyData, productOption,
-    suitabilityData, clientProfile; notifications if available).
-    client_id: optional; used for DB contract_summary filter and as Sureify UserID.
+    contract_summary, products) and from the API server (policies, products,
+    client profile with suitability, notifications).
+    client_id: optional; used for DB contract_summary filter and client profile lookup.
     Returns JSON with keys: clients, client_suitability_profiles, contract_summary, products,
     sureify_policies, sureify_notifications_by_policy, sureify_products,
-    sureify_suitability_data, sureify_client_profiles.
+    sureify_suitability_data, client_profile.
     """
     ctx = fetch_db_context(client_id or None)
-    sureify_id = (client_id or "").strip() or "1001"
-    sureify = _get_sureify_context(sureify_id)
+    cid = (client_id or "").strip()
+    if not cid:
+        logger.warning("get_current_database_context called without client_id")
+    sureify = _get_sureify_context(cid or "unknown")
     ctx["sureify_policies"] = sureify["sureify_policies"]
     ctx["sureify_notifications_by_policy"] = sureify["sureify_notifications_by_policy"]
     ctx["sureify_products"] = sureify["sureify_products"]
     ctx["sureify_suitability_data"] = sureify["sureify_suitability_data"]
-    ctx["sureify_client_profiles"] = sureify["sureify_client_profiles"]
+    ctx["client_profile"] = sureify["client_profile"]
     return json.dumps(ctx, default=str, indent=2)
 
 
@@ -352,13 +365,13 @@ def generate_product_recommendations(
         return json.dumps({"error": "Invalid changes shape", "message": str(e)})
 
     db_context = fetch_db_context(client_id)
-    sureify_id = (client_id or "").strip() or "1001"
-    sureify = _get_sureify_context(sureify_id)
+    cid = (client_id or "").strip() or "unknown"
+    sureify = _get_sureify_context(cid)
     db_context["sureify_policies"] = sureify["sureify_policies"]
     db_context["sureify_notifications_by_policy"] = sureify["sureify_notifications_by_policy"]
     db_context["sureify_products"] = sureify["sureify_products"]
     db_context["sureify_suitability_data"] = sureify["sureify_suitability_data"]
-    db_context["sureify_client_profiles"] = sureify["sureify_client_profiles"]
+    db_context["client_profile"] = sureify["client_profile"]
 
     # Persist front-end client profile when new or as update (upsert)
     if changes.client_profile or changes.suitability:

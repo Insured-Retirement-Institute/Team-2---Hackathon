@@ -10,9 +10,14 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/admin", tags=["Admin Operations"])
 
+_AGENTS_URL = os.environ.get("AGENTS_URL", "")
+if not _AGENTS_URL:
+    import logging
+    logging.getLogger(__name__).warning("AGENTS_URL environment variable is not set; admin endpoints will fail")
+
 
 class TriggerAlertsRequest(BaseModel):
-    customer_identifier: str = "Marty McFly"
+    customer_identifier: str
 
 
 class TriggerAlertsResponse(BaseModel):
@@ -51,7 +56,9 @@ async def trigger_alerts_generation(request: TriggerAlertsRequest):
             "errors": null
         }
     """
-    agents_url = os.environ.get("AGENTS_URL", "http://agents:80")
+    agents_url = os.environ.get("AGENTS_URL", "")
+    if not agents_url:
+        raise HTTPException(status_code=503, detail="AGENTS_URL environment variable is not configured")
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -90,7 +97,9 @@ async def check_agents_health() -> dict[str, Any]:
 
     Returns the health status and available endpoints from the agents service.
     """
-    agents_url = os.environ.get("AGENTS_URL", "http://agents:80")
+    agents_url = os.environ.get("AGENTS_URL", "")
+    if not agents_url:
+        return {"agents_service": "unconfigured", "agents_url": "(not set)", "error": "AGENTS_URL not set"}
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:

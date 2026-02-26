@@ -1,5 +1,5 @@
 """
-Strands agent: Sureify book of business for Marty McFly.
+Strands agent: Sureify book of business scanner.
 
 Scans Sureify passthrough APIs via the API server, lists all policies as JSON
 using frontend-relevant shapes, applies business logic (replacements, data
@@ -9,7 +9,7 @@ result to /api/alerts.
 Run from repo root: PYTHONPATH=. uv run python -m agents.agent_one
 
 Environment:
-  API_BASE_URL (default http://localhost:8000): API server with passthrough + alerts.
+  API_BASE_URL (required): API server with passthrough + alerts.
   IRI_API_BASE_URL: Optional IRI API for alerts/dashboard/compare/action.
 """
 
@@ -60,7 +60,9 @@ from agents.logic import RENEWAL_NOTIFICATION_DAYS, apply_business_logic
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.schemas import BookOfBusinessOutput, PolicyNotification, PolicyOutput
 
-_API_BASE = _os.environ.get("API_BASE_URL", "http://localhost:8000")
+_API_BASE = _os.environ.get("API_BASE_URL", "")
+if not _API_BASE:
+    raise RuntimeError("API_BASE_URL environment variable is required but not set")
 
 
 def _api_get(path: str) -> list | dict:
@@ -326,7 +328,7 @@ BOOK_OF_BUSINESS_SYSTEM_PROMPT = """You are an assistant that scans the Sureify 
 - **Products:** `get_puddle_product_options` and `get_puddle_visualization_products` for product options and comparison/chart data.
 - **Clients:** `get_puddle_client_profiles` for client profiles and comparison parameters.
 
-Your main task is to produce the **book of business** for **Marty McFly** (or the customer identifier you are given):
+Your main task is to produce the **book of business** for the customer identifier you are given:
 1. Use `get_book_of_business_with_notifications_and_flags` to get policies with business logic flags (replacement_opportunity, data_quality_issues, income_activation_eligible, schedule_meeting, etc.) and POST the result as alerts.
 2. Optionally use the passthrough tools above when the user asks for suitability, disclosures, product options, visualization data, or client profiles.
 3. Output the full JSON with "customer_identifier" and "policies" array; the frontend consumes this as-is.
@@ -370,93 +372,123 @@ def create_agent() -> Agent:
 
 def _emit_agent_one_event(
     run_id: str,
+    client_id: str,
     input_summary: dict,
     success: bool,
     error_message: str | None = None,
     explanation_summary: str | None = None,
+    data_sources_used: list[str] | None = None,
+    payload_ref: str | None = None,
 ) -> None:
     event = AgentRunEvent(
         event_id=str(uuid.uuid4()),
         timestamp=datetime.now(timezone.utc).isoformat(),
         agent_id=AgentId.agent_one,
         run_id=run_id,
-        client_id_scope="Marty McFly",
+        client_id_scope=client_id,
         input_summary=input_summary,
         success=success,
         error_message=error_message,
         explanation_summary=explanation_summary,
+        data_sources_used=data_sources_used,
         input_validation_passed=True,
         guardrail_triggered=None,
+        payload_ref=payload_ref,
     )
     persist_event(event)
 
 
 def main() -> None:
+    import argparse
     import os
+    parser = argparse.ArgumentParser(description="AgentOne: book of business scanner")
+    parser.add_argument("--client-id", type=str, default="", help="Client/customer identifier")
+    args = parser.parse_args()
+
+    customer_id = args.client_id or os.environ.get("CLIENT_ID", "")
+    if not customer_id:
+        parser.error("--client-id is required (or set CLIENT_ID env var)")
+
     run_id = str(uuid.uuid4())
+    _data_sources = ["sureify_policy_data", "business_logic"]
+
     if os.environ.get("SUREIFY_AGENT_SCHEMA_ONLY"):
         print(get_book_of_business_json_schema())
         _emit_agent_one_event(
             run_id,
-            {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_json_schema"]},
+            customer_id,
+            {"customer_identifier_scope": customer_id, "tools_used": ["get_book_of_business_json_schema"]},
             True,
             explanation_summary="JSON schema returned",
+            data_sources_used=["json_schema"],
         )
         return
     if os.environ.get("SUREIFY_AGENT_TOOL_ONLY"):
         try:
-            json_out = get_book_of_business_with_notifications_and_flags("Marty McFly")
+            json_out = get_book_of_business_with_notifications_and_flags(customer_id)
             print(json_out)
             _emit_agent_one_event(
                 run_id,
-                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
+                customer_id,
+                {"customer_identifier_scope": customer_id, "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
                 True,
                 explanation_summary="Book of business produced with notifications and flags",
+                data_sources_used=_data_sources,
             )
         except Exception as e:
             _emit_agent_one_event(
                 run_id,
-                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
+                customer_id,
+                {"customer_identifier_scope": customer_id, "tools_used": ["get_book_of_business_with_notifications_and_flags"]},
                 False,
                 error_message=str(e),
+                data_sources_used=_data_sources,
             )
             raise
         return
     if os.environ.get("SUREIFY_AGENT_IRI_ONLY"):
         try:
-            print(get_book_of_business_as_iri_alerts("Marty McFly"))
+            print(get_book_of_business_as_iri_alerts(customer_id))
             _emit_agent_one_event(
                 run_id,
-                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_as_iri_alerts"]},
+                customer_id,
+                {"customer_identifier_scope": customer_id, "tools_used": ["get_book_of_business_as_iri_alerts"]},
                 True,
                 explanation_summary="Book of business as IRI alerts",
+                data_sources_used=_data_sources + ["iri_alerts_format"],
             )
         except Exception as e:
             _emit_agent_one_event(
                 run_id,
-                {"customer_identifier_scope": "Marty McFly", "tools_used": ["get_book_of_business_as_iri_alerts"]},
+                customer_id,
+                {"customer_identifier_scope": customer_id, "tools_used": ["get_book_of_business_as_iri_alerts"]},
                 False,
                 error_message=str(e),
+                data_sources_used=_data_sources,
             )
             raise
         return
     try:
         agent = create_agent()
-        user_message = "Produce the book of business for Marty McFly. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
+        user_message = f"Produce the book of business for {customer_id}. List all policies as JSON with notifications and which ones should have a scheduled meeting with the customer."
         result = agent(user_message)
         print(result.get("output", result) if isinstance(result, dict) else result)
         _emit_agent_one_event(
             run_id,
-            {"customer_identifier_scope": "Marty McFly", "tools_used": ["agent_run"]},
+            customer_id,
+            {"customer_identifier_scope": customer_id, "tools_used": ["agent_run"]},
             True,
             explanation_summary="Book of business produced with notifications and flags",
+            data_sources_used=_data_sources,
         )
     except Exception as e:
         _emit_agent_one_event(
             run_id,
-            {"customer_identifier_scope": "Marty McFly", "tools_used": ["agent_run"]},
+            customer_id,
+            {"customer_identifier_scope": customer_id, "tools_used": ["agent_run"]},
             False,
             error_message=str(e),
+            data_sources_used=_data_sources,
         )
         raise
 
