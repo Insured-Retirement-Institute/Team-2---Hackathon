@@ -83,7 +83,7 @@ class HealthResponse(BaseModel):
 
 
 class AgentOneRequest(BaseModel):
-    customer_identifier: str = "Marty McFly"
+    customer_identifier: str
     format: str = "book_of_business"  # "book_of_business" or "iri_alerts"
     use_llm: bool = False
     message: str | None = None
@@ -95,7 +95,7 @@ class AgentOneResponse(BaseModel):
 
 
 class CreateAlertsRequest(BaseModel):
-    customer_identifier: str = "Marty McFly"
+    customer_identifier: str
 
 
 class CreateAlertsResponse(BaseModel):
@@ -106,11 +106,11 @@ class CreateAlertsResponse(BaseModel):
 
 
 class AgentTwoContextRequest(BaseModel):
-    client_id: str = "Marty McFly"
+    client_id: str
 
 
 class AgentTwoRecommendationsRequest(BaseModel):
-    client_id: str = "Marty McFly"
+    client_id: str
     changes_json: str = "{}"
     alert_id: str = ""
     use_llm: bool = False
@@ -129,7 +129,7 @@ class AgentThreeConversationTurn(BaseModel):
 class AgentThreeChatRequest(BaseModel):
     screen: str = "dashboard"  # "dashboard", "product_comparison", "elsewhere"
     message: str
-    client_id: str = "Marty McFly"
+    client_id: str
     changes_json: str | None = None
     alert_id: str = ""
     location_in_experience: str | None = None

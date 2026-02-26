@@ -33,7 +33,7 @@ class ChatRequest(BaseModel):
     )
     user_message: str = Field(..., description="What the user said or asked")
     client_id: str = Field(
-        default="Marty McFly",
+        ...,
         description="Client identifier; used when calling agentTwo for context or recommendations",
     )
     changes_json: str | None = Field(

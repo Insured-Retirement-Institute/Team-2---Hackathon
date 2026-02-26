@@ -12,7 +12,7 @@ from api.sureify_client import SureifyClient, SureifyAuthConfig
 
 import api.routers.profiles as profiles_module
 
-AGENTS_URL = os.environ.get("AGENTS_URL", "http://agents:8000")
+AGENTS_URL = os.environ.get("AGENTS_URL", "")
 
 router = APIRouter(prefix="/api/alerts", tags=["Compare"])
 
@@ -125,6 +125,9 @@ async def run_comparison(alert_id: str):
         await profiles_module.get_client_profile(client_id, sureify)
     finally:
         await sureify.close()
+
+    if not AGENTS_URL:
+        raise HTTPException(status_code=503, detail="AGENTS_URL environment variable is not configured")
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:

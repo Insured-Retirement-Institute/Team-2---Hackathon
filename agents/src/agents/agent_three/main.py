@@ -44,12 +44,12 @@ from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 
 
 @tool
-def get_recommendation_context(client_id: str = "Marty McFly") -> str:
+def get_recommendation_context(client_id: str = "") -> str:
     """
     Get current context for opportunities: DB + Sureify (clients, suitability profiles,
     contracts, products, policies, notifications). Call this when the user asks about
     their data, current products, or context before opportunities.
-    client_id: client identifier (e.g. "Marty McFly").
+    client_id: client identifier.
     """
     return get_current_database_context(client_id)
 
@@ -57,7 +57,7 @@ def get_recommendation_context(client_id: str = "Marty McFly") -> str:
 @tool
 def get_product_recommendations_and_explanation(
     changes_json: str,
-    client_id: str = "Marty McFly",
+    client_id: str = "",
     alert_id: str = "",
 ) -> str:
     """
@@ -162,7 +162,7 @@ def _format_conversation_history_as_string(
 def run_chat(
     screen_state: ScreenState | str,
     user_message: str,
-    client_id: str = "Marty McFly",
+    client_id: str = "",
     changes_json: str | None = None,
     alert_id: str = "",
     location_in_experience: str | None = None,
@@ -182,6 +182,10 @@ def run_chat(
             screen_state = ScreenState.elsewhere
     run_id = str(uuid.uuid4())
     timestamp = datetime.now(timezone.utc).isoformat()
+    agent_two_invoked = False
+    agent_two_summary: str | None = None
+    data_sources: list[str] = []
+
     input_summary = {
         "screen_state": screen_state.value,
         "client_id_scope": client_id,
@@ -199,6 +203,25 @@ def run_chat(
         else:
             result = agent(current_turn)
         reply = result.get("output", result) if isinstance(result, dict) else str(result)
+
+        # Detect if agentTwo tools were invoked by inspecting tool usage
+        if isinstance(result, dict):
+            messages = result.get("messages") or result.get("tool_results") or []
+            for msg in messages if isinstance(messages, list) else []:
+                tool_name = ""
+                if isinstance(msg, dict):
+                    tool_name = msg.get("tool_name") or msg.get("name") or ""
+                if tool_name in ("get_recommendation_context", "get_product_recommendations_and_explanation"):
+                    agent_two_invoked = True
+                    if tool_name == "get_recommendation_context":
+                        data_sources.append("agent_two_context")
+                    else:
+                        data_sources.append("agent_two_recommendations")
+                        agent_two_summary = "Product recommendations and explanation generated"
+
+        input_summary["agent_two_invoked"] = agent_two_invoked
+        explanation = agent_two_summary or "Chat reply generated"
+
         persist_event(
             AgentRunEvent(
                 event_id=str(uuid.uuid4()),
@@ -208,7 +231,8 @@ def run_chat(
                 client_id_scope=client_id,
                 input_summary=input_summary,
                 success=True,
-                explanation_summary="Chat reply generated",
+                explanation_summary=explanation,
+                data_sources_used=data_sources if data_sources else None,
                 input_validation_passed=True,
                 guardrail_triggered=None,
             )
@@ -216,8 +240,8 @@ def run_chat(
         return ChatResponse(
             reply=reply,
             screen_state=screen_state,
-            agent_two_invoked=False,
-            agent_two_summary=None,
+            agent_two_invoked=agent_two_invoked,
+            agent_two_summary=agent_two_summary,
             storable_payload=None,
         )
     except Exception as e:
@@ -232,6 +256,7 @@ def run_chat(
                 input_summary=input_summary,
                 success=False,
                 error_message=str(e),
+                data_sources_used=data_sources if data_sources else None,
                 input_validation_passed=True,
                 guardrail_triggered=None,
             )
@@ -241,7 +266,7 @@ def run_chat(
 
 def run_interactive(
     screen_state: ScreenState | str = "elsewhere",
-    client_id: str = "Marty McFly",
+    client_id: str = "",
     changes_json: str | None = None,
     alert_id: str = "",
     location_in_experience: str | None = None,
@@ -291,7 +316,7 @@ def main() -> None:
     parser.add_argument("--screen", type=str, default="elsewhere", choices=["dashboard", "product_comparison", "elsewhere"], help="Current screen state")
     parser.add_argument("--message", type=str, help="User message (omit for interactive mode with --interactive)")
     parser.add_argument("--interactive", action="store_true", help="Run an interactive conversation (read messages from stdin)")
-    parser.add_argument("--client-id", type=str, default="Marty McFly", help="Client identifier for agentTwo")
+    parser.add_argument("--client-id", type=str, required=True, help="Client identifier for agentTwo")
     parser.add_argument("--changes", type=str, help="Path to JSON file with suitability/clientGoals/clientProfile (optional)")
     parser.add_argument("--alert-id", type=str, default="", help="Optional IRI alert ID")
     parser.add_argument("--location", type=str, default="", dest="location_in_experience", help="Where the customer is in the experience (e.g. viewing_alert_123)")
