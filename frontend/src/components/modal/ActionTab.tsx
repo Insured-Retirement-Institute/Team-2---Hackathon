@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type {
   SuitabilityData,
   DisclosureItem,
   TransactionOption,
 } from "@/types/alert-detail";
+import { generateAISummary } from "@/api/suitability";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -92,9 +93,22 @@ export function ActionTab({
   const [selectedTransaction, setSelectedTransaction] = useState<number | null>(
     null,
   );
+  const [aiSummary, setAiSummary] = useState<string>("");
+  const [loadingSummary, setLoadingSummary] = useState(false);
 
-  // Auto-generate summary from suitability data
-  const aiSummary = `Based on the client's ${suitabilityData.riskTolerance.toLowerCase()} risk tolerance and ${suitabilityData.timeHorizon.toLowerCase()} time horizon, this transaction aligns with their stated objectives: ${suitabilityData.clientObjectives}. The client's liquidity needs (${suitabilityData.liquidityNeeds.toLowerCase()}) and tax considerations (${suitabilityData.taxConsiderations}) support this recommendation. This product provides the guaranteed income features the client desires while maintaining appropriate surrender timeline flexibility.`;
+  // Fetch AI summary when suitability data changes
+  useEffect(() => {
+    if (suitabilityData && transactionId) {
+      setLoadingSummary(true);
+      generateAISummary(transactionId, suitabilityData)
+        .then(setAiSummary)
+        .catch((err) => {
+          console.error("Failed to generate AI summary:", err);
+          setAiSummary("Unable to generate summary at this time.");
+        })
+        .finally(() => setLoadingSummary(false));
+    }
+  }, [suitabilityData, transactionId]);
 
   const updateField = (
     field: keyof SuitabilityData,
