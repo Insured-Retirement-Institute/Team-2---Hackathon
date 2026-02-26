@@ -257,3 +257,56 @@ async def get_users(
     keycard: Annotated[str | None, Query()] = None,
 ) -> list[User]:
     return await client.get_users(user_id, persona, keycard)
+
+
+# --- Puddle Data API (suitabilityData, disclosureItem, productOption, visualizationProduct, clientProfile) ---
+
+
+@router.get("/suitability-data")
+async def get_suitability_data(
+    client: SureifyClientDep,
+    user_id: Annotated[str | None, Query()] = None,
+    persona: Annotated[Persona | None, Query()] = None,
+    keycard: Annotated[str | None, Query()] = None,
+) -> list[dict]:
+    return await client.get_suitability_data(user_id, persona, keycard)
+
+
+@router.get("/disclosure-items")
+async def get_disclosure_items(
+    client: SureifyClientDep,
+    user_id: Annotated[str | None, Query()] = None,
+    persona: Annotated[Persona | None, Query()] = None,
+    keycard: Annotated[str | None, Query()] = None,
+) -> list[dict]:
+    return await client.get_disclosure_items(user_id, persona, keycard)
+
+
+@router.get("/product-options")
+async def get_product_options(
+    client: SureifyClientDep,
+    user_id: Annotated[str | None, Query()] = None,
+    persona: Annotated[Persona | None, Query()] = None,
+    keycard: Annotated[str | None, Query()] = None,
+) -> list[dict]:
+    return await client.get_product_options(user_id, persona, keycard)
+
+
+@router.get("/visualization-products")
+async def get_visualization_products(
+    client: SureifyClientDep,
+    user_id: Annotated[str | None, Query()] = None,
+    persona: Annotated[Persona | None, Query()] = None,
+    keycard: Annotated[str | None, Query()] = None,
+) -> list[dict]:
+    return await client.get_visualization_products(user_id, persona, keycard)
+
+
+@router.get("/client-profiles")
+async def get_client_profiles(
+    client: SureifyClientDep,
+    user_id: Annotated[str | None, Query()] = None,
+    persona: Annotated[Persona | None, Query()] = None,
+    keycard: Annotated[str | None, Query()] = None,
+) -> list[dict]:
+    return await client.get_client_profiles(user_id, persona, keycard)

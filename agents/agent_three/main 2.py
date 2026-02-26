@@ -2,10 +2,16 @@
 AgentThree: chatbot that uses the user's current screen state (dashboard, product comparison,
 or elsewhere) as context.
 
-**Data source:** AgentThree does not call the API or Sureify directly. All product data,
+**Sureify / API:** AgentThree does not call Sureify or the API directly. All product data,
 opportunities, and explainability come from **agentTwo** (the domain agent for product
-comparisons and opportunity explainability). AgentTwo uses the API passthrough
-(passthrough APIs) so AgentThree gets up-to-date data via agentTwo.
+comparisons and opportunity explainability). AgentTwo uses the shared Sureify client
+(agents.sureify_client → api Sureify client), so AgentThree always gets up-to-date
+product and opportunity data via agentTwo.
+
+**Sureify spec:** The Sureify Puddle Data API used by this agent is defined in
+**agents/sureify.yaml** (canonical spec). When SUREIFY_BASE_URL is not set, the base URL
+is taken from that file so this agent uses the latest spec. Keep agents/sureify.yaml in
+sync with the hackathon/Sureify API.
 
 **Product comparisons & explainability:** When the user asks about opportunities, "why did
 you show me this?", or product comparisons, AgentThree must call the agentTwo tools
@@ -17,7 +23,6 @@ Run from repo root: PYTHONPATH=. uv run python -m agents.agent_three
 
 from __future__ import annotations
 
-import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -37,8 +42,6 @@ if _env_file.exists():
 
 from strands import Agent, tool
 
-_API_BASE = os.environ.get("API_BASE_URL", "http://k8s-default-hack2fut-959780892e-989138425.us-east-1.elb.amazonaws.com/api").rstrip("/")
-
 from agents.agent_three_schemas import ChatRequest, ChatResponse, ConversationTurn, ScreenState
 from agents.agent_two import generate_product_recommendations, get_current_database_context
 from agents.audit_writer import persist_event
@@ -46,12 +49,12 @@ from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 
 
 @tool
-def get_recommendation_context(client_id: str = "1001") -> str:
+def get_recommendation_context(client_id: str = "Marty McFly") -> str:
     """
     Get current context for opportunities: DB + Sureify (clients, suitability profiles,
     contracts, products, policies, notifications). Call this when the user asks about
     their data, current products, or context before opportunities.
-    client_id: client identifier (Sureify UserID; use 1001 for hackathon API).
+    client_id: client identifier (e.g. "Marty McFly").
     """
     return get_current_database_context(client_id)
 
@@ -59,7 +62,7 @@ def get_recommendation_context(client_id: str = "1001") -> str:
 @tool
 def get_product_recommendations_and_explanation(
     changes_json: str,
-    client_id: str = "1001",
+    client_id: str = "Marty McFly",
     alert_id: str = "",
 ) -> str:
     """
@@ -163,7 +166,7 @@ def _format_conversation_history_as_string(
 def run_chat(
     screen_state: ScreenState | str,
     user_message: str,
-    client_id: str = "1001",
+    client_id: str = "Marty McFly",
     changes_json: str | None = None,
     alert_id: str = "",
     location_in_experience: str | None = None,
@@ -239,7 +242,7 @@ def run_chat(
 
 def run_interactive(
     screen_state: ScreenState | str = "elsewhere",
-    client_id: str = "1001",
+    client_id: str = "Marty McFly",
     changes_json: str | None = None,
     alert_id: str = "",
     location_in_experience: str | None = None,
@@ -289,7 +292,7 @@ def main() -> None:
     parser.add_argument("--screen", type=str, default="elsewhere", choices=["dashboard", "product_comparison", "elsewhere"], help="Current screen state")
     parser.add_argument("--message", type=str, help="User message (omit for interactive mode with --interactive)")
     parser.add_argument("--interactive", action="store_true", help="Run an interactive conversation (read messages from stdin)")
-    parser.add_argument("--client-id", type=str, default="1001", help="Client identifier (Sureify UserID; use 1001 for hackathon API)")
+    parser.add_argument("--client-id", type=str, default="Marty McFly", help="Client identifier for agentTwo")
     parser.add_argument("--changes", type=str, help="Path to JSON file with suitability/clientGoals/clientProfile (optional)")
     parser.add_argument("--alert-id", type=str, default="", help="Optional IRI alert ID")
     parser.add_argument("--location", type=str, default="", dest="location_in_experience", help="Where the customer is in the experience (e.g. viewing_alert_123)")

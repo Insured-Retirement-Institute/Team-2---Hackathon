@@ -1,0 +1,33 @@
+{
+  "suitability": {
+    "riskTolerance": "Conservative",
+    "timeHorizon": "5-10 years",
+    "liquidityNeeds": "Low -- has separate emergency fund covering 12 months of expenses",
+    "clientObjectives": "Supplement Social Security with guaranteed income; preserve assets for estate"
+  },
+  "clientGoals": {
+    "financialObjectives": "Supplement Social Security with guaranteed income; preserve assets for estate",
+    "distributionPlan": "Systematic withdrawals beginning at age 67",
+    "ownedAssets": "Primary residence (paid off), 401(k), Roth IRA, existing fixed annuity",
+    "timeToFirstDistribution": "5 years",
+    "expectedHoldingPeriod": "10+ years",
+    "sourceOfFunds": "1035 exchange from existing annuity and savings account",
+    "employmentStatus": "Employed full-time, plans to retire in 5 years"
+  },
+  "clientProfile": {
+    "residesInNursingHome": "no",
+    "hasLongTermCareInsurance": "yes",
+    "hasMedicareSupplemental": "yes",
+    "grossIncome": "85000",
+    "disposableIncome": "45000",
+    "taxBracket": "22%",
+    "householdLiquidAssets": "250000",
+    "monthlyLivingExpenses": "4500",
+    "totalAnnuityValue": "180000",
+    "householdNetWorth": "650000",
+    "anticipateExpenseIncrease": "no",
+    "anticipateIncomeDecrease": "yes",
+    "anticipateLiquidAssetDecrease": "no",
+    "applyToMeansTestedBenefits": "no"
+  }
+}

@@ -52,11 +52,11 @@ class AgentOneResponse(BaseModel):
 
 
 class AgentTwoContextRequest(BaseModel):
-    client_id: str = "1001"
+    client_id: str = "Marty McFly"
 
 
 class AgentTwoRecommendationsRequest(BaseModel):
-    client_id: str = "1001"
+    client_id: str = "Marty McFly"
     changes_json: str = "{}"
     alert_id: str = ""
     use_llm: bool = False
@@ -75,7 +75,7 @@ class AgentThreeConversationTurn(BaseModel):
 class AgentThreeChatRequest(BaseModel):
     screen: str = "dashboard"  # "dashboard", "product_comparison", "elsewhere"
     message: str
-    client_id: str = "1001"
+    client_id: str = "Marty McFly"
     changes_json: str | None = None
     alert_id: str = ""
     location_in_experience: str | None = None

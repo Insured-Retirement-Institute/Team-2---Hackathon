@@ -13,9 +13,6 @@ import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
-
-import httpx
 
 _repo_root = Path(__file__).resolve().parent.parent.parent
 if str(_repo_root) not in sys.path:
@@ -49,91 +46,11 @@ from agents.audit_writer import (
 from agents.db_reader import get_current_database_context as fetch_db_context
 from agents.recommendations import generate_recommendations
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
-_API_BASE = os.environ.get("API_BASE_URL", "http://k8s-default-hack2fut-959780892e-989138425.us-east-1.elb.amazonaws.com/api").rstrip("/")
-_USER_ID_DEFAULT = "1001"
-
-
-def _resolve_user_id(customer_identifier: str | None) -> str:
-    raw = (customer_identifier or "").strip()
-    key = raw.lower().replace(" ", "").replace("-", "").replace("_", "")
-    if key in ("1001", "martymcfly", "marty_mcfly", "marty", "janedoe", "jane_doe", "jane", "johnsmith", "john_smith", "john", ""):
-        return _USER_ID_DEFAULT
-    return raw
-
-
-def _passthrough_get(path: str, params: dict[str, str] | None = None) -> list[Any] | dict[str, Any]:
-    url = f"{_API_BASE}/passthrough{path}"
-    try:
-        with httpx.Client(timeout=60.0) as client:
-            r = client.get(url, params=params or {})
-            r.raise_for_status()
-            data = r.json()
-            return data if isinstance(data, (list, dict)) else {}
-    except Exception as e:
-        print(f"[agent_two] GET {path} failed: {type(e).__name__}: {e}", file=sys.stderr)
-        return []
-
-
-def _normalize_policies(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out = []
-    for p in data:
-        if p.get("ID") is not None and not isinstance(p.get("ID"), str):
-            p = {**p, "ID": str(p["ID"])}
-        out.append(p)
-    return out
-
-
-def _policy_id_from_value(val: Any) -> str | None:
-    if val is None:
-        return None
-    if isinstance(val, str):
-        return val
-    if isinstance(val, dict):
-        return val.get("root") or val.get("__root__")
-    return str(val)
-
-
-def _normalize_notes_to_notifications(data: list[dict], policy_ids: list[str]) -> dict[str, list[dict]]:
-    result: dict[str, list[dict]] = {pid: [] for pid in policy_ids}
-    for note in data:
-        pid = _policy_id_from_value(note.get("policyID") if isinstance(note, dict) else None)
-        if pid and pid in result:
-            msg = (note.get("title") or note.get("content") or "Note") if isinstance(note, dict) else "Note"
-            result[pid].append({"type": "note", "message": msg, "severity": "info"})
-    return result
-
-
-def _normalize_product_options(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out = []
-    for p in data:
-        product_id = str(p.get("productId") or p.get("ID") or p.get("productCode") or "")
-        name = str(p.get("name") or "Unknown")
-        carrier = str(p.get("carrier") or p.get("carrierCode") or "")
-        rate = p.get("rate")
-        if rate is None and p.get("attributes"):
-            for a in p.get("attributes") or []:
-                if isinstance(a, dict) and (a.get("name") or a.get("key") or "").lower() == "rate":
-                    rate = a.get("value") or a.get("val")
-                    break
-        if rate is None:
-            rate = "N/A"
-        if rate != "N/A" and isinstance(rate, (int, float)):
-            rate = f"{rate}%"
-        attrs = p.get("attributes") or []
-        attr_map = {}
-        for a in attrs:
-            if isinstance(a, dict):
-                k = (a.get("name") or a.get("key") or "").strip().lower()
-                if k:
-                    attr_map[k] = a.get("value") or a.get("val")
-        risk_profile = attr_map.get("riskprofile") or attr_map.get("risk_profile")
-        out.append({
-            "product_id": product_id, "name": name, "carrier": carrier, "rate": rate,
-            "term": p.get("term"), "surrenderPeriod": p.get("surrenderPeriod"),
-            "freeWithdrawal": p.get("freeWithdrawal"), "guaranteedMinRate": p.get("guaranteedMinRate"),
-            "risk_profile": risk_profile, "attributes_map": attr_map, "states": p.get("states"),
-        })
-    return out
+from agents.sureify_client import get_book_of_business as fetch_sureify_policies
+from agents.sureify_client import get_client_profiles as fetch_sureify_client_profiles
+from agents.sureify_client import get_notifications_for_policies as fetch_sureify_notifications
+from agents.sureify_client import get_products as fetch_sureify_products
+from agents.sureify_client import get_suitability_data as fetch_sureify_suitability_data
 
 
 def _client_profile_characteristics(merged: dict) -> list[str]:
@@ -323,21 +240,14 @@ def _build_best_interest_and_eapp(
 
 
 def _get_sureify_context(customer_identifier: str) -> dict:
-    """Fetch context via passthrough APIs: policies, notes, product-options, suitability-data, client-profiles."""
-    uid = _resolve_user_id(customer_identifier)
-    params = {"user_id": uid, "persona": "agent"}
-    raw_policies = _passthrough_get("/policies", params)
-    policies = _normalize_policies(raw_policies) if isinstance(raw_policies, list) else []
+    """Fetch Puddle Data API context: policyData, notes (if available), productOption, suitabilityData, clientProfile."""
+    policies = fetch_sureify_policies(customer_identifier)
     policy_ids = [p.get("ID") or p.get("policyNumber") or p.get("contractId") or "" for p in policies if p]
     policy_ids = [x for x in policy_ids if x]
-    raw_notes = _passthrough_get("/notes", params)
-    notifications = _normalize_notes_to_notifications(raw_notes, policy_ids) if isinstance(raw_notes, list) else {pid: [] for pid in policy_ids}
-    raw_products = _passthrough_get("/product-options", params)
-    products = _normalize_product_options(raw_products) if isinstance(raw_products, list) else []
-    raw_suitability = _passthrough_get("/suitability-data", params)
-    suitability_data = raw_suitability if isinstance(raw_suitability, list) else []
-    raw_profiles = _passthrough_get("/client-profiles", params)
-    client_profiles = raw_profiles if isinstance(raw_profiles, list) else []
+    notifications = fetch_sureify_notifications(policy_ids, user_id=customer_identifier)
+    products = fetch_sureify_products(customer_identifier)
+    suitability_data = fetch_sureify_suitability_data(customer_identifier)
+    client_profiles = fetch_sureify_client_profiles(customer_identifier)
     return {
         "sureify_policies": policies,
         "sureify_notifications_by_policy": notifications,

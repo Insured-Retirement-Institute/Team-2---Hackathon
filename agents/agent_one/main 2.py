@@ -8,10 +8,10 @@ data quality, income activation, scheduled-meeting recommendation).
 Run from repo root: PYTHONPATH=. uv run python -m agents.agent_one
 
 Environment & endpoints (load from repo root .env):
-  Puddle Data API: This agent uses the passthrough APIs for all data. Set API_BASE_URL to the API root (e.g. http://.../api). Swagger: {API_BASE_URL}/docs
-    Endpoints: GET /passthrough/policies, /passthrough/notes, /passthrough/suitability-data,
-    /passthrough/disclosure-items, /passthrough/product-options, /passthrough/visualization-products,
-    /passthrough/client-profiles.
+  Puddle Data API (Sureify): SUREIFY_BASE_URL + SUREIFY_BEARER_TOKEN or client credentials.
+    Endpoints (agents.sureify_client): GET {base}/puddle/policyData, /puddle/suitabilityData,
+    /puddle/disclosureItem, /puddle/productOption, /puddle/visualizationProduct, /puddle/clientProfile,
+    /puddle/notes. Schema: agents/puddle_api_spec.yaml (OpenAPI 1.0.0).
   IRI API (alerts/dashboard/compare/action): IRI_API_BASE_URL.
     Endpoints: GET/POST/PUT under {base}/alerts, {base}/dashboard/stats, {base}/clients/{id}/profile.
 """
@@ -19,12 +19,10 @@ Environment & endpoints (load from repo root .env):
 from __future__ import annotations
 
 import json
-import os
 import sys
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 _repo_root = Path(__file__).resolve().parent.parent.parent
 if str(_repo_root) not in sys.path:
@@ -38,9 +36,8 @@ if _env_file.exists():
     except ImportError:
         pass
 
-os.environ.pop("AWS_BEARER_TOKEN_BEDROCK", None)
-
-import httpx
+import os as _os
+_os.environ.pop("AWS_BEARER_TOKEN_BEDROCK", None)
 
 from strands import Agent, tool
 
@@ -62,176 +59,83 @@ from agents.audit_writer import persist_agent_one_book_of_business, persist_even
 from agents.logic import RENEWAL_NOTIFICATION_DAYS, apply_business_logic
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.schemas import BookOfBusinessOutput, PolicyNotification, PolicyOutput
-_API_BASE = os.environ.get("API_BASE_URL", "http://k8s-default-hack2fut-959780892e-989138425.us-east-1.elb.amazonaws.com/api").rstrip("/")
-_USER_ID_DEFAULT = "1001"
-
-
-def _resolve_user_id(customer_identifier: str | None) -> str:
-    raw = (customer_identifier or "").strip()
-    key = raw.lower().replace(" ", "").replace("-", "").replace("_", "")
-    if key in ("1001", "martymcfly", "marty_mcfly", "marty", "janedoe", "jane_doe", "jane", "johnsmith", "john_smith", "john", ""):
-        return _USER_ID_DEFAULT
-    return raw
-
-
-def _passthrough_get(path: str, params: dict[str, str] | None = None) -> list[Any] | dict[str, Any]:
-    url = f"{_API_BASE}/passthrough{path}"
-    try:
-        with httpx.Client(timeout=60.0) as client:
-            r = client.get(url, params=params or {})
-            r.raise_for_status()
-            data = r.json()
-            return data if isinstance(data, (list, dict)) else {}
-    except Exception as e:
-        print(f"[agent_one] GET {path} failed: {type(e).__name__}: {e}", file=sys.stderr)
-        return []
-
-
-def _normalize_policies(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out = []
-    for p in data:
-        if p.get("ID") is not None and not isinstance(p.get("ID"), str):
-            p = {**p, "ID": str(p["ID"])}
-        out.append(p)
-    return out
-
-
-def _policy_id_from_value(val: Any) -> str | None:
-    if val is None:
-        return None
-    if isinstance(val, str):
-        return val
-    if isinstance(val, dict):
-        return val.get("root") or val.get("__root__")
-    return str(val)
-
-
-def _normalize_notes_to_notifications(data: list[dict], policy_ids: list[str]) -> dict[str, list[dict]]:
-    result: dict[str, list[dict]] = {pid: [] for pid in policy_ids}
-    for note in data:
-        pid = _policy_id_from_value(note.get("policyID") if isinstance(note, dict) else None)
-        if pid and pid in result:
-            msg = (note.get("title") or note.get("content") or "Note") if isinstance(note, dict) else "Note"
-            result[pid].append({"type": "note", "message": msg, "severity": "info"})
-    return result
-
-
-def _normalize_product_options(data: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    out = []
-    for p in data:
-        product_id = str(p.get("productId") or p.get("ID") or p.get("productCode") or "")
-        name = str(p.get("name") or "Unknown")
-        carrier = str(p.get("carrier") or p.get("carrierCode") or "")
-        rate = p.get("rate")
-        if rate is None and p.get("attributes"):
-            for a in p.get("attributes") or []:
-                if isinstance(a, dict) and (a.get("name") or a.get("key") or "").lower() == "rate":
-                    rate = a.get("value") or a.get("val")
-                    break
-        if rate is None:
-            rate = "N/A"
-        if rate != "N/A" and isinstance(rate, (int, float)):
-            rate = f"{rate}%"
-        attrs = p.get("attributes") or []
-        attr_map = {}
-        for a in attrs:
-            if isinstance(a, dict):
-                k = (a.get("name") or a.get("key") or "").strip().lower()
-                if k:
-                    attr_map[k] = a.get("value") or a.get("val")
-        risk_profile = attr_map.get("riskprofile") or attr_map.get("risk_profile")
-        out.append({
-            "product_id": product_id, "name": name, "carrier": carrier, "rate": rate,
-            "term": p.get("term"), "surrenderPeriod": p.get("surrenderPeriod"),
-            "freeWithdrawal": p.get("freeWithdrawal"), "guaranteedMinRate": p.get("guaranteedMinRate"),
-            "risk_profile": risk_profile, "attributes_map": attr_map, "states": p.get("states"),
-        })
-    return out
-
-
-def _fetch_policies(customer_identifier: str) -> list[dict[str, Any]]:
-    uid = _resolve_user_id(customer_identifier)
-    data = _passthrough_get("/policies", {"user_id": uid, "persona": "agent"})
-    return _normalize_policies(data) if isinstance(data, list) else []
-
-
-def _fetch_notifications(policy_ids: list[str], user_id: str | None = None) -> dict[str, list[dict]]:
-    uid = _resolve_user_id(user_id)
-    data = _passthrough_get("/notes", {"user_id": uid, "persona": "agent"})
-    return _normalize_notes_to_notifications(data, policy_ids) if isinstance(data, list) else {pid: [] for pid in policy_ids}
+from agents.sureify_client import (
+    get_book_of_business as fetch_policies,
+    get_client_profiles as fetch_client_profiles,
+    get_disclosure_items as fetch_disclosure_items,
+    get_notifications_for_policies as fetch_notifications,
+    get_product_options as fetch_product_options,
+    get_suitability_data as fetch_suitability_data,
+    get_visualization_products as fetch_visualization_products,
+)
 
 
 @tool
 def get_book_of_business(customer_identifier: str) -> str:
-    """Get the book of business (all policies) for a customer or advisor (GET /passthrough/policies)."""
-    policies = _fetch_policies(customer_identifier)
+    """Get the book of business (all policies) for a customer or advisor from Sureify."""
+    policies = fetch_policies(customer_identifier)
     return json.dumps(policies, default=str, indent=2)
 
 
 @tool
 def get_notifications_for_policies(policy_ids: str) -> str:
-    """Get notifications applicable to the given policies (GET /passthrough/notes)."""
+    """Get notifications applicable to the given policies."""
     try:
         ids = json.loads(policy_ids)
     except json.JSONDecodeError:
         return json.dumps({"error": "policy_ids must be a JSON array of strings"})
     if not isinstance(ids, list):
         return json.dumps({"error": "policy_ids must be a JSON array"})
-    result = _fetch_notifications(ids)
+    result = fetch_notifications(ids)
     return json.dumps(result, default=str, indent=2)
 
 
 @tool
 def get_puddle_suitability_data() -> str:
-    """Get all suitability assessments (GET /passthrough/suitability-data)."""
-    data = _passthrough_get("/suitability-data", {"user_id": _USER_ID_DEFAULT, "persona": "agent"})
-    data = data if isinstance(data, list) else []
+    """Get all suitability assessments from the Puddle Data API (GET /puddle/suitabilityData)."""
+    data = fetch_suitability_data()
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_disclosure_items() -> str:
-    """Get all disclosure items (GET /passthrough/disclosure-items)."""
-    data = _passthrough_get("/disclosure-items", {"user_id": _USER_ID_DEFAULT, "persona": "agent"})
-    data = data if isinstance(data, list) else []
+    """Get all disclosure items from the Puddle Data API (GET /puddle/disclosureItem)."""
+    data = fetch_disclosure_items()
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_product_options() -> str:
-    """Get all product options (GET /passthrough/product-options)."""
-    data = _passthrough_get("/product-options", {"user_id": _USER_ID_DEFAULT, "persona": "agent"})
-    data = _normalize_product_options(data) if isinstance(data, list) else []
+    """Get all product options from the Puddle Data API (GET /puddle/productOption)."""
+    data = fetch_product_options()
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_visualization_products() -> str:
-    """Get all visualization products (GET /passthrough/visualization-products)."""
-    data = _passthrough_get("/visualization-products", {"user_id": _USER_ID_DEFAULT, "persona": "agent"})
-    data = data if isinstance(data, list) else []
+    """Get all visualization products from the Puddle Data API (GET /puddle/visualizationProduct)."""
+    data = fetch_visualization_products()
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_client_profiles() -> str:
-    """Get all client profiles (GET /passthrough/client-profiles)."""
-    data = _passthrough_get("/client-profiles", {"user_id": _USER_ID_DEFAULT, "persona": "agent"})
-    data = data if isinstance(data, list) else []
+    """Get all client profiles from the Puddle Data API (GET /puddle/clientProfile)."""
+    data = fetch_client_profiles()
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_book_of_business_with_notifications_and_flags(customer_identifier: str) -> str:
     """Get the full book of business with notifications and business logic flags."""
-    policies = _fetch_policies(customer_identifier)
+    policies = fetch_policies(customer_identifier)
     if not policies:
         out = BookOfBusinessOutput(customer_identifier=customer_identifier, policies=[])
         return out.model_dump_json(indent=2)
 
     policy_ids = [p.get("ID") or p.get("policyNumber") or "" for p in policies]
     policy_ids = [x for x in policy_ids if x]
-    notif_by_policy = _fetch_notifications(policy_ids, customer_identifier)
+    notif_by_policy = fetch_notifications(policy_ids, customer_identifier)
 
     outputs: list[PolicyOutput] = []
     for p in policies:
@@ -475,6 +379,7 @@ def _emit_agent_one_event(
 
 
 def main() -> None:
+    import os
     run_id = str(uuid.uuid4())
     if os.environ.get("SUREIFY_AGENT_SCHEMA_ONLY"):
         print(get_book_of_business_json_schema())
