@@ -23,7 +23,7 @@ from agents.agent_two_schemas import (
 
 
 def _sureify_product_to_canonical(p: dict[str, Any]) -> dict[str, Any]:
-    """Normalize Sureify product to canonical shape for ProductRecommendation. Accepts Puddle ProductOption (from /puddle/productOption) already normalized by sureify_client, or legacy shape with attributes."""
+    """Normalize Sureify product to canonical shape for ProductRecommendation. Accepts Puddle ProductOption (from /passthrough/product-options) or legacy shape with attributes."""
     if p.get("product_id"):
         return p
     attrs = p.get("attributes") or []

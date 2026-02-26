@@ -1,19 +1,16 @@
 """
 Strands agent: Sureify book of business for Marty McFly.
 
-Scans Sureify APIs (or mock), lists all policies as JSON using frontend-relevant
-shapes, attaches notifications, and applies business logic (replacements,
-data quality, income activation, scheduled-meeting recommendation).
+Scans Sureify passthrough APIs via the API server, lists all policies as JSON
+using frontend-relevant shapes, applies business logic (replacements, data
+quality, income activation, scheduled-meeting recommendation), and POSTs the
+result to /api/alerts.
 
 Run from repo root: PYTHONPATH=. uv run python -m agents.agent_one
 
-Environment & endpoints (load from repo root .env):
-  Puddle Data API (Sureify): SUREIFY_BASE_URL + SUREIFY_BEARER_TOKEN or client credentials.
-    Endpoints (agents.sureify_client): GET {base}/puddle/policyData, /puddle/suitabilityData,
-    /puddle/disclosureItem, /puddle/productOption, /puddle/visualizationProduct, /puddle/clientProfile,
-    /puddle/notes. Schema: agents/puddle_api_spec.yaml (OpenAPI 1.0.0).
-  IRI API (alerts/dashboard/compare/action): IRI_API_BASE_URL.
-    Endpoints: GET/POST/PUT under {base}/alerts, {base}/dashboard/stats, {base}/clients/{id}/profile.
+Environment:
+  API_BASE_URL (default http://localhost:8000): API server with passthrough + alerts.
+  IRI_API_BASE_URL: Optional IRI API for alerts/dashboard/compare/action.
 """
 
 from __future__ import annotations
@@ -56,107 +53,87 @@ from agents.iri_client import (
     submit_iri_transaction as iri_submit_transaction,
     snooze_iri_alert as iri_snooze,
 )
+import httpx
+
 from agents.audit_writer import persist_agent_one_book_of_business, persist_event
 from agents.logic import RENEWAL_NOTIFICATION_DAYS, apply_business_logic
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
 from agents.schemas import BookOfBusinessOutput, PolicyNotification, PolicyOutput
-from agents.sureify_client import (
-    get_book_of_business as fetch_policies,
-    get_client_profiles as fetch_client_profiles,
-    get_disclosure_items as fetch_disclosure_items,
-    get_notifications_for_policies as fetch_notifications,
-    get_product_options as fetch_product_options,
-    get_suitability_data as fetch_suitability_data,
-    get_visualization_products as fetch_visualization_products,
-)
+
+_API_BASE = _os.environ.get("API_BASE_URL", "http://localhost:8000")
+
+
+def _api_get(path: str) -> list | dict:
+    """GET helper for the API server passthrough endpoints."""
+    r = httpx.get(f"{_API_BASE}{path}", timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+
+def _api_post(path: str, payload: dict | list) -> dict:
+    """POST helper for the API server."""
+    r = httpx.post(f"{_API_BASE}{path}", json=payload, timeout=30)
+    r.raise_for_status()
+    return r.json()
 
 
 @tool
 def get_book_of_business(customer_identifier: str) -> str:
-    """Get the book of business (all policies) for a customer or advisor from Sureify."""
-    policies = fetch_policies(customer_identifier)
+    """Get the book of business (all policies) for a customer or advisor via the passthrough API."""
+    policies = _api_get("/passthrough/policy-data")
     return json.dumps(policies, default=str, indent=2)
 
 
 @tool
-def get_notifications_for_policies(policy_ids: str) -> str:
-    """Get notifications applicable to the given policies."""
-    try:
-        ids = json.loads(policy_ids)
-    except json.JSONDecodeError as e:
-        logger.error("get_notifications_for_policies: invalid JSON input: %s", e)
-        return json.dumps({"error": "policy_ids must be a JSON array of strings"})
-    if not isinstance(ids, list):
-        logger.error("get_notifications_for_policies: policy_ids is not an array")
-        return json.dumps({"error": "policy_ids must be a JSON array"})
-    result = fetch_notifications(ids)
-    return json.dumps(result, default=str, indent=2)
-
-
-@tool
 def get_puddle_suitability_data() -> str:
-    """Get all suitability assessments from the Puddle Data API (GET /puddle/suitabilityData)."""
-    data = fetch_suitability_data()
+    """Get all suitability assessments via the passthrough API."""
+    data = _api_get("/passthrough/suitability-data")
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_disclosure_items() -> str:
-    """Get all disclosure items from the Puddle Data API (GET /puddle/disclosureItem)."""
-    data = fetch_disclosure_items()
+    """Get all disclosure items via the passthrough API."""
+    data = _api_get("/passthrough/disclosure-items")
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_product_options() -> str:
-    """Get all product options from the Puddle Data API (GET /puddle/productOption)."""
-    data = fetch_product_options()
+    """Get all product options via the passthrough API."""
+    data = _api_get("/passthrough/product-options")
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_visualization_products() -> str:
-    """Get all visualization products from the Puddle Data API (GET /puddle/visualizationProduct)."""
-    data = fetch_visualization_products()
+    """Get all visualization products via the passthrough API."""
+    data = _api_get("/passthrough/visualization-products")
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_puddle_client_profiles() -> str:
-    """Get all client profiles from the Puddle Data API (GET /puddle/clientProfile)."""
-    data = fetch_client_profiles()
+    """Get all client profiles via the passthrough API."""
+    data = _api_get("/passthrough/client-profiles")
     return json.dumps(data, default=str, indent=2)
 
 
 @tool
 def get_book_of_business_with_notifications_and_flags(customer_identifier: str) -> str:
-    """Get the full book of business with notifications and business logic flags."""
+    """Get the full book of business with notifications and business logic flags, then POST alerts."""
     logger.info("get_book_of_business_with_notifications_and_flags: customer=%s", customer_identifier)
-    policies = fetch_policies(customer_identifier)
+    policies = _api_get("/passthrough/policy-data")
     if not policies:
         logger.warning("get_book_of_business_with_notifications_and_flags: no policies found for %s", customer_identifier)
         out = BookOfBusinessOutput(customer_identifier=customer_identifier, policies=[])
         return out.model_dump_json(indent=2)
 
-    policy_ids = [p.get("ID") or p.get("policyNumber") or "" for p in policies]
-    policy_ids = [x for x in policy_ids if x]
-    notif_by_policy = fetch_notifications(policy_ids, customer_identifier)
-
     outputs: list[PolicyOutput] = []
     for p in policies:
         pid = p.get("ID") or p.get("policyNumber") or ""
         logic = apply_business_logic(p)
-        notifs = notif_by_policy.get(pid) or []
-        notifications = [
-            PolicyNotification(
-                notification_type=n.get("type", "unknown"),
-                message=n.get("message", ""),
-                policy_id=pid or None,
-                severity=n.get("severity"),
-            )
-            for n in notifs
-        ]
-        # Generate replacement notification when policy renews in next 30 days
+        notifications: list[PolicyNotification] = []
         days_until = logic.get("days_until_renewal")
         if days_until is not None and 1 <= days_until <= RENEWAL_NOTIFICATION_DAYS:
             notifications.append(
@@ -194,6 +171,13 @@ def get_book_of_business_with_notifications_and_flags(customer_identifier: str) 
         customer_identifier=customer_identifier,
         payload=payload_dict,
     )
+
+    try:
+        _api_post("/api/alerts", payload_dict)
+        logger.info("POSTed BookOfBusinessOutput to /api/alerts for %s", customer_identifier)
+    except Exception:
+        logger.exception("Failed to POST alerts for %s", customer_identifier)
+
     return json.dumps(payload_dict, indent=2, default=str)
 
 
@@ -333,18 +317,18 @@ def create_iri_alerts_from_book(customer_identifier: str) -> str:
     return json.dumps(result, default=str, indent=2)
 
 
-BOOK_OF_BUSINESS_SYSTEM_PROMPT = """You are an assistant that scans Sureify APIs and produces the book of business for a given customer.
+BOOK_OF_BUSINESS_SYSTEM_PROMPT = """You are an assistant that scans the Sureify passthrough APIs and produces the book of business for a given customer.
 
-**Puddle Data API** (OpenAPI 1.0.0, agents/puddle_api_spec.yaml): All endpoints use UserID header 1001 and optional persona=agent. When configured, use:
-- **Policy data:** `get_book_of_business` / `get_book_of_business_with_notifications_and_flags` (GET /puddle/policyData) for annuity policies with values, rates, renewal status, features.
-- **Suitability:** `get_puddle_suitability_data` (GET /puddle/suitabilityData) for suitability assessments (objectives, risk, score).
-- **Disclosures:** `get_puddle_disclosure_items` (GET /puddle/disclosureItem) for required/optional disclosure documents.
-- **Products:** `get_puddle_product_options` (GET /puddle/productOption) and `get_puddle_visualization_products` (GET /puddle/visualizationProduct) for product options and comparison/chart data.
-- **Clients:** `get_puddle_client_profiles` (GET /puddle/clientProfile) for client profiles and comparison parameters.
+**Passthrough API** (via API server): Data is fetched through the API server's passthrough endpoints which proxy to Sureify.
+- **Policy data:** `get_book_of_business` / `get_book_of_business_with_notifications_and_flags` for annuity policies with values, rates, renewal status, features.
+- **Suitability:** `get_puddle_suitability_data` for suitability assessments (objectives, risk, score).
+- **Disclosures:** `get_puddle_disclosure_items` for required/optional disclosure documents.
+- **Products:** `get_puddle_product_options` and `get_puddle_visualization_products` for product options and comparison/chart data.
+- **Clients:** `get_puddle_client_profiles` for client profiles and comparison parameters.
 
 Your main task is to produce the **book of business** for **Marty McFly** (or the customer identifier you are given):
-1. Use `get_book_of_business_with_notifications_and_flags` to get policies with notifications and business logic flags (replacement_opportunity, data_quality_issues, income_activation_eligible, schedule_meeting, etc.).
-2. Optionally use the Puddle tools above when the user asks for suitability, disclosures, product options, visualization data, or client profiles.
+1. Use `get_book_of_business_with_notifications_and_flags` to get policies with business logic flags (replacement_opportunity, data_quality_issues, income_activation_eligible, schedule_meeting, etc.) and POST the result as alerts.
+2. Optionally use the passthrough tools above when the user asks for suitability, disclosures, product options, visualization data, or client profiles.
 3. Output the full JSON with "customer_identifier" and "policies" array; the frontend consumes this as-is.
 
 When the user asks for a JSON schema for table design, call `get_book_of_business_json_schema`.
@@ -359,7 +343,6 @@ def create_agent() -> Agent:
     return Agent(
         tools=[
             get_book_of_business,
-            get_notifications_for_policies,
             get_book_of_business_with_notifications_and_flags,
             get_book_of_business_json_schema,
             get_book_of_business_as_iri_alerts,

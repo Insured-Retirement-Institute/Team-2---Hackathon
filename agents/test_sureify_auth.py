@@ -1,11 +1,11 @@
 """
-Test Sureify auth (Option A: SUREIFY_BASE_URL + SUREIFY_BEARER_TOKEN).
-Loads .env from repo root, then calls the shared client and one Puddle endpoint.
+Test API server passthrough connectivity.
+
+Verifies that the API server is reachable and the passthrough endpoints return
+data from Sureify. The API server handles Sureify auth (OAuth / bearer token).
 
 Run from repo root:
   PYTHONPATH=. python -m agents.test_sureify_auth
-Or with explicit .env:
-  PYTHONPATH=. python -m agents.test_sureify_auth  # uses .env in cwd
 """
 from __future__ import annotations
 
@@ -13,12 +13,7 @@ import os
 import sys
 from pathlib import Path
 
-# Repo root = parent of agents/
 _repo_root = Path(__file__).resolve().parent.parent
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
-
-# Load .env from repo root (Option A: SUREIFY_BEARER_TOKEN)
 _env = _repo_root / ".env"
 if _env.exists():
     try:
@@ -27,45 +22,46 @@ if _env.exists():
     except ImportError:
         pass
 
+import httpx
+
 
 def main() -> None:
-    base = os.environ.get("SUREIFY_BASE_URL", "").strip()
-    token = os.environ.get("SUREIFY_BEARER_TOKEN", "").strip()
+    base = os.environ.get("API_BASE_URL", "http://localhost:8000").rstrip("/")
+    print(f"API_BASE_URL={base}")
 
-    if not base:
-        print("FAIL: SUREIFY_BASE_URL is not set. Set it in .env or export it.")
-        sys.exit(1)
-    if not token:
-        print("FAIL: SUREIFY_BEARER_TOKEN is not set (Option A). Add your token to .env or export SUREIFY_BEARER_TOKEN.")
-        sys.exit(1)
-    # Mask token in output
-    token_preview = f"{token[:8]}...{token[-4:]}" if len(token) > 12 else "***"
-
-    print("Using Option A: SUREIFY_BASE_URL + SUREIFY_BEARER_TOKEN")
-    print(f"  SUREIFY_BASE_URL={base}")
-    print(f"  SUREIFY_BEARER_TOKEN={token_preview}")
-
-    from agents.sureify_client import _get_authenticated_client, get_products
-
-    client = _get_authenticated_client()
-    if client is None:
-        print("FAIL: _get_authenticated_client() returned None (auth failed or no token).")
-        sys.exit(1)
-    print("  Authenticated client obtained.")
-
-    # Call one Puddle endpoint (productOption) to verify token works
+    # Health check
     try:
-        options = get_products("1001")
+        r = httpx.get(f"{base}/health", timeout=10)
+        r.raise_for_status()
+        health = r.json()
+        print(f"  /health: {health}")
     except Exception as e:
-        err = str(e)
-        print(f"FAIL: API call failed: {e}")
-        if "401" in err:
-            print("  Hint: Token may be expired or invalid. Refresh SUREIFY_BEARER_TOKEN and try again.")
+        print(f"FAIL: API server not reachable at {base}/health: {e}")
         sys.exit(1)
 
-    count = len(options) if isinstance(options, list) else 0
-    print(f"  GET /puddle/productOption: OK ({count} product(s) returned).")
-    print("SUCCESS: Sureify Option A auth and Puddle API call work.")
+    # Passthrough product-options
+    try:
+        r = httpx.get(f"{base}/passthrough/product-options", timeout=30)
+        r.raise_for_status()
+        products = r.json()
+        count = len(products) if isinstance(products, list) else 0
+        print(f"  /passthrough/product-options: OK ({count} product(s) returned)")
+    except Exception as e:
+        print(f"FAIL: /passthrough/product-options call failed: {e}")
+        sys.exit(1)
+
+    # Passthrough policy-data
+    try:
+        r = httpx.get(f"{base}/passthrough/policy-data", timeout=30)
+        r.raise_for_status()
+        policies = r.json()
+        count = len(policies) if isinstance(policies, list) else 0
+        print(f"  /passthrough/policy-data: OK ({count} polic(ies) returned)")
+    except Exception as e:
+        print(f"FAIL: /passthrough/policy-data call failed: {e}")
+        sys.exit(1)
+
+    print("SUCCESS: API server passthrough endpoints are working.")
 
 
 if __name__ == "__main__":
