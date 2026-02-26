@@ -25,10 +25,7 @@ CREATE TABLE IF NOT EXISTS alerts (
     agent_data jsonb,  -- Store complete Agent 1 BookOfBusinessOutput
     created_at timestamp DEFAULT now(),
     updated_at timestamp DEFAULT now(),
-    snoozed_until timestamp,
-
-    -- Foreign key to contract_summary
-    FOREIGN KEY (policy_id) REFERENCES contract_summary(contract_id)
+    snoozed_until timestamp
 );
 
 -- Index for common queries

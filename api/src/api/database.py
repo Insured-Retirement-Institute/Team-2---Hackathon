@@ -78,9 +78,30 @@ async def get_db() -> AsyncGenerator[Connection, None]:
 DbConnection = Annotated[Connection, Depends(get_db)]
 
 
-async def fetch_rows(conn: Connection, query_name: str, *args) -> list[dict]:
-    sql = queries.get(query_name)
-    if sql is None:
-        raise HTTPException(status_code=500, detail=f"Query {query_name} not found")
-    rows = await conn.fetch(sql, *args)
-    return [dict(r) for r in rows]
+async def fetch_rows(query_name_or_conn: Connection | str, query_name: str | None = None, *args) -> list[dict]:
+    """Fetch rows from database using a named query.
+
+    Can be called two ways:
+    - fetch_rows(conn, "query_name", arg1, arg2) - uses provided connection
+    - fetch_rows("query_name", arg1, arg2) - uses global pool
+    """
+    if isinstance(query_name_or_conn, str):
+        # Called without connection: fetch_rows("query_name", arg1, arg2)
+        actual_query_name = query_name_or_conn
+        actual_args = (query_name,) + args
+        if pool is None or pool._closed:
+            raise HTTPException(status_code=503, detail="Database not available")
+        async with pool.acquire() as conn:
+            sql = queries.get(actual_query_name)
+            if sql is None:
+                raise HTTPException(status_code=500, detail=f"Query {actual_query_name} not found")
+            rows = await conn.fetch(sql, *actual_args)
+            return [dict(r) for r in rows]
+    else:
+        # Called with connection: fetch_rows(conn, "query_name", arg1, arg2)
+        conn = query_name_or_conn
+        sql = queries.get(query_name)
+        if sql is None:
+            raise HTTPException(status_code=500, detail=f"Query {query_name} not found")
+        rows = await conn.fetch(sql, *args)
+        return [dict(r) for r in rows]

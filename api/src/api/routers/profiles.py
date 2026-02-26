@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from api.sureify_client import SureifyClient, SureifyAuthConfig
 from api.database import pool
 
-router = APIRouter(prefix="/api/clients", tags=["Client Profiles"])
+router = APIRouter(prefix="/clients", tags=["Client Profiles"])
 
 
 class ComparisonParameters(BaseModel):
@@ -125,7 +125,7 @@ async def get_client_profile(
             source_of_funds,
             employment_status,
             apply_to_means_tested_benefits
-        FROM client_profiles
+        FROM hackathon.client_profiles
         WHERE client_id = $1
         """,
         clientId
@@ -146,7 +146,7 @@ async def get_client_profile(
             advisor_eligibility,
             score,
             is_prefilled
-        FROM client_suitability_data
+        FROM hackathon.client_suitability_data
         WHERE client_id = $1
         """,
         clientId
@@ -281,7 +281,7 @@ async def get_client_profile(
         if parameters:
             await pool.execute(
                 """
-                INSERT INTO client_profiles (
+                INSERT INTO hackathon.client_profiles (
                     client_id, client_name,
                     resides_in_nursing_home, has_long_term_care_insurance, has_medicare_supplemental,
                     gross_income, disposable_income, tax_bracket,
@@ -323,7 +323,7 @@ async def get_client_profile(
         if suitability:
             await pool.execute(
                 """
-                INSERT INTO client_suitability_data (
+                INSERT INTO hackathon.client_suitability_data (
                     client_id,
                     client_objectives, risk_tolerance, time_horizon, liquidity_needs,
                     tax_considerations, guaranteed_income, rate_expectations, surrender_timeline,
@@ -373,7 +373,7 @@ async def save_client_profile(
     """
     # Check if profile exists first to get client_name, or use a default
     existing = await pool.fetchrow(
-        "SELECT client_name FROM client_profiles WHERE client_id = $1",
+        "SELECT client_name FROM hackathon.client_profiles WHERE client_id = $1",
         clientId
     )
 
@@ -381,7 +381,7 @@ async def save_client_profile(
 
     await pool.execute(
         """
-        INSERT INTO client_profiles (
+        INSERT INTO hackathon.client_profiles (
             client_id,
             client_name,
             resides_in_nursing_home,
@@ -523,7 +523,7 @@ async def save_suitability(
     """
     # 1. Verify client_profiles record exists (FK constraint requirement)
     profile_exists = await pool.fetchrow(
-        "SELECT client_id FROM client_profiles WHERE client_id = $1",
+        "SELECT client_id FROM hackathon.client_profiles WHERE client_id = $1",
         clientId
     )
 
@@ -536,7 +536,7 @@ async def save_suitability(
     # 2. Insert or update suitability data
     await pool.execute(
         """
-        INSERT INTO client_suitability_data (
+        INSERT INTO hackathon.client_suitability_data (
             client_id,
             client_objectives,
             risk_tolerance,

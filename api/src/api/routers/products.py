@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 from api.sureify_client import SureifyClient, SureifyAuthConfig
 from api.sureify_models import ProductOption
 
-router = APIRouter(prefix="/api/products", tags=["Products"])
+router = APIRouter(prefix="/products", tags=["Products"])
 
 
 async def get_sureify_client() -> AsyncGenerator[SureifyClient, None]:

@@ -10,7 +10,8 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from api.database import fetch_rows, pool
+from api import database
+from api.database import fetch_rows
 from schemas.iri_schemas import (
     RenewalAlert,
     DashboardStats,
@@ -18,7 +19,7 @@ from schemas.iri_schemas import (
     Status,
 )
 
-router = APIRouter(prefix="/api", tags=["IRI Dashboard"])
+router = APIRouter(tags=["IRI Dashboard"])
 
 
 # Request/Response models
@@ -90,10 +91,7 @@ async def get_alerts(
     # Convert database rows to Pydantic models
     alerts = []
     for row in rows:
-        # Handle array fields properly
         alert_data = dict(row)
-        if alert_data.get("alertTypes"):
-            alert_data["alertTypes"] = [alert_data["alertTypes"]]
         alerts.append(RenewalAlert(**alert_data))
 
     return alerts
@@ -185,7 +183,7 @@ async def create_alerts(book_of_business: BookOfBusinessOutput):
                 alert_description = f"Renewal alert for policy {policy_id}"
 
             # Generate alert ID
-            alert_id = f"alert-{policy_id}-{datetime.now(timezone.utc).strftime('%Y%m%d')}"
+            alert_id = f"alert-{policy_id}-{datetime.utcnow().strftime('%Y%m%d')}"
 
             # Determine has_data_exception
             has_data_exception = bool(policy_output.data_quality_issues)
@@ -194,9 +192,9 @@ async def create_alerts(book_of_business: BookOfBusinessOutput):
             missing_fields = policy_output.data_quality_issues if policy_output.data_quality_issues else None
 
             # Insert or update alert
-            await pool.execute(
+            await database.pool.execute(
                 """
-                INSERT INTO alerts (
+                INSERT INTO hackathon.alerts (
                     id,
                     customer_identifier,
                     policy_id,
@@ -260,8 +258,8 @@ async def create_alerts(book_of_business: BookOfBusinessOutput):
                 alert_description,
                 json.dumps(policy_output.model_dump()),  # Store full PolicyOutput
                 json.dumps(book_of_business.model_dump()),  # Store full BookOfBusinessOutput
-                datetime.now(timezone.utc),
-                datetime.now(timezone.utc)
+                datetime.utcnow(),
+                datetime.utcnow()
             )
 
             created_count += 1
@@ -428,8 +426,8 @@ async def save_suitability(
     4. Requires client_profiles record to exist first (FK constraint)
     """
     # 1. Get alert_detail from alerts table
-    alert_row = await pool.fetchrow(
-        "SELECT alert_detail FROM alerts WHERE id = $1",
+    alert_row = await database.pool.fetchrow(
+        "SELECT alert_detail FROM hackathon.alerts WHERE id = $1",
         alert_id
     )
 
@@ -457,8 +455,8 @@ async def save_suitability(
         )
 
     # 3. Verify client_profiles record exists (FK constraint requirement)
-    profile_exists = await pool.fetchrow(
-        "SELECT client_id FROM client_profiles WHERE client_id = $1",
+    profile_exists = await database.pool.fetchrow(
+        "SELECT client_id FROM hackathon.client_profiles WHERE client_id = $1",
         client_id
     )
 
@@ -469,9 +467,9 @@ async def save_suitability(
         )
 
     # 4. Insert or update suitability data
-    await pool.execute(
+    await database.pool.execute(
         """
-        INSERT INTO client_suitability_data (
+        INSERT INTO hackathon.client_suitability_data (
             client_id,
             client_objectives,
             risk_tolerance,

@@ -81,6 +81,9 @@ spec:
             # Agents service URL (for product comparison)
             - name: AGENTS_URL
               value: "http://agents:80"
+            # API base URL (required by agents code imported in actions router)
+            - name: API_BASE_URL
+              value: "http://hack2future:80"
           resources:
             requests:
               memory: "128Mi"

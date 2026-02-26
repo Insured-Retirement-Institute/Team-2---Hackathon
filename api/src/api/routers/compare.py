@@ -14,7 +14,7 @@ import api.routers.profiles as profiles_module
 
 AGENTS_URL = os.environ.get("AGENTS_URL", "")
 
-router = APIRouter(prefix="/api/alerts", tags=["Compare"])
+router = APIRouter(prefix="/alerts", tags=["Compare"])
 
 
 class ProductOption(BaseModel):
@@ -80,7 +80,7 @@ async def _get_alert_and_client(alert_id: str) -> tuple[dict, str]:
         """
         SELECT customer_identifier, policy_id, client_name, carrier,
                current_value, current_rate, renewal_rate, alert_detail
-        FROM alerts
+        FROM hackathon.alerts
         WHERE id = $1
         """,
         alert_id

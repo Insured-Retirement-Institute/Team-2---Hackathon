@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from api.database import pool
 from agents.agent_two.main import generate_product_recommendations
 
-router = APIRouter(prefix="/api/alerts", tags=["Action"])
+router = APIRouter(prefix="/alerts", tags=["Action"])
 
 
 # Request/Response Models
@@ -55,7 +55,7 @@ async def save_disclosures(
     """
     # Verify alert exists
     alert_row = await pool.fetchrow(
-        "SELECT id FROM alerts WHERE id = $1",
+        "SELECT id FROM hackathon.alerts WHERE id = $1",
         alert_id
     )
 
@@ -68,7 +68,7 @@ async def save_disclosures(
     # Store acknowledged disclosure IDs in alert_detail JSONB
     await pool.execute(
         """
-        UPDATE alerts
+        UPDATE hackathon.alerts
         SET alert_detail = COALESCE(alert_detail, '{}'::jsonb) ||
             jsonb_build_object('acknowledgedDisclosures', $1::jsonb)
         WHERE id = $2
@@ -98,7 +98,7 @@ async def submit_transaction(
     alert_row = await pool.fetchrow(
         """
         SELECT policy_id, client_name, carrier, alert_detail
-        FROM alerts
+        FROM hackathon.alerts
         WHERE id = $1
         """,
         alert_id
