@@ -98,9 +98,7 @@ class SureifyClient:
 
     async def _get(self, path: str, response_key: str) -> list[dict]:
         if not self._access_token:
-            raise RuntimeError(
-                "SureifyClient not authenticated. Call authenticate() first or use as context manager."
-            )
+            await self.authenticate()
         url = f"{self._config.base_url}{path}"
         headers = self._headers()
         logger.debug("GET %s", url)
@@ -112,6 +110,10 @@ class SureifyClient:
             response.status_code,
             dict(response.headers),
         )
+        if response.status_code == 401:
+            logger.info("GET %s returned 401, re-authenticating and retrying", url)
+            await self.authenticate()
+            response = await self._client.get(path, headers=self._headers())
         response.raise_for_status()
         return response.json()[response_key]
 
