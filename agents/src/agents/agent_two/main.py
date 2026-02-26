@@ -119,6 +119,7 @@ def generate_product_recommendations(
     try:
         payload = json.loads(changes_json)
     except json.JSONDecodeError as e:
+        logger.error("generate_product_recommendations: invalid JSON input: %s", e)
         _emit_event({}, False, error_message=str(e), input_validation_passed=False)
         return json.dumps({"error": "Invalid JSON", "message": str(e)})
 
@@ -127,6 +128,7 @@ def generate_product_recommendations(
     try:
         changes = ProfileChangesInput.model_validate(payload)
     except Exception as e:
+        logger.error("generate_product_recommendations: invalid changes shape: %s", e)
         _emit_event(input_summary, False, error_message=str(e), input_validation_passed=False)
         return json.dumps({"error": "Invalid changes shape", "message": str(e)})
 
@@ -147,13 +149,16 @@ def generate_product_recommendations(
             )
             if changes.client_profile:
                 params = changes.client_profile.model_dump(exclude_none=True)
+                logger.debug("Saving client profile to IRI API: client_id=%s", client_id)
                 save_iri_client_profile(client_id, params)
             if changes.suitability:
                 suit = changes.suitability.model_dump(exclude_none=True)
+                logger.debug("Saving suitability to IRI API: alert_id=%s", alert_id)
                 save_iri_suitability(alert_id, suit)
+            logger.debug("Running IRI comparison: alert_id=%s", alert_id)
             iri_result = run_iri_comparison(alert_id)
         except Exception:
-            pass
+            logger.exception("IRI API operations failed for alert_id=%s", alert_id)
 
     try:
         out = generate_recommendations(
@@ -164,6 +169,7 @@ def generate_product_recommendations(
             iri_comparison_result=iri_result,
         )
     except Exception as e:
+        logger.exception("generate_product_recommendations: recommendation generation failed for client_id=%s", client_id)
         _emit_event(input_summary, False, error_message=str(e), input_validation_passed=True)
         raise
     if out.explanation:

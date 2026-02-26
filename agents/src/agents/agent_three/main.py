@@ -119,10 +119,12 @@ def run_chat(
     Run the chatbot with the given screen state and user message. Returns a ChatResponse
     with the reply and optional agentTwo summary/storable_payload if we can detect them.
     """
+    logger.info("run_chat: screen=%s client_id=%s message_len=%d", screen_state, client_id, len(user_message) if user_message else 0)
     if isinstance(screen_state, str):
         try:
             screen_state = ScreenState(screen_state)
         except ValueError:
+            logger.warning("run_chat: invalid screen_state '%s', defaulting to elsewhere", screen_state)
             screen_state = ScreenState.elsewhere
     run_id = str(uuid.uuid4())
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -158,6 +160,7 @@ def run_chat(
             storable_payload=None,
         )
     except Exception as e:
+        logger.exception("run_chat failed: screen=%s client_id=%s", screen_state.value if hasattr(screen_state, "value") else screen_state, client_id)
         persist_event(
             AgentRunEvent(
                 event_id=str(uuid.uuid4()),

@@ -68,9 +68,11 @@ def get_notifications_for_policies(policy_ids: str) -> str:
     """Get notifications applicable to the given policies."""
     try:
         ids = json.loads(policy_ids)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error("get_notifications_for_policies: invalid JSON input: %s", e)
         return json.dumps({"error": "policy_ids must be a JSON array of strings"})
     if not isinstance(ids, list):
+        logger.error("get_notifications_for_policies: policy_ids is not an array")
         return json.dumps({"error": "policy_ids must be a JSON array"})
     result = fetch_notifications(ids)
     return json.dumps(result, default=str, indent=2)
@@ -79,8 +81,10 @@ def get_notifications_for_policies(policy_ids: str) -> str:
 @tool
 def get_book_of_business_with_notifications_and_flags(customer_identifier: str) -> str:
     """Get the full book of business with notifications and business logic flags."""
+    logger.info("get_book_of_business_with_notifications_and_flags: customer=%s", customer_identifier)
     policies = fetch_policies(customer_identifier)
     if not policies:
+        logger.warning("get_book_of_business_with_notifications_and_flags: no policies found for %s", customer_identifier)
         out = BookOfBusinessOutput(customer_identifier=customer_identifier, policies=[])
         return out.model_dump_json(indent=2)
 
@@ -197,7 +201,8 @@ def save_iri_client_profile(client_id: str, parameters_json: str) -> str:
     """Save client profile (PUT /clients/{clientId}/profile)."""
     try:
         params = json.loads(parameters_json)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error("save_iri_client_profile: invalid JSON: %s", e)
         return json.dumps({"error": "Invalid JSON", "message": "parameters_json must be valid JSON"})
     result = iri_save_client_profile(client_id, params)
     return json.dumps(result, default=str, indent=2)
@@ -208,7 +213,8 @@ def save_iri_suitability(alert_id: str, suitability_json: str) -> str:
     """Save suitability data for an alert (PUT /alerts/{alertId}/suitability)."""
     try:
         data = json.loads(suitability_json)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error("save_iri_suitability: invalid JSON: %s", e)
         return json.dumps({"error": "Invalid JSON", "message": "suitability_json must be valid JSON"})
     result = iri_save_suitability(alert_id, data)
     return json.dumps(result, default=str, indent=2)
@@ -219,9 +225,11 @@ def save_iri_disclosures(alert_id: str, acknowledged_ids_json: str) -> str:
     """Save disclosure acknowledgments (PUT /alerts/{alertId}/disclosures)."""
     try:
         ids = json.loads(acknowledged_ids_json)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
+        logger.error("save_iri_disclosures: invalid JSON: %s", e)
         return json.dumps({"error": "Invalid JSON", "message": "acknowledged_ids_json must be a JSON array"})
     if not isinstance(ids, list):
+        logger.error("save_iri_disclosures: acknowledged_ids is not an array")
         return json.dumps({"error": "Invalid input", "message": "acknowledged_ids must be an array"})
     result = iri_save_disclosures(alert_id, ids)
     return json.dumps(result, default=str, indent=2)

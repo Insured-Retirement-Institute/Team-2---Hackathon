@@ -136,6 +136,7 @@ def _is_sureify_configured() -> bool:
 def _get_authenticated_client():
     """Return an authenticated SureifyClient from api.sureify_client, or None if not configured."""
     if not _is_sureify_configured():
+        logger.debug("Sureify API not configured, using mock data")
         return None
     try:
         from api.sureify_client import SureifyAuthConfig, SureifyClient
@@ -143,16 +144,22 @@ def _get_authenticated_client():
         try:
             from api.src.api.sureify_client import SureifyAuthConfig, SureifyClient
         except ImportError:
+            logger.error("Sureify client import failed - api.sureify_client not found")
             return None
-    config = SureifyAuthConfig()
-    client = SureifyClient(config)
     try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    loop.run_until_complete(client.authenticate())
-    return client
+        config = SureifyAuthConfig()
+        client = SureifyClient(config)
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        loop.run_until_complete(client.authenticate())
+        logger.info("Sureify API client authenticated successfully")
+        return client
+    except Exception:
+        logger.exception("Sureify API authentication failed")
+        return None
 
 
 def _model_to_dict(obj: Any) -> dict[str, Any]:
@@ -185,10 +192,17 @@ def get_products(customer_identifier: str) -> list[dict[str, Any]]:
     """
     client = _get_authenticated_client()
     if client is not None:
-        products = _run_async(client.get_product_options())
-        return [_model_to_dict(p) for p in products]
+        try:
+            products = _run_async(client.get_product_options())
+            logger.info("get_products: fetched %d products from Sureify API", len(products))
+            return [_model_to_dict(p) for p in products]
+        except Exception:
+            logger.exception("get_products: Sureify API call failed")
+            return []
     if customer_identifier.lower().replace(" ", "") in ("martymcfly", "marty_mcfly", "marty-mcfly", ""):
+        logger.debug("get_products: using mock data for %s", customer_identifier)
         return [dict(p) for p in MOCK_PRODUCTS]
+    logger.debug("get_products: no products for unknown customer %s", customer_identifier)
     return []
 
 
@@ -201,11 +215,18 @@ def get_book_of_business(customer_identifier: str) -> list[dict[str, Any]]:
     """
     client = _get_authenticated_client()
     if client is not None:
-        policies = _run_async(client.get_policy_data())
-        return [_model_to_dict(p) for p in policies]
+        try:
+            policies = _run_async(client.get_policy_data())
+            logger.info("get_book_of_business: fetched %d policies from Sureify API for %s", len(policies), customer_identifier)
+            return [_model_to_dict(p) for p in policies]
+        except Exception:
+            logger.exception("get_book_of_business: Sureify API call failed for %s", customer_identifier)
+            return []
     # Mock
     if customer_identifier.lower().replace(" ", "") in ("martymcfly", "marty_mcfly", "marty-mcfly"):
+        logger.debug("get_book_of_business: using mock data for %s", customer_identifier)
         return [dict(p) for p in MOCK_POLICIES]
+    logger.debug("get_book_of_business: no policies for unknown customer %s", customer_identifier)
     return []
 
 
@@ -223,35 +244,41 @@ def get_notifications_for_policies(
     """
     client = _get_authenticated_client()
     if client is not None:
-        policies = _run_async(client.get_policy_data())
-        result: dict[str, list[dict[str, Any]]] = {pid: [] for pid in policy_ids}
-        for policy in policies:
-            pid = policy.ID
-            if pid not in result:
-                continue
-            notifications = []
-            # Generate notifications based on policy status
-            if policy.isMinRateRenewal:
-                notifications.append({
-                    "type": "renewal_alert",
-                    "message": f"Rate renewal on {policy.renewalDate} will drop to minimum rate ({policy.guaranteedMinRate})",
-                    "severity": "warning",
-                })
-            if policy.suitabilityStatus.value != "complete":
-                notifications.append({
-                    "type": "suitability_incomplete",
-                    "message": f"Suitability assessment is {policy.suitabilityStatus.value}",
-                    "severity": "warning",
-                })
-            if policy.eligibilityStatus.value == "restricted":
-                notifications.append({
-                    "type": "eligibility_restricted",
-                    "message": "Policy has restricted eligibility for renewal/exchange",
-                    "severity": "info",
-                })
-            result[pid] = notifications
-        return result
+        try:
+            policies = _run_async(client.get_policy_data())
+            result: dict[str, list[dict[str, Any]]] = {pid: [] for pid in policy_ids}
+            for policy in policies:
+                pid = policy.ID
+                if pid not in result:
+                    continue
+                notifications = []
+                # Generate notifications based on policy status
+                if policy.isMinRateRenewal:
+                    notifications.append({
+                        "type": "renewal_alert",
+                        "message": f"Rate renewal on {policy.renewalDate} will drop to minimum rate ({policy.guaranteedMinRate})",
+                        "severity": "warning",
+                    })
+                if policy.suitabilityStatus.value != "complete":
+                    notifications.append({
+                        "type": "suitability_incomplete",
+                        "message": f"Suitability assessment is {policy.suitabilityStatus.value}",
+                        "severity": "warning",
+                    })
+                if policy.eligibilityStatus.value == "restricted":
+                    notifications.append({
+                        "type": "eligibility_restricted",
+                        "message": "Policy has restricted eligibility for renewal/exchange",
+                        "severity": "info",
+                    })
+                result[pid] = notifications
+            logger.debug("get_notifications_for_policies: generated notifications for %d policies from Sureify", len(policy_ids))
+            return result
+        except Exception:
+            logger.exception("get_notifications_for_policies: Sureify API call failed")
+            return {pid: [] for pid in policy_ids}
     # Mock
+    logger.debug("get_notifications_for_policies: using mock data for %d policies", len(policy_ids))
     result = {}
     for pid in policy_ids:
         result[pid] = [dict(n) for n in MOCK_NOTIFICATIONS.get(pid, [])]

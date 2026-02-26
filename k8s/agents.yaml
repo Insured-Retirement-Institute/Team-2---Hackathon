@@ -86,7 +86,6 @@ spec:
             # Logging level (DEBUG, INFO, WARNING, ERROR)
             - name: LOG_LEVEL
               value: DEBUG
->>>>>>> 925f890 (feat: add config option to frontend build)
           resources:
             requests:
               memory: "256Mi"

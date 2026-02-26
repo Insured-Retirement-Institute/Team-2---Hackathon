@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 from typing import Any
+from urllib.parse import urlencode
 
 from agents.logging_config import get_logger
 from schemas.iri_schemas import AlertType, DashboardStats, Priority, RenewalAlert, Status
@@ -212,21 +215,26 @@ def _request(
 ) -> dict | list:
     base = _get_iri_base_url()
     if not base:
+        logger.error("IRI_API_BASE_URL not set")
         return {"error": "IRI_API_BASE_URL not set", "message": "Configure IRI API base URL to call alerts API."}
     try:
-        import urllib.request
-        import urllib.error
-
         url = f"{base.rstrip('/')}{path}"
         if params:
-            from urllib.parse import urlencode
             url += "?" + urlencode(params)
         data = json.dumps(json_body).encode() if json_body else None
+        logger.info("IRI API request: %s %s", method, url)
         req = urllib.request.Request(url, data=data, method=method)
         req.add_header("Content-Type", "application/json")
         with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.loads(resp.read().decode())
+            response_data = json.loads(resp.read().decode())
+            logger.info("IRI API response: %s %s -> %s", method, path, resp.status)
+            return response_data
+    except urllib.error.HTTPError as e:
+        body = e.read().decode() if e.fp else ""
+        logger.error("IRI API HTTP error: %s %s -> %s %s: %s", method, path, e.code, e.reason, body)
+        return {"error": "IRI_HTTP_ERROR", "message": f"{e.code} {e.reason}: {body}"}
     except Exception as e:
+        logger.exception("IRI API request failed: %s %s", method, path)
         return {"error": "IRI_REQUEST_ERROR", "message": str(e)}
 
 
@@ -325,9 +333,12 @@ def create_iri_alerts(book_of_business: BookOfBusinessOutput) -> dict:
 
     Returns: Success response with created count or error dict.
     """
+    logger.info("create_iri_alerts: customer=%s policies=%d", book_of_business.customer_identifier, len(book_of_business.policies))
     out = _request(
         "POST",
         "/alerts",
         json_body=book_of_business.model_dump(mode="json", exclude_none=True),
     )
+    if isinstance(out, dict) and out.get("error"):
+        logger.error("create_iri_alerts failed: %s", out)
     return out if isinstance(out, dict) else {"error": "INVALID_RESPONSE", "message": "Expected object"}

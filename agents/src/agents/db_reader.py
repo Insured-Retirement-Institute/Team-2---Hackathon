@@ -36,6 +36,7 @@ def _get_connection_params() -> dict[str, str] | None:
             "password": password,
             "dbname": dbname,
         }
+    logger.debug("Database not configured (no DATABASE_URL or RDS* env vars)")
     return None
 
 
@@ -48,8 +49,11 @@ def get_all_clients() -> list[dict[str, Any]]:
         with psycopg2.connect(**params) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT client_account_number, client_name, process_dt FROM clients ORDER BY client_name")
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_all_clients: fetched %d rows", len(rows))
+                return rows
     except Exception:
+        logger.exception("get_all_clients: database query failed")
         return []
 
 
@@ -73,8 +77,11 @@ def get_all_client_suitability_profiles() -> list[dict[str, Any]]:
                     FROM client_suitability_profiles
                     """
                 )
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_all_client_suitability_profiles: fetched %d rows", len(rows))
+                return rows
     except Exception:
+        logger.exception("get_all_client_suitability_profiles: database query failed")
         return []
 
 
@@ -93,8 +100,11 @@ def get_contract_summary(client_id: str | None = None) -> list[dict[str, Any]]:
                     )
                 else:
                     cur.execute("SELECT * FROM contract_summary LIMIT 500")
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_contract_summary: fetched %d rows (client_id=%s)", len(rows), client_id)
+                return rows
     except Exception:
+        logger.exception("get_contract_summary: database query failed (client_id=%s)", client_id)
         return []
 
 
@@ -117,8 +127,11 @@ def get_all_products() -> list[dict[str, Any]]:
                     ORDER BY current_fixed_rate DESC NULLS LAST
                     """
                 )
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_all_products: fetched %d rows", len(rows))
+                return rows
     except Exception:
+        logger.exception("get_all_products: database query failed")
         return []
 
 

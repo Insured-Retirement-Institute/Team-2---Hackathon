@@ -241,6 +241,7 @@ def generate_recommendations(
     Build merged profile from DB + changes, then recommend products from the catalog.
     Optionally include IRI comparison result if run_iri_comparison was called.
     """
+    logger.info("generate_recommendations: client_id=%s alert_id=%s", client_id, alert_id)
     clients = db_context.get("clients") or []
     profiles = db_context.get("client_suitability_profiles") or []
     products = db_context.get("products") or []
@@ -342,6 +343,7 @@ def generate_recommendations(
 
     recs.sort(key=rate_sort_key, reverse=True)
     recs = recs[:max_recommendations]
+    logger.info("generate_recommendations: produced %d recommendations (source=%s)", len(recs), "sureify" if use_sureify else "db")
 
     explanation = _build_choice_explanation(
         use_sureify, merged_suit, merged_goals, changes, len(recs)
