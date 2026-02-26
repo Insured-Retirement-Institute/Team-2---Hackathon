@@ -94,19 +94,16 @@ export function ActionTab({
     null,
   );
   const [aiSummary, setAiSummary] = useState<string>("");
-  const [loadingSummary, setLoadingSummary] = useState(false);
 
   // Fetch AI summary when suitability data changes
   useEffect(() => {
     if (suitabilityData && transactionId) {
-      setLoadingSummary(true);
       generateAISummary(transactionId, suitabilityData)
         .then(setAiSummary)
         .catch((err) => {
           console.error("Failed to generate AI summary:", err);
           setAiSummary("Unable to generate summary at this time.");
-        })
-        .finally(() => setLoadingSummary(false));
+        });
     }
   }, [suitabilityData, transactionId]);
 

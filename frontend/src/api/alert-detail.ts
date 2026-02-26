@@ -322,7 +322,8 @@ export async function fetchVisualization(
         : undefined;
       const initialValue = 150000;
       const r: VisualizationProduct = {
-        id: _productId,
+        ID: _productId,
+        productId: _productId,
         name: product.name,
         carrier: product.carrier,
         currentRate: rate,

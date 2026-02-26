@@ -7,7 +7,7 @@ export type VisualizationProduct = {
   guaranteedMinRate: number;
   surrenderYears: number;
   initialValue: number;
-  premiumBonus?: number | null;
+  premiumBonus?: number;
   incomeScore: number;
   growthScore: number;
   liquidityScore: number;

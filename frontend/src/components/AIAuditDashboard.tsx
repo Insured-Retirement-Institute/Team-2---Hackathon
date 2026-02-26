@@ -1,21 +1,12 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Shield,
   Activity,
   AlertTriangle,
   CheckCircle2,
-  XCircle,
   TrendingUp,
   TrendingDown,
-  Database,
-  Zap,
-  FileText,
-  Eye,
-  Clock,
-  Users,
-  BarChart3,
   AlertCircle,
-  Check,
   X,
   ChevronRight,
   ChevronDown,
@@ -29,10 +20,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -214,7 +201,6 @@ interface AuditDashboardProps {
 
 export function AIAuditDashboard({ onClose }: AuditDashboardProps) {
   const [selectedTab, setSelectedTab] = useState<"overview" | "bias" | "compliance" | "audit">("overview");
-  const [timeRange, setTimeRange] = useState<"24h" | "7d" | "30d">("24h");
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -236,7 +222,6 @@ export function AIAuditDashboard({ onClose }: AuditDashboardProps) {
   const avgSuccessRate = (
     systemHealth.reduce((sum, h) => sum + h.successRate, 0) / systemHealth.length
   ).toFixed(1);
-  const totalErrors = systemHealth.reduce((sum, h) => sum + h.errors, 0);
 
   const agentStatus = [
     { name: "Insights Agent 1", status: "healthy", uptime: 99.8, requests: 4234, avgLatency: 145 },
@@ -460,7 +445,7 @@ export function AIAuditDashboard({ onClose }: AuditDashboardProps) {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"

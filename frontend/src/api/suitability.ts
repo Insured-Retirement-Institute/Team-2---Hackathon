@@ -9,15 +9,15 @@ export async function generateAISummary(
   suitabilityData: SuitabilityData
 ): Promise<string> {
   if (USE_MOCKS) {
-    logRequest("POST", `/api/alerts/${alertId}/ai-summary`, suitabilityData);
+    logRequest("POST", `/api/alerts/${alertId}/ai-summary`);
     await new Promise((resolve) => setTimeout(resolve, 300));
     const mockSummary = `Based on the client's ${suitabilityData.riskTolerance.toLowerCase()} risk tolerance and ${suitabilityData.timeHorizon.toLowerCase()} time horizon, this transaction aligns with their stated objectives: ${suitabilityData.clientObjectives}. The client's liquidity needs (${suitabilityData.liquidityNeeds.toLowerCase()}) and tax considerations (${suitabilityData.taxConsiderations}) support this recommendation. This product provides the guaranteed income features the client desires while maintaining appropriate surrender timeline flexibility.`;
-    logResponse("POST", `/api/alerts/${alertId}/ai-summary`, { summary: mockSummary });
+    logResponse("POST", `/api/alerts/${alertId}/ai-summary`);
     return mockSummary;
   }
 
   const url = `${API_BASE_URL}/alerts/${alertId}/ai-summary`;
-  logRequest("POST", url, suitabilityData);
+  logRequest("POST", url);
 
   const response = await fetch(url, {
     method: "POST",
@@ -30,6 +30,6 @@ export async function generateAISummary(
   }
 
   const data = await response.json();
-  logResponse("POST", url, data);
+  logResponse("POST", url);
   return data.summary;
 }

@@ -86,7 +86,7 @@ export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
       avgSuccessRate: 98.6,
       totalErrors: 12,
     };
-    logResponse("GET", "/api/admin/dashboard (mock)", mockData);
+    logResponse("GET", "/api/admin/dashboard (mock)");
     return mockData;
   }
 
@@ -99,6 +99,6 @@ export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
   }
 
   const data = await response.json();
-  logResponse("GET", url, data);
+  logResponse("GET", url);
   return data;
 }
