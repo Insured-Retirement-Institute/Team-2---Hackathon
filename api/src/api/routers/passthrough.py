@@ -6,11 +6,8 @@ from fastapi import APIRouter, Depends
 from api.sureify_client import SureifyAuthConfig, SureifyClient
 from api.sureify_models import (
     ClientProfile,
-    DisclosureItem,
     PolicyData,
     ProductOption,
-    SuitabilityData,
-    VisualizationProduct,
 )
 
 router = APIRouter(prefix="/passthrough", tags=["passthrough"])
@@ -35,12 +32,12 @@ async def get_policy_data(client: SureifyClientDep) -> list[PolicyData]:
 
 
 @router.get("/suitability-data")
-async def get_suitability_data(client: SureifyClientDep) -> list[SuitabilityData]:
+async def get_suitability_data(client: SureifyClientDep) -> list[dict]:
     return await client.get_suitability_data()
 
 
 @router.get("/disclosure-items")
-async def get_disclosure_items(client: SureifyClientDep) -> list[DisclosureItem]:
+async def get_disclosure_items(client: SureifyClientDep) -> list[dict]:
     return await client.get_disclosure_items()
 
 
@@ -50,7 +47,7 @@ async def get_product_options(client: SureifyClientDep) -> list[ProductOption]:
 
 
 @router.get("/visualization-products")
-async def get_visualization_products(client: SureifyClientDep) -> list[VisualizationProduct]:
+async def get_visualization_products(client: SureifyClientDep) -> list[dict]:
     return await client.get_visualization_products()
 
 

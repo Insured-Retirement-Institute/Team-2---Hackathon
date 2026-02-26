@@ -1,19 +1,43 @@
 import logging
 import os
+from enum import Enum
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-from api.sureify_models import (
-    ClientProfile,
-    DisclosureItem,
-    PolicyData,
-    ProductOption,
-    SuitabilityData,
-    VisualizationProduct,
-)
+from api.sureify_models import PolicyData
+
+
+class Persona(str, Enum):
+    agent = "agent"
+
+
+# Stub types for API responses - these endpoints return untyped dicts
+Document = dict[str, Any]
+FinancialActivity = dict[str, Any]
+FundAllocation = dict[str, Any]
+Keycard = dict[str, Any]
+Note = dict[str, Any]
+Policy = dict[str, Any]
+Product = dict[str, Any]
+Quote = dict[str, Any]
+QuoteIllustrationBase = dict[str, Any]
+Requirement = dict[str, Any]
+Rider = dict[str, Any]
+User = dict[str, Any]
+Contact = dict[str, Any]
+Person = dict[str, Any]
+Company = dict[str, Any]
+Trust = dict[str, Any]
+Estate = dict[str, Any]
+Charity = dict[str, Any]
+Application = dict[str, Any]
+Case = dict[str, Any]
+Commission = dict[str, Any]
+CommissionStatement = dict[str, Any]
 
 
 def _env(key: str, default: str = "") -> str:
@@ -120,22 +144,6 @@ class SureifyClient:
     async def get_policy_data(self) -> list[PolicyData]:
         data = await self._get("/puddle/policyData", "policyData")
         return [PolicyData(**item) for item in data]
-
-    async def get_suitability_data(self) -> list[SuitabilityData]:
-        data = await self._get("/puddle/suitabilityData", "suitabilityData")
-        return [SuitabilityData(**item) for item in data]
-
-    async def get_disclosure_items(self) -> list[DisclosureItem]:
-        data = await self._get("/puddle/disclosureItem", "disclosureItems")
-        return [DisclosureItem(**item) for item in data]
-
-    async def get_product_options(self) -> list[ProductOption]:
-        data = await self._get("/puddle/productOption", "productOptions")
-        return [ProductOption(**item) for item in data]
-
-    async def get_visualization_products(self) -> list[VisualizationProduct]:
-        data = await self._get("/puddle/visualizationProduct", "visualizationProducts")
-        return [VisualizationProduct(**item) for item in data]
 
     async def get_documents(
         self,
@@ -293,60 +301,20 @@ class SureifyClient:
 
     # --- Puddle Data API (OpenAPI 1.0.0: suitabilityData, disclosureItem, productOption, visualizationProduct, clientProfile) ---
 
-    async def get_suitability_data(
-        self,
-        user_id: str | None = None,
-        persona: Persona | None = Persona.agent,
-        keycard: str | None = None,
-    ) -> list[dict]:
-        data = await self._get("/puddle/suitabilityData", user_id, persona, keycard)
-        if isinstance(data, dict) and "suitabilityData" in data:
-            return data["suitabilityData"]
-        return data if isinstance(data, list) else []
+    async def get_suitability_data(self) -> list[dict]:
+        return await self._get("/puddle/suitabilityData", "suitabilityData")
 
-    async def get_disclosure_items(
-        self,
-        user_id: str | None = None,
-        persona: Persona | None = Persona.agent,
-        keycard: str | None = None,
-    ) -> list[dict]:
-        data = await self._get("/puddle/disclosureItem", user_id, persona, keycard)
-        if isinstance(data, dict) and "disclosureItems" in data:
-            return data["disclosureItems"]
-        return data if isinstance(data, list) else []
+    async def get_disclosure_items(self) -> list[dict]:
+        return await self._get("/puddle/disclosureItem", "disclosureItems")
 
-    async def get_product_options(
-        self,
-        user_id: str | None = None,
-        persona: Persona | None = Persona.agent,
-        keycard: str | None = None,
-    ) -> list[dict]:
-        data = await self._get("/puddle/productOption", user_id, persona, keycard)
-        if isinstance(data, dict) and "productOptions" in data:
-            return data["productOptions"]
-        return data if isinstance(data, list) else []
+    async def get_product_options(self) -> list[dict]:
+        return await self._get("/puddle/productOption", "productOptions")
 
-    async def get_visualization_products(
-        self,
-        user_id: str | None = None,
-        persona: Persona | None = Persona.agent,
-        keycard: str | None = None,
-    ) -> list[dict]:
-        data = await self._get("/puddle/visualizationProduct", user_id, persona, keycard)
-        if isinstance(data, dict) and "visualizationProducts" in data:
-            return data["visualizationProducts"]
-        return data if isinstance(data, list) else []
+    async def get_visualization_products(self) -> list[dict]:
+        return await self._get("/puddle/visualizationProduct", "visualizationProducts")
 
-    async def get_client_profiles(
-        self,
-        user_id: str | None = None,
-        persona: Persona | None = Persona.agent,
-        keycard: str | None = None,
-    ) -> list[dict]:
-        data = await self._get("/puddle/clientProfile", user_id, persona, keycard)
-        if isinstance(data, dict) and "clientProfiles" in data:
-            return data["clientProfiles"]
-        return data if isinstance(data, list) else []
+    async def get_client_profiles(self) -> list[dict]:
+        return await self._get("/puddle/clientProfile", "clientProfiles")
 
 
 def _parse_contact(data: dict) -> Contact:
@@ -471,26 +439,26 @@ def get_users(client: SureifyClient, **kwargs) -> list[User]:
     return asyncio.get_event_loop().run_until_complete(client.get_users(**kwargs))
 
 
-def get_suitability_data(client: SureifyClient, **kwargs) -> list[dict]:
+def get_suitability_data(client: SureifyClient) -> list[dict]:
     import asyncio
-    return asyncio.get_event_loop().run_until_complete(client.get_suitability_data(**kwargs))
+    return asyncio.get_event_loop().run_until_complete(client.get_suitability_data())
 
 
-def get_disclosure_items(client: SureifyClient, **kwargs) -> list[dict]:
+def get_disclosure_items(client: SureifyClient) -> list[dict]:
     import asyncio
-    return asyncio.get_event_loop().run_until_complete(client.get_disclosure_items(**kwargs))
+    return asyncio.get_event_loop().run_until_complete(client.get_disclosure_items())
 
 
-def get_product_options(client: SureifyClient, **kwargs) -> list[dict]:
+def get_product_options(client: SureifyClient) -> list[dict]:
     import asyncio
-    return asyncio.get_event_loop().run_until_complete(client.get_product_options(**kwargs))
+    return asyncio.get_event_loop().run_until_complete(client.get_product_options())
 
 
-def get_visualization_products(client: SureifyClient, **kwargs) -> list[dict]:
+def get_visualization_products(client: SureifyClient) -> list[dict]:
     import asyncio
-    return asyncio.get_event_loop().run_until_complete(client.get_visualization_products(**kwargs))
+    return asyncio.get_event_loop().run_until_complete(client.get_visualization_products())
 
 
-def get_client_profiles(client: SureifyClient, **kwargs) -> list[dict]:
+def get_client_profiles(client: SureifyClient) -> list[dict]:
     import asyncio
-    return asyncio.get_event_loop().run_until_complete(client.get_client_profiles(**kwargs))
+    return asyncio.get_event_loop().run_until_complete(client.get_client_profiles())

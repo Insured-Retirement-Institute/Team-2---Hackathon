@@ -6,10 +6,7 @@ from api.sureify_models import (
     PolicyData,
     PolicyFeaturesData,
     PolicyFeature,
-    SuitabilityData,
-    DisclosureItem,
     ProductOption,
-    VisualizationProduct,
     ClientProfile,
     ComparisonParameters,
 )
@@ -18,10 +15,7 @@ __all__ = [
     "PolicyData",
     "PolicyFeaturesData",
     "PolicyFeature",
-    "SuitabilityData",
-    "DisclosureItem",
     "ProductOption",
-    "VisualizationProduct",
     "ClientProfile",
     "ComparisonParameters",
 ]
