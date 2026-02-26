@@ -67,12 +67,19 @@ class AgentTwoResponse(BaseModel):
     result: Any
 
 
+class AgentThreeConversationTurn(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
 class AgentThreeChatRequest(BaseModel):
     screen: str = "dashboard"  # "dashboard", "product_comparison", "elsewhere"
     message: str
     client_id: str = "Marty McFly"
     changes_json: str | None = None
     alert_id: str = ""
+    location_in_experience: str | None = None
+    conversation_history: list[AgentThreeConversationTurn] | None = None
 
 
 class AgentThreeChatResponse(BaseModel):
@@ -184,6 +191,11 @@ def agent_three_chat(request: AgentThreeChatRequest):
     """
     try:
         from agents.agent_three.main import run_chat
+        from agents.agent_three_schemas import ConversationTurn
+
+        history = None
+        if request.conversation_history:
+            history = [ConversationTurn(role=t.role, content=t.content) for t in request.conversation_history]
 
         response = run_chat(
             screen_state=request.screen,
@@ -191,6 +203,8 @@ def agent_three_chat(request: AgentThreeChatRequest):
             client_id=request.client_id,
             changes_json=request.changes_json,
             alert_id=request.alert_id,
+            location_in_experience=request.location_in_experience,
+            conversation_history=history,
         )
         return AgentThreeChatResponse(
             reply=response.reply,

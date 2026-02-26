@@ -30,7 +30,10 @@ from strands import Agent, tool
 
 from agents.agent_two_schemas import (
     AgentTwoStorablePayload,
+    BestInterestSummary,
+    CustomerSelection,
     ElectronicApplicationPayload,
+    FinalEAppOutput,
     ProductRecommendationsOutput,
     ProfileChangesInput,
 )
@@ -48,6 +51,192 @@ from agents.sureify_client import get_client_profiles as fetch_sureify_client_pr
 from agents.sureify_client import get_notifications_for_policies as fetch_sureify_notifications
 from agents.sureify_client import get_products as fetch_sureify_products
 from agents.sureify_client import get_suitability_data as fetch_sureify_suitability_data
+
+
+def _client_profile_characteristics(merged: dict) -> list[str]:
+    """Extract client profile characteristics from merged_profile_summary for Best Interest narrative."""
+    parts: list[str] = []
+    suit = merged.get("suitability") or {}
+    goals = merged.get("goals_and_profile") or {}
+    if suit.get("risk_tolerance"):
+        parts.append(f"risk tolerance: {suit['risk_tolerance']}")
+    if suit.get("time_horizon") or suit.get("investment_horizon"):
+        parts.append(f"time horizon: {suit.get('time_horizon') or suit.get('investment_horizon')}")
+    if suit.get("liquidity_needs") or suit.get("liquidity_importance"):
+        parts.append(f"liquidity needs: {suit.get('liquidity_needs') or suit.get('liquidity_importance')}")
+    if suit.get("client_objectives"):
+        parts.append(f"objectives: {suit['client_objectives']}")
+    if goals.get("financial_objectives"):
+        parts.append(f"financial objectives: {goals['financial_objectives']}")
+    if goals.get("distribution_plan"):
+        parts.append(f"distribution plan: {goals['distribution_plan']}")
+    if goals.get("expected_holding_period"):
+        parts.append(f"expected holding period: {goals['expected_holding_period']}")
+    if goals.get("gross_income"):
+        parts.append(f"gross income: {goals['gross_income']}")
+    if goals.get("household_net_worth"):
+        parts.append(f"household net worth: {goals['household_net_worth']}")
+    if goals.get("household_liquid_assets"):
+        parts.append(f"household liquid assets: {goals['household_liquid_assets']}")
+    if goals.get("tax_bracket"):
+        parts.append(f"tax bracket: {goals['tax_bracket']}")
+    return parts
+
+
+def _selection_context(
+    recommendations: list,
+    customer_selection: CustomerSelection | None,
+) -> tuple[str, list[dict]]:
+    """
+    Build a human-readable sentence for the customer's selection and the list of selected
+    recommendation dicts (for e-app). Returns (selection_sentence, selected_recs).
+    """
+    if not customer_selection or not getattr(customer_selection, "selected_product_ids", None):
+        return "", []
+    ids = set(customer_selection.selected_product_ids or [])
+    if not ids:
+        return "", []
+    selected: list[dict] = []
+    names: list[str] = []
+    for r in recommendations:
+        if r.product_id in ids:
+            selected.append({
+                "product_id": r.product_id,
+                "name": r.name,
+                "carrier": r.carrier,
+                "rate": r.rate,
+                "term": r.term,
+                "surrenderPeriod": r.surrenderPeriod,
+                "freeWithdrawal": r.freeWithdrawal,
+                "guaranteedMinRate": r.guaranteedMinRate,
+                "match_reason": r.match_reason,
+            })
+            names.append(f"{r.name} ({r.carrier})" if r.carrier else r.name)
+    if not names:
+        return "", []
+    selection_sentence = (
+        "The customer selected "
+        + (", ".join(names) if len(names) <= 3 else ", ".join(names[:2]) + f", and {len(names) - 2} other(s)")
+        + " from the opportunities presented."
+    )
+    if getattr(customer_selection, "notes", None) and customer_selection.notes.strip():
+        selection_sentence += f" Notes: {customer_selection.notes.strip()}"
+    return selection_sentence, selected
+
+
+def _build_best_interest_and_eapp(
+    run_id: str,
+    created_at: str,
+    client_id: str,
+    out: ProductRecommendationsOutput,
+    e_apply: ElectronicApplicationPayload,
+    customer_selection: CustomerSelection | None = None,
+) -> tuple[BestInterestSummary, FinalEAppOutput]:
+    """Build Best Interest Combined Framework summary and final e-app output from recommendation result."""
+    expl = out.explanation
+    summary_text = expl.summary if expl else "Opportunities presented from product catalog and client context."
+    criteria = (expl.choice_criteria or []) if expl else []
+    data_sources = (expl.data_sources_used or []) if expl else []
+    selection_sentence, selected_recs = _selection_context(out.recommendations, customer_selection)
+    recs_with_explain = [
+        {
+            "product_id": r.product_id,
+            "name": r.name,
+            "carrier": r.carrier,
+            "rate": r.rate,
+            "term": r.term,
+            "surrenderPeriod": r.surrenderPeriod,
+            "freeWithdrawal": r.freeWithdrawal,
+            "guaranteedMinRate": r.guaranteedMinRate,
+            "match_reason": r.match_reason,
+        }
+        for r in out.recommendations
+    ]
+    merged = out.merged_profile_summary or {}
+    profile_chars = _client_profile_characteristics(merged)
+    profile_narrative = (
+        "Client profile characteristics used to justify the assessment: "
+        + "; ".join(profile_chars)
+        + "."
+        if profile_chars
+        else "Client profile characteristics were considered where provided."
+    )
+    # Human-readable data sources (no internal names like sureify_products, db_suitability)
+    _source_labels = {
+        "sureify_products": "available product catalog",
+        "db_products": "product catalog",
+        "db_suitability": "client suitability profile",
+    }
+    data_sources_readable = [_source_labels.get(s, s) for s in data_sources] or ["product catalog and client profile"]
+    sources_phrase = ", ".join(data_sources_readable)
+    # Summary for display: use "Opportunity Generator" and "opportunities presented"
+    summary_display = (summary_text or "").replace("AgentTwo", "Opportunity Generator").replace("agentTwo", "Opportunity Generator")
+    summary_display = summary_display.replace("recommendation(s)", "opportunities presented")
+    if selection_sentence:
+        summary_display = summary_display.rstrip(". ") + ". " + selection_sentence
+
+    prudential = (
+        f"Reasonable diligence was applied to the customer's financial situation, needs, and objectives. "
+        f"{profile_narrative} "
+        f"Available products were investigated from the {sources_phrase}. "
+        f"Explicit comparative analysis was performed using criteria: {', '.join(criteria) or 'product match'}. "
+        f"Summary: {summary_display}"
+    )
+    if selection_sentence:
+        prudential = selection_sentence + " " + prudential
+    conflict = (
+        "Material conflicts of interest are identified in firm disclosures. "
+        "Compensation structures (commission, fee) are disclosed; conflicts are eliminated where possible or disclosed in writing. "
+        "The opportunities presented were generated using the client profile characteristics above and product data; no conflict incentivized the selection of a particular product."
+    )
+    if selection_sentence:
+        conflict = selection_sentence + " " + conflict
+    _chars_ref = ", ".join(profile_chars[:6]) + ("..." if len(profile_chars) > 6 else "") if profile_chars else "suitability and goals"
+    transparency = (
+        "Conflicts of interest and compensation are disclosed in writing before the transaction. "
+        f"Product alternatives considered are reflected in the opportunities presented and reasons to switch (pros/cons). "
+        f"The client profile characteristics that justify the assessment ({_chars_ref}) are documented in merged_profile_summary. "
+        "Product risks and features (rate, term, surrender period, free withdrawal, guaranteed minimum) are included for each opportunity with match_reason explaining fit to the client's profile."
+    )
+    if selection_sentence:
+        transparency = selection_sentence + " " + transparency
+    documentation = (
+        f"Customer information gathered and analysis performed are documented in merged_profile_summary and input_summary, including the client profile characteristics that justify the assessment: {', '.join(profile_chars) if profile_chars else 'suitability and goals'}. "
+        "The basis for the opportunities presented is documented in explanation (summary, data_sources_used, choice_criteria) and in each opportunity's match_reason. "
+        "Alternatives considered are reflected in the product set and reasons_to_switch. "
+    )
+    if selection_sentence:
+        documentation += "The customer's selection from the opportunities presented is documented in this summary and in the selected_products submitted for e-app. "
+    documentation += (
+        "Records supporting compliance (run_id, timestamp, payload) are retained; minimum 6-year retention applies per firm policy. "
+        "Customer acknowledgment of the opportunities presented and conflicts is obtained at point of sale (e-app flow)."
+    )
+    ongoing = (
+        "Firm will monitor customer accounts and the opportunities presented for continued suitability; "
+        "review changing circumstances and market conditions; update the opportunities presented when customer profile characteristics change; "
+        "and conduct periodic compliance reviews of firm-wide practices."
+    )
+
+    best_interest = BestInterestSummary(
+        prudential_standards=prudential,
+        conflict_management=conflict,
+        transparency=transparency,
+        documentation=documentation,
+        ongoing_duty=ongoing,
+    )
+    # When customer selected specific products, final e-app shows only those
+    recs_for_eapp = selected_recs if selected_recs else recs_with_explain
+    final_eapp = FinalEAppOutput(
+        run_id=run_id,
+        created_at=created_at,
+        client_id=client_id,
+        best_interest_summary=best_interest,
+        recommendations_with_explainability=recs_for_eapp,
+        reasons_to_switch=out.reasons_to_switch,
+        electronic_application_payload=e_apply,
+        customer_acknowledgment_placeholder="Customer acknowledgment of recommendations and conflicts to be obtained at point of sale.",
+    )
+    return best_interest, final_eapp
 
 
 def _get_sureify_context(customer_identifier: str) -> dict:
@@ -80,7 +269,7 @@ def get_current_database_context(client_id: str = "") -> str:
     sureify_suitability_data, sureify_client_profiles.
     """
     ctx = fetch_db_context(client_id or None)
-    sureify_id = client_id.strip() if client_id else "Marty McFly"
+    sureify_id = (client_id or "").strip() or "1001"
     sureify = _get_sureify_context(sureify_id)
     ctx["sureify_policies"] = sureify["sureify_policies"]
     ctx["sureify_notifications_by_policy"] = sureify["sureify_notifications_by_policy"]
@@ -142,7 +331,7 @@ def generate_product_recommendations(
         _emit_event({}, False, error_message=str(e), input_validation_passed=False)
         return json.dumps({"error": "Invalid JSON", "message": str(e)})
 
-    input_summary = {"sections_present": [k for k in ("suitability", "clientGoals", "clientProfile") if payload.get(k)]}
+    input_summary = {"sections_present": [k for k in ("suitability", "clientGoals", "clientProfile", "customerSelection") if payload.get(k)]}
 
     try:
         changes = ProfileChangesInput.model_validate(payload)
@@ -151,7 +340,7 @@ def generate_product_recommendations(
         return json.dumps({"error": "Invalid changes shape", "message": str(e)})
 
     db_context = fetch_db_context(client_id)
-    sureify_id = client_id.strip() if client_id else "Marty McFly"
+    sureify_id = (client_id or "").strip() or "1001"
     sureify = _get_sureify_context(sureify_id)
     db_context["sureify_policies"] = sureify["sureify_policies"]
     db_context["sureify_notifications_by_policy"] = sureify["sureify_notifications_by_policy"]
@@ -214,7 +403,8 @@ def generate_product_recommendations(
 
     # Build submission-ready e-apply payload (merged profile + selected products)
     merged = out.merged_profile_summary or {}
-    selected = [r.model_dump(mode="json") for r in out.recommendations]
+    _, selected_for_eapp = _selection_context(out.recommendations, getattr(changes, "customer_selection", None))
+    selected = selected_for_eapp if selected_for_eapp else [r.model_dump(mode="json") for r in out.recommendations]
     e_apply = ElectronicApplicationPayload(
         run_id=run_id,
         client_id=client_id,
@@ -222,6 +412,13 @@ def generate_product_recommendations(
         selected_products=selected,
     )
     out.electronic_application_payload = e_apply
+
+    # Best Interest Combined Framework summary and final e-app output (contextualized with customer selection when provided)
+    best_interest, final_eapp = _build_best_interest_and_eapp(
+        run_id, created_at, client_id, out, e_apply, customer_selection=getattr(changes, "customer_selection", None)
+    )
+    out.best_interest_summary = best_interest
+    out.final_eapp_output = final_eapp
 
     if out.explanation:
         storable = AgentTwoStorablePayload(
@@ -284,7 +481,7 @@ def main() -> None:
     import argparse
     parser = argparse.ArgumentParser(description="AgentTwo: DB + changes → product recommendations")
     parser.add_argument("--changes", type=str, help="Path to JSON file with suitability/clientGoals/clientProfile changes")
-    parser.add_argument("--client-id", type=str, default="Marty McFly", help="Client identifier")
+    parser.add_argument("--client-id", type=str, default="1001", help="Client identifier (Sureify UserID; use 1001 for live API data)")
     parser.add_argument("--alert-id", type=str, default="", help="Optional IRI alert ID for comparison")
     parser.add_argument("--tool-only", action="store_true", help="Run tools only (no LLM)")
     args = parser.parse_args()

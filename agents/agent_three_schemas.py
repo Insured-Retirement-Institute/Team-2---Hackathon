@@ -17,6 +17,13 @@ class ScreenState(str, Enum):
     elsewhere = "elsewhere"
 
 
+# ---- Conversation turn (for multi-turn chat) ----
+class ConversationTurn(BaseModel):
+    """A single turn in the conversation history (user or assistant)."""
+    role: str = Field(..., description="'user' or 'assistant'")
+    content: str = Field(..., description="Message content")
+
+
 # ---- Chat request (front-end → agentThree) ----
 class ChatRequest(BaseModel):
     """Request to agentThree chatbot. Include screen state and optional client_id for agentTwo calls."""
@@ -34,6 +41,14 @@ class ChatRequest(BaseModel):
         description="Optional JSON with suitability/clientGoals/clientProfile; used if user asks for recommendations and front-end has form data",
     )
     alert_id: str = Field(default="", description="Optional IRI alert ID when on product comparison / action flow")
+    location_in_experience: str | None = Field(
+        None,
+        description="Where the customer is in the experience (e.g. 'viewing_alert_123', 'on_suitability_step_2', 'comparing_products'). Used to tailor answers.",
+    )
+    conversation_history: list[ConversationTurn] | None = Field(
+        None,
+        description="Prior turns (user/assistant) for multi-turn conversation. Newest last.",
+    )
 
 
 # ---- Chat response (agentThree → front-end) ----

@@ -2,6 +2,12 @@
 
 AgentTwo reads the database and Sureify for current state, accepts JSON changes (suitability, client goals, client profile) from the front-end, and generates product recommendations. Optional IRI API integration for comparison when `alert_id` and `IRI_API_BASE_URL` are set.
 
+**Quick test with mocked JSON (get 3 product recommendations + Best Interest + e-app output):**
+```bash
+SUREIFY_BASE_URL= PYTHONPATH=. python -m agents.agent_two --tool-only --changes agents/sample_changes.json --client-id "1001"
+```
+With live Sureify (Option A token), omit `SUREIFY_BASE_URL=` to use real Puddle data for UserID 1001.
+
 ```mermaid
 flowchart TB
     subgraph entry["Entry"]

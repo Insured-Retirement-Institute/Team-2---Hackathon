@@ -19,10 +19,60 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-# Allow api.sureify_client / api.sureify_models when run from repo root (api lives under api/src)
+# Use the repo's API package (api/src) so agents always use the latest Sureify client and auth
 _api_src = Path(__file__).resolve().parent.parent / "api" / "src"
 if _api_src.exists() and str(_api_src) not in sys.path:
     sys.path.insert(0, str(_api_src))
+
+# Import Sureify client from api package (same as API server) for consistent auth and endpoints
+def _get_sureify_api():
+    """Return the api.sureify_client module (latest client used by the API server)."""
+    try:
+        from api.sureify_client import (
+            SureifyAuthConfig,
+            SureifyClient,
+            get_client_profiles as api_get_client_profiles,
+            get_disclosure_items as api_get_disclosure_items,
+            get_notes as api_get_notes,
+            get_policies as api_get_policies,
+            get_product_options as api_get_product_options,
+            get_suitability_data as api_get_suitability_data,
+            get_visualization_products as api_get_visualization_products,
+        )
+        return (
+            SureifyAuthConfig,
+            SureifyClient,
+            api_get_policies,
+            api_get_notes,
+            api_get_product_options,
+            api_get_suitability_data,
+            api_get_client_profiles,
+            api_get_disclosure_items,
+            api_get_visualization_products,
+        )
+    except ImportError:
+        from api.src.api.sureify_client import (
+            SureifyAuthConfig,
+            SureifyClient,
+            get_client_profiles as api_get_client_profiles,
+            get_disclosure_items as api_get_disclosure_items,
+            get_notes as api_get_notes,
+            get_policies as api_get_policies,
+            get_product_options as api_get_product_options,
+            get_suitability_data as api_get_suitability_data,
+            get_visualization_products as api_get_visualization_products,
+        )
+        return (
+            SureifyAuthConfig,
+            SureifyClient,
+            api_get_policies,
+            api_get_notes,
+            api_get_product_options,
+            api_get_suitability_data,
+            api_get_client_profiles,
+            api_get_disclosure_items,
+            api_get_visualization_products,
+        )
 
 # ---------------------------------------------------------------------------
 # Mock data (used when Sureify API is not configured)
@@ -209,36 +259,112 @@ MOCK_PRODUCTS: list[dict[str, Any]] = [
     },
 ]
 
+# Mock client profile for agentTwo when Puddle Data API is not configured (GET /puddle/clientProfile shape).
+MOCK_CLIENT_PROFILES: list[dict[str, Any]] = [
+    {
+        "ID": "client-profile-mock-001",
+        "clientId": "CLT-2024-00100",
+        "clientName": "Margaret A. Whitfield",
+        "parameters": {
+            "residesInNursingHome": "no",
+            "hasLongTermCareInsurance": "yes",
+            "hasMedicareSupplemental": "yes",
+            "grossIncome": "85000",
+            "disposableIncome": "45000",
+            "taxBracket": "22%",
+            "householdLiquidAssets": "250000",
+            "monthlyLivingExpenses": "4500",
+            "totalAnnuityValue": "180000",
+            "householdNetWorth": "650000",
+            "anticipateExpenseIncrease": "no",
+            "anticipateIncomeDecrease": "yes",
+            "anticipateLiquidAssetDecrease": "no",
+            "financialObjectives": "Supplement Social Security with guaranteed income; preserve assets for estate",
+            "distributionPlan": "Systematic withdrawals beginning at age 67",
+            "ownedAssets": "Primary residence (paid off), 401(k), Roth IRA, existing fixed annuity",
+            "timeToFirstDistribution": "5 years",
+            "expectedHoldingPeriod": "10+ years",
+            "sourceOfFunds": "1035 exchange from existing annuity and savings account",
+            "employmentStatus": "Employed full-time, plans to retire in 5 years",
+            "applyToMeansTestedBenefits": "no",
+        },
+    },
+    {
+        "ID": "client-profile-mock-002",
+        "clientId": "Marty McFly",
+        "clientName": "Marty McFly",
+        "parameters": {
+            "residesInNursingHome": "yes",
+            "hasLongTermCareInsurance": "yes",
+            "hasMedicareSupplemental": "yes",
+            "grossIncome": "85000",
+            "disposableIncome": "45000",
+            "taxBracket": "22%",
+            "householdLiquidAssets": "250000",
+            "monthlyLivingExpenses": "4500",
+            "totalAnnuityValue": "180000",
+            "householdNetWorth": "650000",
+            "anticipateExpenseIncrease": "yes",
+            "anticipateIncomeDecrease": "yes",
+            "anticipateLiquidAssetDecrease": "yes",
+            "financialObjectives": "string",
+            "distributionPlan": "string",
+            "ownedAssets": "string",
+            "timeToFirstDistribution": "string",
+            "expectedHoldingPeriod": "string",
+            "sourceOfFunds": "string",
+            "employmentStatus": "string",
+            "applyToMeansTestedBenefits": "yes",
+        },
+    },
+]
+
 
 def _is_sureify_configured() -> bool:
     """True if we have enough env to use the shared Sureify API client (base URL + bearer token or client credentials)."""
     base = os.environ.get("SUREIFY_BASE_URL")
-    if not base:
+    if not base or not base.strip():
         return False
     if os.environ.get("SUREIFY_BEARER_TOKEN"):
         return True
     return bool(os.environ.get("SUREIFY_CLIENT_ID") and os.environ.get("SUREIFY_CLIENT_SECRET"))
 
 
+# Cached authenticated client so we don't re-auth on every call (same client as API server)
+_cached_sureify_client: Any = None
+
+
 def _get_authenticated_client():
-    """Return an authenticated SureifyClient from api.sureify_client, or None if not configured."""
+    """Return an authenticated SureifyClient from the api package (latest client). Authenticates once per process and caches the client."""
+    global _cached_sureify_client
     if not _is_sureify_configured():
+        _cached_sureify_client = None
         return None
+    if _cached_sureify_client is not None and getattr(_cached_sureify_client, "access_token", None):
+        return _cached_sureify_client
     try:
-        from api.sureify_client import SureifyAuthConfig, SureifyClient
+        SureifyAuthConfig, SureifyClient, _, _, _, _, _, _, _ = _get_sureify_api()
     except ImportError:
-        try:
-            from api.src.api.sureify_client import SureifyAuthConfig, SureifyClient
-        except ImportError:
-            return None
+        return None
     config = SureifyAuthConfig()
     client = SureifyClient(config)
     try:
         loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
     except RuntimeError:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-    loop.run_until_complete(client.authenticate())
+    try:
+        loop.run_until_complete(client.authenticate())
+    except Exception:
+        _cached_sureify_client = None
+        return None
+    if not getattr(client, "access_token", None):
+        _cached_sureify_client = None
+        return None
+    _cached_sureify_client = client
     return client
 
 
@@ -349,13 +475,11 @@ def get_products(customer_identifier: str) -> list[dict[str, Any]]:
     """
     client = _get_authenticated_client()
     if client is not None:
-        try:
-            from api.sureify_client import get_product_options as api_get_product_options
-        except ImportError:
-            from api.src.api.sureify_client import get_product_options as api_get_product_options
+        _, _, _, _, api_get_product_options, _, _, _, _ = _get_sureify_api()
         options = api_get_product_options(client, user_id=customer_identifier or SUREIFY_USER_ID_HEADER)
         return [_product_option_to_canonical(o) for o in options]
-    if customer_identifier.lower().replace(" ", "") in ("martymcfly", "marty_mcfly", "marty-mcfly", ""):
+    key = customer_identifier.lower().replace(" ", "").replace("-", "").replace("_", "")
+    if key in ("1001", "martymcfly", "marty_mcfly", "marty-mcfly", ""):
         return [_product_option_to_canonical(dict(p)) for p in MOCK_PRODUCTS]
     return []
 
@@ -364,21 +488,19 @@ def get_book_of_business(customer_identifier: str) -> list[dict[str, Any]]:
     """
     Fetch the book of business (all policies) for a customer or advisor.
 
-    Uses api.sureify_client.get_policies when Sureify is configured (SUREIFY_BASE_URL,
-    SUREIFY_CLIENT_ID, SUREIFY_CLIENT_SECRET). Sends UserID header 1001.
-    Otherwise returns mock data for Marty McFly.
+    Uses the same Sureify client as the API server (api.sureify_client). Requires
+    SUREIFY_BASE_URL and either SUREIFY_BEARER_TOKEN or SUREIFY_CLIENT_ID + SUREIFY_CLIENT_SECRET.
+    Sends UserID header (customer_identifier or 1001). Otherwise returns mock data.
     """
     client = _get_authenticated_client()
     if client is not None:
-        try:
-            from api.sureify_client import get_policies
-        except ImportError:
-            from api.src.api.sureify_client import get_policies
-        policies = get_policies(client, user_id=SUREIFY_USER_ID_HEADER)
+        _, _, api_get_policies, _, _, _, _, _, _ = _get_sureify_api()
+        user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
+        policies = api_get_policies(client, user_id=user_id)
         return [_policy_to_dict(p) for p in policies]
-    # Mock: Marty McFly (default), Jane Doe (2 CDs 100k maturing in 30 days), John Smith (1 CD 1M maturing in 30 days)
+    # Mock: 1001 (default), Marty McFly, Jane Doe, John Smith
     key = customer_identifier.lower().replace(" ", "").replace("-", "").replace("_", "")
-    if key in ("martymcfly", "marty_mcfly", "marty"):
+    if key in ("1001", "martymcfly", "marty_mcfly", "marty"):
         return [dict(p) for p in MOCK_POLICIES]
     if key in ("janedoe", "jane_doe", "jane"):
         return [dict(p) for p in _mock_cd_policies_100k()]
@@ -400,12 +522,10 @@ def get_notifications_for_policies(
     """
     client = _get_authenticated_client()
     if client is not None:
+        _, _, _, api_get_notes, _, _, _, _, _ = _get_sureify_api()
         try:
-            from api.sureify_client import get_notes
-        except ImportError:
-            from api.src.api.sureify_client import get_notes
-        try:
-            notes = get_notes(client, user_id=SUREIFY_USER_ID_HEADER)
+            uid = (user_id or "").strip() or SUREIFY_USER_ID_HEADER
+            notes = api_get_notes(client, user_id=uid)
         except Exception:
             notes = []
         result: dict[str, list[dict[str, Any]]] = {pid: [] for pid in policy_ids}
@@ -426,10 +546,7 @@ def get_suitability_data(customer_identifier: str | None = None) -> list[dict[st
     client = _get_authenticated_client()
     if client is None:
         return []
-    try:
-        from api.sureify_client import get_suitability_data as api_get_suitability
-    except ImportError:
-        from api.src.api.sureify_client import get_suitability_data as api_get_suitability
+    _, _, _, _, _, api_get_suitability, _, _, _ = _get_sureify_api()
     user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
     return api_get_suitability(client, user_id=user_id)
 
@@ -439,10 +556,7 @@ def get_disclosure_items() -> list[dict[str, Any]]:
     client = _get_authenticated_client()
     if client is None:
         return []
-    try:
-        from api.sureify_client import get_disclosure_items as api_get_disclosures
-    except ImportError:
-        from api.src.api.sureify_client import get_disclosure_items as api_get_disclosures
+    _, _, _, _, _, _, _, api_get_disclosures, _ = _get_sureify_api()
     return api_get_disclosures(client, user_id=SUREIFY_USER_ID_HEADER)
 
 
@@ -451,10 +565,7 @@ def get_product_options() -> list[dict[str, Any]]:
     client = _get_authenticated_client()
     if client is None:
         return []
-    try:
-        from api.sureify_client import get_product_options as api_get_product_options
-    except ImportError:
-        from api.src.api.sureify_client import get_product_options as api_get_product_options
+    _, _, _, _, api_get_product_options, _, _, _, _ = _get_sureify_api()
     return api_get_product_options(client, user_id=SUREIFY_USER_ID_HEADER)
 
 
@@ -463,21 +574,22 @@ def get_visualization_products() -> list[dict[str, Any]]:
     client = _get_authenticated_client()
     if client is None:
         return []
-    try:
-        from api.sureify_client import get_visualization_products as api_get_viz
-    except ImportError:
-        from api.src.api.sureify_client import get_visualization_products as api_get_viz
+    _, _, _, _, _, _, _, _, api_get_viz = _get_sureify_api()
     return api_get_viz(client, user_id=SUREIFY_USER_ID_HEADER)
 
 
 def get_client_profiles(customer_identifier: str | None = None) -> list[dict[str, Any]]:
-    """Fetch client profiles from Puddle Data API (GET /puddle/clientProfile). Returns [] when not configured. Pass customer_identifier as UserID when provided."""
+    """Fetch client profiles from Puddle Data API (GET /puddle/clientProfile). Returns mock profiles when not configured. Pass customer_identifier as UserID when provided."""
     client = _get_authenticated_client()
-    if client is None:
-        return []
-    try:
-        from api.sureify_client import get_client_profiles as api_get_profiles
-    except ImportError:
-        from api.src.api.sureify_client import get_client_profiles as api_get_profiles
-    user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
-    return api_get_profiles(client, user_id=user_id)
+    if client is not None:
+        _, _, _, _, _, _, api_get_profiles, _, _ = _get_sureify_api()
+        user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
+        return api_get_profiles(client, user_id=user_id)
+    # Mock for agentTwo when Sureify is not configured
+    key = (customer_identifier or "").lower().replace(" ", "").replace("-", "").replace("_", "")
+    if key in ("1001", "martymcfly", "marty_mcfly", "marty", ""):
+        return [dict(p) for p in MOCK_CLIENT_PROFILES]
+    # Default: return first profile so any client_id gets some context
+    if MOCK_CLIENT_PROFILES:
+        return [dict(MOCK_CLIENT_PROFILES[0])]
+    return []

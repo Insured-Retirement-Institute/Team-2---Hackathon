@@ -17,20 +17,27 @@ except ImportError:
     RealDictCursor = None  # type: ignore
 
 
-def _get_connection_params() -> dict[str, str] | None:
+def _get_connection_params() -> dict[str, Any] | None:
     url = os.environ.get("DATABASE_URL")
     if url and url.strip() and url != "postgresql://":
         return {"dsn": url}
-    host = os.environ.get("RDSHOST")
-    user = os.environ.get("RDS_USER")
-    password = os.environ.get("RDS_PASSWORD")
-    dbname = os.environ.get("RDS_DB", "postgres")
+    # Prefer libpq-style PG* (so all agents + API can share env)
+    host = os.environ.get("PGHOST") or os.environ.get("RDSHOST")
+    user = os.environ.get("PGUSER") or os.environ.get("RDS_USER")
+    password = os.environ.get("PGPASSWORD") or os.environ.get("RDS_PASSWORD")
+    dbname = os.environ.get("PGDATABASE") or os.environ.get("RDS_DB", "postgres")
+    port_str = os.environ.get("PGPORT") or os.environ.get("RDS_PORT", "5432")
     if host and user and password:
+        try:
+            port = int(port_str)
+        except ValueError:
+            port = 5432
         return {
             "host": host,
             "user": user,
             "password": password,
             "dbname": dbname,
+            "port": port,
         }
     return None
 

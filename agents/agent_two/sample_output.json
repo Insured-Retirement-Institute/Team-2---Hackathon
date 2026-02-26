@@ -1,0 +1,420 @@
+
+{
+  "client_id": "1001",
+  "merged_profile_summary": {
+    "suitability": {
+      "risk_tolerance": "Conservative",
+      "time_horizon": "5-10 years",
+      "liquidity_needs": "Low -- has separate emergency fund covering 12 months of expenses",
+      "client_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate"
+    },
+    "goals_and_profile": {
+      "financial_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate",
+      "distribution_plan": "Systematic withdrawals beginning at age 67",
+      "expected_holding_period": "10+ years",
+      "gross_income": "85000",
+      "household_net_worth": "650000",
+      "household_liquid_assets": "250000",
+      "tax_bracket": "22%"
+    }
+  },
+  "recommendations": [
+    {
+      "product_id": "prod-mock-001",
+      "name": "Whole Life 5",
+      "carrier": "SureCo",
+      "rate": "N/A",
+      "risk_profile": "Moderate",
+      "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+    },
+    {
+      "product_id": "prod-mock-002",
+      "name": "Fixed Annuity Plus",
+      "carrier": "SureCo",
+      "rate": "N/A",
+      "risk_profile": "Conservative",
+      "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+    },
+    {
+      "product_id": "prod-mock-003",
+      "name": "Multi-Year Guarantee Annuity 7",
+      "carrier": "SureCo",
+      "rate": "N/A",
+      "risk_profile": "Moderate",
+      "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+    }
+  ],
+  "explanation": {
+    "summary": "AgentTwo produced 3 recommendation(s) from Sureify /puddle/products, contextualized using: risk tolerance, time horizon, liquidity needs, financial objectives, expected holding period. Input sections received: suitability, clientGoals, clientProfile.",
+    "data_sources_used": [
+      "sureify_products",
+      "db_suitability"
+    ],
+    "choice_criteria": [
+      "risk tolerance",
+      "time horizon",
+      "liquidity needs",
+      "financial objectives",
+      "expected holding period"
+    ],
+    "input_sections_received": [
+      "suitability",
+      "clientGoals",
+      "clientProfile"
+    ]
+  },
+  "reasons_to_switch": {
+    "pros": [
+      "No new paperwork or underwriting",
+      "Maintains existing carrier relationship",
+      "Surrender period already expired or minimal remaining"
+    ],
+    "cons": [
+      "Missing opportunity to capture higher market rates (check current product rates)"
+    ]
+  },
+  "storable_payload": {
+    "run_id": "1df10f00-ba19-4fec-ae54-b698b628ff8b",
+    "created_at": "2026-02-25T20:35:35.137564+00:00",
+    "client_id": "1001",
+    "input_summary": {
+      "sections_present": [
+        "suitability",
+        "clientGoals",
+        "clientProfile"
+      ]
+    },
+    "explanation": {
+      "summary": "AgentTwo produced 3 recommendation(s) from Sureify /puddle/products, contextualized using: risk tolerance, time horizon, liquidity needs, financial objectives, expected holding period. Input sections received: suitability, clientGoals, clientProfile.",
+      "data_sources_used": [
+        "sureify_products",
+        "db_suitability"
+      ],
+      "choice_criteria": [
+        "risk tolerance",
+        "time horizon",
+        "liquidity needs",
+        "financial objectives",
+        "expected holding period"
+      ],
+      "input_sections_received": [
+        "suitability",
+        "clientGoals",
+        "clientProfile"
+      ]
+    },
+    "recommendations": [
+      {
+        "product_id": "prod-mock-001",
+        "name": "Whole Life 5",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "risk_profile": "Moderate",
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      },
+      {
+        "product_id": "prod-mock-002",
+        "name": "Fixed Annuity Plus",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "risk_profile": "Conservative",
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      },
+      {
+        "product_id": "prod-mock-003",
+        "name": "Multi-Year Guarantee Annuity 7",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "risk_profile": "Moderate",
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      }
+    ],
+    "reasons_to_switch": {
+      "pros": [
+        "No new paperwork or underwriting",
+        "Maintains existing carrier relationship",
+        "Surrender period already expired or minimal remaining"
+      ],
+      "cons": [
+        "Missing opportunity to capture higher market rates (check current product rates)"
+      ]
+    },
+    "merged_profile_summary": {
+      "suitability": {
+        "risk_tolerance": "Conservative",
+        "time_horizon": "5-10 years",
+        "liquidity_needs": "Low -- has separate emergency fund covering 12 months of expenses",
+        "client_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate"
+      },
+      "goals_and_profile": {
+        "financial_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate",
+        "distribution_plan": "Systematic withdrawals beginning at age 67",
+        "expected_holding_period": "10+ years",
+        "gross_income": "85000",
+        "household_net_worth": "650000",
+        "household_liquid_assets": "250000",
+        "tax_bracket": "22%"
+      }
+    },
+    "electronic_application_payload": {
+      "run_id": "1df10f00-ba19-4fec-ae54-b698b628ff8b",
+      "client_id": "1001",
+      "merged_profile": {
+        "suitability": {
+          "risk_tolerance": "Conservative",
+          "time_horizon": "5-10 years",
+          "liquidity_needs": "Low -- has separate emergency fund covering 12 months of expenses",
+          "client_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate"
+        },
+        "goals_and_profile": {
+          "financial_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate",
+          "distribution_plan": "Systematic withdrawals beginning at age 67",
+          "expected_holding_period": "10+ years",
+          "gross_income": "85000",
+          "household_net_worth": "650000",
+          "household_liquid_assets": "250000",
+          "tax_bracket": "22%"
+        }
+      },
+      "selected_products": [
+        {
+          "product_id": "prod-mock-001",
+          "name": "Whole Life 5",
+          "carrier": "SureCo",
+          "rate": "N/A",
+          "term": null,
+          "surrenderPeriod": null,
+          "freeWithdrawal": null,
+          "guaranteedMinRate": null,
+          "risk_profile": "Moderate",
+          "suitable_for": null,
+          "key_benefits": null,
+          "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+        },
+        {
+          "product_id": "prod-mock-002",
+          "name": "Fixed Annuity Plus",
+          "carrier": "SureCo",
+          "rate": "N/A",
+          "term": null,
+          "surrenderPeriod": null,
+          "freeWithdrawal": null,
+          "guaranteedMinRate": null,
+          "risk_profile": "Conservative",
+          "suitable_for": null,
+          "key_benefits": null,
+          "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+        },
+        {
+          "product_id": "prod-mock-003",
+          "name": "Multi-Year Guarantee Annuity 7",
+          "carrier": "SureCo",
+          "rate": "N/A",
+          "term": null,
+          "surrenderPeriod": null,
+          "freeWithdrawal": null,
+          "guaranteedMinRate": null,
+          "risk_profile": "Moderate",
+          "suitable_for": null,
+          "key_benefits": null,
+          "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+        }
+      ]
+    }
+  },
+  "electronic_application_payload": {
+    "run_id": "1df10f00-ba19-4fec-ae54-b698b628ff8b",
+    "client_id": "1001",
+    "merged_profile": {
+      "suitability": {
+        "risk_tolerance": "Conservative",
+        "time_horizon": "5-10 years",
+        "liquidity_needs": "Low -- has separate emergency fund covering 12 months of expenses",
+        "client_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate"
+      },
+      "goals_and_profile": {
+        "financial_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate",
+        "distribution_plan": "Systematic withdrawals beginning at age 67",
+        "expected_holding_period": "10+ years",
+        "gross_income": "85000",
+        "household_net_worth": "650000",
+        "household_liquid_assets": "250000",
+        "tax_bracket": "22%"
+      }
+    },
+    "selected_products": [
+      {
+        "product_id": "prod-mock-001",
+        "name": "Whole Life 5",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "term": null,
+        "surrenderPeriod": null,
+        "freeWithdrawal": null,
+        "guaranteedMinRate": null,
+        "risk_profile": "Moderate",
+        "suitable_for": null,
+        "key_benefits": null,
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      },
+      {
+        "product_id": "prod-mock-002",
+        "name": "Fixed Annuity Plus",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "term": null,
+        "surrenderPeriod": null,
+        "freeWithdrawal": null,
+        "guaranteedMinRate": null,
+        "risk_profile": "Conservative",
+        "suitable_for": null,
+        "key_benefits": null,
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      },
+      {
+        "product_id": "prod-mock-003",
+        "name": "Multi-Year Guarantee Annuity 7",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "term": null,
+        "surrenderPeriod": null,
+        "freeWithdrawal": null,
+        "guaranteedMinRate": null,
+        "risk_profile": "Moderate",
+        "suitable_for": null,
+        "key_benefits": null,
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      }
+    ]
+  },
+  "best_interest_summary": {
+    "prudential_standards": "Reasonable diligence was applied to the customer's financial situation, needs, and objectives. Client profile characteristics used to justify the assessment: risk tolerance: Conservative; time horizon: 5-10 years; liquidity needs: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; financial objectives: Supplement Social Security with guaranteed income; preserve assets for estate; distribution plan: Systematic withdrawals beginning at age 67; expected holding period: 10+ years; gross income: 85000; household net worth: 650000; household liquid assets: 250000; tax bracket: 22%. Available products were investigated from sureify_products, db_suitability. Explicit comparative analysis was performed using criteria: risk tolerance, time horizon, liquidity needs, financial objectives, expected holding period. The options recommended are those that align with these client profile characteristics and are in the customer's best interest. Summary: AgentTwo produced 3 recommendation(s) from Sureify /puddle/products, contextualized using: risk tolerance, time horizon, liquidity needs, financial objectives, expected holding period. Input sections received: suitability, clientGoals, clientProfile.",
+    "conflict_management": "Material conflicts of interest are identified in firm disclosures. Compensation structures (commission, fee) are disclosed; conflicts are eliminated where possible or disclosed in writing. This recommendation was generated using the client profile characteristics above and product data; no conflict incentivized the selection of a particular product.",
+    "transparency": "Conflicts of interest and compensation are disclosed in writing before the transaction. Product alternatives considered are reflected in the recommendation set and reasons to switch (pros/cons). The client profile characteristics that justify the assessment (risk tolerance: Conservative, time horizon: 5-10 years, liquidity needs: Low -- has separate emergency fund covering 12 months of expenses, objectives: Supplement Social Security with guaranteed income; preserve assets for estate, financial objectives: Supplement Social Security with guaranteed income; preserve assets for estate, distribution plan: Systematic withdrawals beginning at age 67...) are documented in merged_profile_summary. Product risks and features (rate, term, surrender period, free withdrawal, guaranteed minimum) are included per recommendation with match_reason explaining fit to the client's profile.",
+    "documentation": "Customer information gathered and analysis performed are documented in merged_profile_summary and input_summary, including the client profile characteristics that justify the assessment: risk tolerance: Conservative, time horizon: 5-10 years, liquidity needs: Low -- has separate emergency fund covering 12 months of expenses, objectives: Supplement Social Security with guaranteed income; preserve assets for estate, financial objectives: Supplement Social Security with guaranteed income; preserve assets for estate, distribution plan: Systematic withdrawals beginning at age 67, expected holding period: 10+ years, gross income: 85000, household net worth: 650000, household liquid assets: 250000, tax bracket: 22%. The basis for the recommendation is documented in explanation (summary, data_sources_used, choice_criteria) and in each recommendation's match_reason. Alternatives considered are reflected in the product set and reasons_to_switch. Records supporting compliance (run_id, timestamp, payload) are retained; minimum 6-year retention applies per firm policy. Customer acknowledgment of recommendations and conflicts is obtained at point of sale (e-app flow).",
+    "ongoing_duty": "Firm will monitor customer accounts and recommendations for continued suitability; review changing circumstances and market conditions; update recommendations when customer profile characteristics change; and conduct periodic compliance reviews of firm-wide practices."
+  },
+  "final_eapp_output": {
+    "run_id": "1df10f00-ba19-4fec-ae54-b698b628ff8b",
+    "created_at": "2026-02-25T20:35:35.137564+00:00",
+    "client_id": "1001",
+    "best_interest_summary": {
+      "prudential_standards": "Reasonable diligence was applied to the customer's financial situation, needs, and objectives. Client profile characteristics used to justify the assessment: risk tolerance: Conservative; time horizon: 5-10 years; liquidity needs: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; financial objectives: Supplement Social Security with guaranteed income; preserve assets for estate; distribution plan: Systematic withdrawals beginning at age 67; expected holding period: 10+ years; gross income: 85000; household net worth: 650000; household liquid assets: 250000; tax bracket: 22%. Available products were investigated from sureify_products, db_suitability. Explicit comparative analysis was performed using criteria: risk tolerance, time horizon, liquidity needs, financial objectives, expected holding period. The options recommended are those that align with these client profile characteristics and are in the customer's best interest. Summary: AgentTwo produced 3 recommendation(s) from Sureify /puddle/products, contextualized using: risk tolerance, time horizon, liquidity needs, financial objectives, expected holding period. Input sections received: suitability, clientGoals, clientProfile.",
+      "conflict_management": "Material conflicts of interest are identified in firm disclosures. Compensation structures (commission, fee) are disclosed; conflicts are eliminated where possible or disclosed in writing. This recommendation was generated using the client profile characteristics above and product data; no conflict incentivized the selection of a particular product.",
+      "transparency": "Conflicts of interest and compensation are disclosed in writing before the transaction. Product alternatives considered are reflected in the recommendation set and reasons to switch (pros/cons). The client profile characteristics that justify the assessment (risk tolerance: Conservative, time horizon: 5-10 years, liquidity needs: Low -- has separate emergency fund covering 12 months of expenses, objectives: Supplement Social Security with guaranteed income; preserve assets for estate, financial objectives: Supplement Social Security with guaranteed income; preserve assets for estate, distribution plan: Systematic withdrawals beginning at age 67...) are documented in merged_profile_summary. Product risks and features (rate, term, surrender period, free withdrawal, guaranteed minimum) are included per recommendation with match_reason explaining fit to the client's profile.",
+      "documentation": "Customer information gathered and analysis performed are documented in merged_profile_summary and input_summary, including the client profile characteristics that justify the assessment: risk tolerance: Conservative, time horizon: 5-10 years, liquidity needs: Low -- has separate emergency fund covering 12 months of expenses, objectives: Supplement Social Security with guaranteed income; preserve assets for estate, financial objectives: Supplement Social Security with guaranteed income; preserve assets for estate, distribution plan: Systematic withdrawals beginning at age 67, expected holding period: 10+ years, gross income: 85000, household net worth: 650000, household liquid assets: 250000, tax bracket: 22%. The basis for the recommendation is documented in explanation (summary, data_sources_used, choice_criteria) and in each recommendation's match_reason. Alternatives considered are reflected in the product set and reasons_to_switch. Records supporting compliance (run_id, timestamp, payload) are retained; minimum 6-year retention applies per firm policy. Customer acknowledgment of recommendations and conflicts is obtained at point of sale (e-app flow).",
+      "ongoing_duty": "Firm will monitor customer accounts and recommendations for continued suitability; review changing circumstances and market conditions; update recommendations when customer profile characteristics change; and conduct periodic compliance reviews of firm-wide practices."
+    },
+    "recommendations_with_explainability": [
+      {
+        "product_id": "prod-mock-001",
+        "name": "Whole Life 5",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "term": null,
+        "surrenderPeriod": null,
+        "freeWithdrawal": null,
+        "guaranteedMinRate": null,
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      },
+      {
+        "product_id": "prod-mock-002",
+        "name": "Fixed Annuity Plus",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "term": null,
+        "surrenderPeriod": null,
+        "freeWithdrawal": null,
+        "guaranteedMinRate": null,
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      },
+      {
+        "product_id": "prod-mock-003",
+        "name": "Multi-Year Guarantee Annuity 7",
+        "carrier": "SureCo",
+        "rate": "N/A",
+        "term": null,
+        "surrenderPeriod": null,
+        "freeWithdrawal": null,
+        "guaranteedMinRate": null,
+        "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+      }
+    ],
+    "reasons_to_switch": {
+      "pros": [
+        "No new paperwork or underwriting",
+        "Maintains existing carrier relationship",
+        "Surrender period already expired or minimal remaining"
+      ],
+      "cons": [
+        "Missing opportunity to capture higher market rates (check current product rates)"
+      ]
+    },
+    "electronic_application_payload": {
+      "run_id": "1df10f00-ba19-4fec-ae54-b698b628ff8b",
+      "client_id": "1001",
+      "merged_profile": {
+        "suitability": {
+          "risk_tolerance": "Conservative",
+          "time_horizon": "5-10 years",
+          "liquidity_needs": "Low -- has separate emergency fund covering 12 months of expenses",
+          "client_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate"
+        },
+        "goals_and_profile": {
+          "financial_objectives": "Supplement Social Security with guaranteed income; preserve assets for estate",
+          "distribution_plan": "Systematic withdrawals beginning at age 67",
+          "expected_holding_period": "10+ years",
+          "gross_income": "85000",
+          "household_net_worth": "650000",
+          "household_liquid_assets": "250000",
+          "tax_bracket": "22%"
+        }
+      },
+      "selected_products": [
+        {
+          "product_id": "prod-mock-001",
+          "name": "Whole Life 5",
+          "carrier": "SureCo",
+          "rate": "N/A",
+          "term": null,
+          "surrenderPeriod": null,
+          "freeWithdrawal": null,
+          "guaranteedMinRate": null,
+          "risk_profile": "Moderate",
+          "suitable_for": null,
+          "key_benefits": null,
+          "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+        },
+        {
+          "product_id": "prod-mock-002",
+          "name": "Fixed Annuity Plus",
+          "carrier": "SureCo",
+          "rate": "N/A",
+          "term": null,
+          "surrenderPeriod": null,
+          "freeWithdrawal": null,
+          "guaranteedMinRate": null,
+          "risk_profile": "Conservative",
+          "suitable_for": null,
+          "key_benefits": null,
+          "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+        },
+        {
+          "product_id": "prod-mock-003",
+          "name": "Multi-Year Guarantee Annuity 7",
+          "carrier": "SureCo",
+          "rate": "N/A",
+          "term": null,
+          "surrenderPeriod": null,
+          "freeWithdrawal": null,
+          "guaranteedMinRate": null,
+          "risk_profile": "Moderate",
+          "suitable_for": null,
+          "key_benefits": null,
+          "match_reason": "Contextualized from your profile: risk tolerance: Conservative; time horizon: 5-10 years; liquidity: Low -- has separate emergency fund covering 12 months of expenses; objectives: Supplement Social Security with guaranteed income; preserve assets for estate; holding period: 10+ years"
+        }
+      ]
+    },
+    "customer_acknowledgment_placeholder": "Customer acknowledgment of recommendations and conflicts to be obtained at point of sale."
+  }
+}
