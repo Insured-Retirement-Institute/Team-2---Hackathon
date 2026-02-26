@@ -1,16 +1,46 @@
 """
-Sureify API client for agentOne (book of business and notifications).
+Sureify API client for agentOne, agentTwo, and agentThree (book of business, recommendations, chatbot).
 
-Uses the shared API client (api.sureify_client) when SUREIFY_BASE_URL and
-SUREIFY_CLIENT_ID / SUREIFY_CLIENT_SECRET are set; agent and API stay consistent
-via get_policies() and get_notes(). Policy/Note shapes follow api.sureify_models.
-Otherwise returns mock data for Marty McFly so the agent can run without the live API.
+Uses the shared API client (api.sureify_client) when SUREIFY_BASE_URL and bearer token or
+client credentials are set. When SUREIFY_BASE_URL is not set, base URL is read from
+**agents/sureify.yaml** (canonical Puddle Data API spec) so agents use the latest spec.
+Policy/Note shapes follow api.sureify_models. When not configured, returns mock data.
 """
 
 from __future__ import annotations
 
 # UserID header sent to Sureify API for policy/notes/products requests
 SUREIFY_USER_ID_HEADER = "1001"
+
+
+def _sureify_user_id(customer_identifier: str | None) -> str:
+    """Map customer display name to Sureify UserID. Hackathon API expects numeric IDs (e.g. 1001)."""
+    raw = (customer_identifier or "").strip()
+    key = raw.lower().replace(" ", "").replace("-", "").replace("_", "")
+    if key in ("1001", "martymcfly", "marty_mcfly", "marty", "janedoe", "jane_doe", "jane", "johnsmith", "john_smith", "john", ""):
+        return SUREIFY_USER_ID_HEADER
+    return raw
+
+
+def _get_base_url_from_sureify_spec() -> str | None:
+    """Read agents/sureify.yaml (canonical Puddle spec) and return base URL for Sureify API. Used when SUREIFY_BASE_URL is not set so agent_three and other agents use the latest spec."""
+    import re
+    spec_path = Path(__file__).resolve().parent / "sureify.yaml"
+    if not spec_path.exists():
+        return None
+    try:
+        text = spec_path.read_text()
+        # First server url (e.g. "  - url: https://hackathon-dev-api.sureify.com/puddle")
+        m = re.search(r"^\s*-\s*url:\s*(\S+)", text, re.MULTILINE)
+        if not m:
+            return None
+        url = m.group(1).strip().rstrip("/")
+        if url.endswith("/puddle"):
+            return url[:-7]  # base URL without /puddle
+        return url or None
+    except Exception:
+        return None
+
 
 import asyncio
 import os
@@ -321,9 +351,14 @@ MOCK_CLIENT_PROFILES: list[dict[str, Any]] = [
 
 
 def _is_sureify_configured() -> bool:
-    """True if we have enough env to use the shared Sureify API client (base URL + bearer token or client credentials)."""
-    base = os.environ.get("SUREIFY_BASE_URL")
-    if not base or not base.strip():
+    """True if we have enough env to use the shared Sureify API client (base URL + bearer token or client credentials). Uses agents/sureify.yaml for base URL when SUREIFY_BASE_URL is not set so agent_three uses the latest spec."""
+    base = os.environ.get("SUREIFY_BASE_URL", "").strip()
+    if not base:
+        from_spec = _get_base_url_from_sureify_spec()
+        if from_spec:
+            os.environ.setdefault("SUREIFY_BASE_URL", from_spec)
+            base = from_spec
+    if not base:
         return False
     if os.environ.get("SUREIFY_BEARER_TOKEN"):
         return True
@@ -495,7 +530,7 @@ def get_book_of_business(customer_identifier: str) -> list[dict[str, Any]]:
     client = _get_authenticated_client()
     if client is not None:
         _, _, api_get_policies, _, _, _, _, _, _ = _get_sureify_api()
-        user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
+        user_id = _sureify_user_id(customer_identifier)
         policies = api_get_policies(client, user_id=user_id)
         return [_policy_to_dict(p) for p in policies]
     # Mock: 1001 (default), Marty McFly, Jane Doe, John Smith
@@ -524,7 +559,7 @@ def get_notifications_for_policies(
     if client is not None:
         _, _, _, api_get_notes, _, _, _, _, _ = _get_sureify_api()
         try:
-            uid = (user_id or "").strip() or SUREIFY_USER_ID_HEADER
+            uid = _sureify_user_id(user_id)
             notes = api_get_notes(client, user_id=uid)
         except Exception:
             notes = []
@@ -542,13 +577,16 @@ def get_notifications_for_policies(
 
 
 def get_suitability_data(customer_identifier: str | None = None) -> list[dict[str, Any]]:
-    """Fetch suitability assessments from Puddle Data API (GET /puddle/suitabilityData). Returns [] when not configured. Pass customer_identifier as UserID when provided."""
+    """Fetch suitability assessments from Puddle Data API (GET /puddle/suitabilityData). Returns [] when not configured or on 404/401/5xx (hackathon API may not expose this endpoint)."""
     client = _get_authenticated_client()
     if client is None:
         return []
     _, _, _, _, _, api_get_suitability, _, _, _ = _get_sureify_api()
-    user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
-    return api_get_suitability(client, user_id=user_id)
+    user_id = _sureify_user_id(customer_identifier)
+    try:
+        return api_get_suitability(client, user_id=user_id)
+    except Exception:
+        return []
 
 
 def get_disclosure_items() -> list[dict[str, Any]]:
@@ -583,8 +621,11 @@ def get_client_profiles(customer_identifier: str | None = None) -> list[dict[str
     client = _get_authenticated_client()
     if client is not None:
         _, _, _, _, _, _, api_get_profiles, _, _ = _get_sureify_api()
-        user_id = (customer_identifier or "").strip() or SUREIFY_USER_ID_HEADER
-        return api_get_profiles(client, user_id=user_id)
+        user_id = _sureify_user_id(customer_identifier)
+        try:
+            return api_get_profiles(client, user_id=user_id)
+        except Exception:
+            return []
     # Mock for agentTwo when Sureify is not configured
     key = (customer_identifier or "").lower().replace(" ", "").replace("-", "").replace("_", "")
     if key in ("1001", "martymcfly", "marty_mcfly", "marty", ""):

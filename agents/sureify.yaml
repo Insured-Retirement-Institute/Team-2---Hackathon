@@ -1,0 +1,359 @@
+# Canonical Sureify Puddle Data API spec for agents (agent_one, agent_two, agent_three).
+# Keep this file in sync with the latest Sureify/hackathon API. Base URL and paths
+# are used by agents.sureify_client when SUREIFY_BASE_URL is not set.
+# See also: agents/puddle_api_spec.yaml (same content, alternate name).
+openapi: 3.0.3
+info:
+  title: Puddle Data API
+  description: |
+    Read-only API providing annuity policy data, client profiles, product options,
+    suitability assessments, disclosure documents, and enriched visualization data.
+
+    All endpoints return the complete set of records the authenticated user is
+    authorized to access. Results are scoped by the caller's authorization context.
+  version: 1.0.0
+  contact:
+    name: Hackathon Team
+
+servers:
+  - url: https://hackathon-dev-api.sureify.com/puddle
+    description: Development
+
+security:
+  - bearerAuth: []
+
+paths:
+  /policyData:
+    get:
+      summary: List all policy data
+      description: |
+        Returns every annuity policy record the caller is authorized to view,
+        including current contract values, rate information, renewal status,
+        and the full set of policy features, benefits, riders, and limitations.
+      operationId: getPolicyData
+      tags: [Policies]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [policyData]
+                properties:
+                  policyData:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PolicyData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /suitabilityData:
+    get:
+      summary: List all suitability assessments
+      operationId: getSuitabilityData
+      tags: [Suitability]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suitabilityData]
+                properties:
+                  suitabilityData:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SuitabilityData'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /disclosureItem:
+    get:
+      summary: List all disclosure items
+      operationId: getDisclosureItems
+      tags: [Disclosures]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [disclosureItems]
+                properties:
+                  disclosureItems:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DisclosureItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /productOption:
+    get:
+      summary: List all product options
+      operationId: getProductOptions
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [productOptions]
+                properties:
+                  productOptions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductOption'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /visualizationProduct:
+    get:
+      summary: List all visualization products
+      operationId: getVisualizationProducts
+      tags: [Products]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [visualizationProducts]
+                properties:
+                  visualizationProducts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VisualizationProduct'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /clientProfile:
+    get:
+      summary: List all client profiles
+      operationId: getClientProfiles
+      tags: [Clients]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clientProfiles]
+                properties:
+                  clientProfiles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClientProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    persona:
+      name: persona
+      in: query
+      required: true
+      schema:
+        type: string
+        enum: [agent]
+    userId:
+      name: UserID
+      in: header
+      required: true
+      schema:
+        type: string
+        default: "1001"
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+
+  schemas:
+    PolicyData:
+      type: object
+      required: [ID, clientId, contractId, clientName, carrier, productName, issueDate, currentValue, surrenderValue, currentRate, renewalRate, guaranteedMinRate, renewalDate, isMinRateRenewal, suitabilityStatus, eligibilityStatus, features]
+      properties:
+        ID: { type: string }
+        clientId: { type: string }
+        contractId: { type: string }
+        clientName: { type: string }
+        carrier: { type: string }
+        productName: { type: string }
+        issueDate: { type: string }
+        currentValue: { type: string }
+        surrenderValue: { type: string }
+        currentRate: { type: string }
+        renewalRate: { type: string }
+        guaranteedMinRate: { type: string }
+        renewalDate: { type: string }
+        isMinRateRenewal: { type: boolean }
+        suitabilityStatus: { type: string }
+        eligibilityStatus: { type: string }
+        features: { $ref: '#/components/schemas/PolicyFeaturesData' }
+
+    PolicyFeaturesData:
+      type: object
+      properties:
+        surrenderCharge: { type: string, nullable: true }
+        withdrawalAllowance: { type: string, nullable: true }
+        mvaPenalty: { type: string, nullable: true }
+        rateGuarantee: { type: string, nullable: true }
+        features: { type: array, items: { $ref: '#/components/schemas/PolicyFeature' } }
+        benefits: { type: array, items: { $ref: '#/components/schemas/PolicyFeature' } }
+        riders: { type: array, items: { $ref: '#/components/schemas/PolicyFeature' } }
+        limitations: { type: array, items: { $ref: '#/components/schemas/PolicyFeature' } }
+
+    PolicyFeature:
+      type: object
+      required: [name, description, included, type]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        included: { type: boolean }
+        type: { type: string, enum: [feature, benefit, rider, limitation] }
+
+    SuitabilityData:
+      type: object
+      required: [ID, clientId, clientObjectives, riskTolerance, timeHorizon, liquidityNeeds, taxConsiderations, guaranteedIncome, rateExpectations, surrenderTimeline, livingBenefits, advisorEligibility, score, isPrefilled]
+      properties:
+        ID: { type: string }
+        clientId: { type: string }
+        clientObjectives: { type: string }
+        riskTolerance: { type: string }
+        timeHorizon: { type: string }
+        liquidityNeeds: { type: string }
+        taxConsiderations: { type: string }
+        guaranteedIncome: { type: string }
+        rateExpectations: { type: string }
+        surrenderTimeline: { type: string }
+        livingBenefits: { type: array, items: { type: string } }
+        advisorEligibility: { type: string }
+        score: { type: integer }
+        isPrefilled: { type: boolean }
+
+    DisclosureItem:
+      type: object
+      required: [ID, disclosureId, required]
+      properties:
+        ID: { type: string }
+        disclosureId: { type: string }
+        label: { type: string, nullable: true }
+        title: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        documentName: { type: string, nullable: true }
+        required: { type: boolean }
+        link: { type: string, nullable: true }
+
+    ProductOption:
+      type: object
+      required: [ID, productId, name, carrier, rate, term, surrenderPeriod, freeWithdrawal, deathBenefit, guaranteedMinRate]
+      properties:
+        ID: { type: string }
+        productId: { type: string }
+        name: { type: string }
+        carrier: { type: string }
+        rate: { type: string }
+        term: { type: string }
+        premiumBonus: { type: string, nullable: true }
+        surrenderPeriod: { type: string }
+        surrenderCharge: { type: string, nullable: true }
+        freeWithdrawal: { type: string }
+        deathBenefit: { type: string }
+        guaranteedMinRate: { type: string }
+        riders: { type: array, items: { type: string }, nullable: true }
+        features: { type: array, items: { type: string }, nullable: true }
+        liquidity: { type: string, nullable: true }
+        mvaPenalty: { type: string, nullable: true }
+        licensingApproved: { type: boolean, nullable: true }
+        licensingDetails: { type: string, nullable: true }
+
+    VisualizationProduct:
+      type: object
+      required: [ID, productId, name, carrier, currentRate, guaranteedMinRate, surrenderYears, initialValue, incomeScore, growthScore, liquidityScore, protectionScore, projectedRates, performanceData, features]
+      properties:
+        ID: { type: string }
+        productId: { type: string }
+        name: { type: string }
+        carrier: { type: string }
+        currentRate: { type: number }
+        guaranteedMinRate: { type: number }
+        surrenderYears: { type: integer }
+        initialValue: { type: number }
+        premiumBonus: { type: number, nullable: true }
+        incomeScore: { type: integer }
+        growthScore: { type: integer }
+        liquidityScore: { type: integer }
+        protectionScore: { type: integer }
+        projectedRates: { type: array, items: { $ref: '#/components/schemas/ProjectedRate' } }
+        performanceData: { type: array, items: { $ref: '#/components/schemas/PerformanceDataPoint' } }
+        features: { type: array, items: { $ref: '#/components/schemas/VisualizationFeature' } }
+
+    ProjectedRate:
+      type: object
+      required: [year, conservativeRate, expectedRate, optimisticRate]
+      properties:
+        year: { type: integer }
+        conservativeRate: { type: number }
+        expectedRate: { type: number }
+        optimisticRate: { type: number }
+
+    PerformanceDataPoint:
+      type: object
+      required: [year, value]
+      properties:
+        year: { type: integer }
+        value: { type: number }
+        income: { type: number }
+
+    VisualizationFeature:
+      type: object
+      required: [name, startYear, endYear, category]
+      properties:
+        name: { type: string }
+        startYear: { type: integer }
+        endYear: { type: integer }
+        category: { type: string, enum: [surrender, bonus, rider, guarantee] }
+
+    ClientProfile:
+      type: object
+      required: [ID, clientId, clientName, parameters]
+      properties:
+        ID: { type: string }
+        clientId: { type: string }
+        clientName: { type: string }
+        parameters: { $ref: '#/components/schemas/ComparisonParameters' }
+        suitability: { nullable: true }
+
+    ComparisonParameters:
+      type: object
+      additionalProperties: true

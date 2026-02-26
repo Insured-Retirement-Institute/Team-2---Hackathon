@@ -8,6 +8,11 @@ comparisons and opportunity explainability). AgentTwo uses the shared Sureify cl
 (agents.sureify_client → api Sureify client), so AgentThree always gets up-to-date
 product and opportunity data via agentTwo.
 
+**Sureify spec:** The Sureify Puddle Data API used by this agent is defined in
+**agents/sureify.yaml** (canonical spec). When SUREIFY_BASE_URL is not set, the base URL
+is taken from that file so this agent uses the latest spec. Keep agents/sureify.yaml in
+sync with the hackathon/Sureify API.
+
 **Product comparisons & explainability:** When the user asks about opportunities, "why did
 you show me this?", or product comparisons, AgentThree must call the agentTwo tools
 (get_recommendation_context, get_product_recommendations_and_explanation) and then explain
