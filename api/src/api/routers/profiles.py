@@ -207,7 +207,7 @@ async def get_client_profile(
         # Build URL for passthrough endpoint (internal call)
         base_url = str(request.base_url).rstrip('/')
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             # Fetch all client profiles from passthrough
             profiles_response = await client.get(f"{base_url}/passthrough/client-profiles")
             if profiles_response.status_code != 200:
@@ -474,7 +474,7 @@ async def get_policy_data(
         # Build URL for passthrough endpoint (internal call)
         base_url = str(request.base_url).rstrip('/')
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             # Fetch all policy data from passthrough
             response = await client.get(f"{base_url}/passthrough/policy-data")
             if response.status_code != 200:

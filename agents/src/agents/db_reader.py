@@ -55,7 +55,7 @@ def get_all_clients() -> list[dict[str, Any]]:
     try:
         with psycopg2.connect(**params) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                cur.execute("SELECT client_account_number, client_name, process_dt FROM clients ORDER BY client_name")
+                cur.execute("SELECT client_account_number, client_name, process_dt FROM hackathon.clients ORDER BY client_name")
                 rows = [dict(r) for r in cur.fetchall()]
                 logger.debug("get_all_clients: fetched %d rows", len(rows))
                 return rows
@@ -81,7 +81,7 @@ def get_all_client_suitability_profiles() -> list[dict[str, Any]]:
                            annual_income_range, net_worth_range, liquid_net_worth_range,
                            tax_bracket, retirement_target_year, state, citizenship,
                            advisory_model, is_fee_based_account
-                    FROM client_suitability_profiles
+                    FROM hackathon.client_suitability_profiles
                     """
                 )
                 rows = [dict(r) for r in cur.fetchall()]
@@ -102,11 +102,11 @@ def get_contract_summary(client_id: str | None = None) -> list[dict[str, Any]]:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 if client_id:
                     cur.execute(
-                        "SELECT * FROM contract_summary WHERE owner_name ILIKE %s LIMIT 500",
+                        "SELECT * FROM hackathon.contract_summary WHERE owner_name ILIKE %s LIMIT 500",
                         (f"%{client_id}%",),
                     )
                 else:
-                    cur.execute("SELECT * FROM contract_summary LIMIT 500")
+                    cur.execute("SELECT * FROM hackathon.contract_summary LIMIT 500")
                 rows = [dict(r) for r in cur.fetchall()]
                 logger.debug("get_contract_summary: fetched %d rows (client_id=%s)", len(rows), client_id)
                 return rows
@@ -129,7 +129,7 @@ def get_all_products() -> list[dict[str, Any]]:
                            available_states, guaranteed_minimum_rate, current_fixed_rate,
                            risk_profile, age_min, age_max, suitable_for, key_benefits,
                            can_sell, compliance_notes
-                    FROM products
+                    FROM hackathon.products
                     WHERE can_sell = true
                     ORDER BY current_fixed_rate DESC NULLS LAST
                     """

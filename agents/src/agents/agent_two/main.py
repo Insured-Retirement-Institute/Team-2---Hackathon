@@ -57,7 +57,13 @@ if not _API_BASE:
 
 def _api_get(path: str) -> list | dict:
     """GET helper for the API server passthrough endpoints."""
-    r = httpx.get(f"{_API_BASE}{path}", timeout=30)
+    import time
+    url = f"{_API_BASE}{path}"
+    logger.info("API GET %s starting...", url)
+    start = time.time()
+    r = httpx.get(url, timeout=90)
+    elapsed = time.time() - start
+    logger.info("API GET %s -> %d in %.2fs", url, r.status_code, elapsed)
     r.raise_for_status()
     return r.json()
 

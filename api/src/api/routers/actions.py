@@ -2,12 +2,15 @@
 Action tab endpoints - disclosures and transaction submission.
 """
 import json
+import os
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from api import database
-from agents.agent_two.main import generate_product_recommendations
+
+AGENTS_URL = os.environ.get("AGENTS_URL", "")
 
 router = APIRouter(prefix="/alerts", tags=["Action"])
 
@@ -131,8 +134,10 @@ async def submit_transaction(
             detail=f"Alert {alert_id} has no clientId in policy data"
         )
 
-    # 3. Call agent_two to generate submission data
-    # Pass transaction details in changes_json
+    # 3. Call agent_two via HTTP to generate submission data
+    if not AGENTS_URL:
+        raise HTTPException(status_code=503, detail="AGENTS_URL environment variable is not configured")
+
     changes_json = json.dumps({
         "transaction_type": request.type,
         "rationale": request.rationale,
@@ -140,13 +145,18 @@ async def submit_transaction(
     })
 
     try:
-        result_json = generate_product_recommendations(
-            changes_json=changes_json,
-            client_id=client_id,
-            alert_id=alert_id
-        )
-
-        result = json.loads(result_json)
+        async with httpx.AsyncClient(timeout=90.0) as http_client:
+            response = await http_client.post(
+                f"{AGENTS_URL}/agent-two/recommendations",
+                json={
+                    "client_id": client_id,
+                    "changes_json": changes_json,
+                    "alert_id": alert_id,
+                    "use_llm": False,
+                }
+            )
+            response.raise_for_status()
+            result = response.json().get("result", {})
 
         if "error" in result:
             raise HTTPException(

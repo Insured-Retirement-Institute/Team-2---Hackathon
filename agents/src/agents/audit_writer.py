@@ -59,7 +59,7 @@ def persist_event(event: AgentRunEvent) -> bool:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO agent_run_events (
+                    INSERT INTO hackathon.agent_run_events (
                         event_id, timestamp, agent_id, run_id, client_id_scope,
                         input_summary, success, error_message, explanation_summary,
                         data_sources_used, choice_criteria, input_validation_passed,
@@ -111,7 +111,7 @@ def persist_agent_one_book_of_business(
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO agent_one_book_of_business (id, run_id, created_at, customer_identifier, payload)
+                    INSERT INTO hackathon.agent_one_book_of_business (id, run_id, created_at, customer_identifier, payload)
                     VALUES (%s::uuid, %s, %s::timestamptz, %s, %s)
                     """,
                     (row_id, run_id, created_at, customer_identifier, Json(payload)),
@@ -146,7 +146,7 @@ def persist_agent_two_payload(
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO agent_two_recommendation_runs (id, run_id, created_at, client_id, payload)
+                    INSERT INTO hackathon.agent_two_recommendation_runs (id, run_id, created_at, client_id, payload)
                     VALUES (%s::uuid, %s, %s::timestamptz, %s, %s)
                     """,
                     (row_id, run_id, created_at, client_id, Json(payload)),
@@ -264,7 +264,7 @@ def upsert_client_suitability_profile(
             with conn.cursor() as cur:
                 cur.execute(
                     f"""
-                    INSERT INTO client_suitability_profiles ({col_list})
+                    INSERT INTO hackathon.client_suitability_profiles ({col_list})
                     VALUES ({placeholders})
                     ON CONFLICT (client_account_number)
                     DO UPDATE SET {update_set}

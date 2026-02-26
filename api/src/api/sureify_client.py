@@ -68,7 +68,7 @@ class SureifyClient:
     def __init__(self, config: SureifyAuthConfig) -> None:
         self._config = config
         self._access_token: str | None = None
-        self._client = httpx.AsyncClient(base_url=config.base_url)
+        self._client = httpx.AsyncClient(base_url=config.base_url, timeout=60.0)
 
     async def __aenter__(self) -> "SureifyClient":
         await self.authenticate()
@@ -121,23 +121,28 @@ class SureifyClient:
         return {"Authorization": f"Bearer {self._access_token}", "UserID": "1001"}
 
     async def _get(self, path: str, response_key: str) -> list[dict]:
+        import time
         if not self._access_token:
             await self.authenticate()
         url = f"{self._config.base_url}{path}"
         headers = self._headers()
-        logger.debug("GET %s", url)
-        logger.debug("GET request headers: %s", headers)
+        logger.info("Sureify GET %s starting...", url)
+        start = time.time()
         response = await self._client.get(path, headers=headers)
-        logger.debug(
-            "GET %s -> %d, response headers: %s",
+        elapsed = time.time() - start
+        logger.info(
+            "Sureify GET %s -> %d in %.2fs",
             url,
             response.status_code,
-            dict(response.headers),
+            elapsed,
         )
         if response.status_code == 401:
             logger.info("GET %s returned 401, re-authenticating and retrying", url)
             await self.authenticate()
+            start = time.time()
             response = await self._client.get(path, headers=self._headers())
+            elapsed = time.time() - start
+            logger.info("Sureify GET %s (retry) -> %d in %.2fs", url, response.status_code, elapsed)
         response.raise_for_status()
         return response.json()[response_key]
 

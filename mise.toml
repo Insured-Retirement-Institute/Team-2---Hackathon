@@ -749,6 +749,10 @@ wait
 echo "Hot-reload disabled. Normal startup restored."
 """
 
+[tasks."hotfix:all"]
+description = "Copy local changes to both api and agents pods"
+depends = ["hotfix:api", "hotfix:agents"]
+
 [tasks."hotfix:api"]
 description = "Copy local api changes to running pod (use after hotfix:enable)"
 run = """
