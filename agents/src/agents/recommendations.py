@@ -151,9 +151,9 @@ def _build_choice_explanation(
         input_sections.append("clientGoals")
     if changes.client_profile:
         input_sections.append("clientProfile")
-    catalog = "Sureify /puddle/products" if use_sureify else "database products table"
+    catalog = "available product catalog" if use_sureify else "product catalog"
     summary = (
-        f"AgentTwo produced {recommendation_count} recommendation(s) from {catalog}, "
+        f"Opportunity Generator produced {recommendation_count} opportunities presented from the {catalog}, "
         f"contextualized using: {', '.join(criteria)}. "
         f"Input sections received: {', '.join(input_sections) or 'none'}."
     )
