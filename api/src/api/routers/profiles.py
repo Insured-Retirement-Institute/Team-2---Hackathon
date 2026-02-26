@@ -205,7 +205,8 @@ async def get_client_profile(
     # 3. No data in DB - fetch from passthrough endpoints (which work!)
     try:
         # Build URL for passthrough endpoint (internal call)
-        base_url = str(request.base_url).rstrip('/')
+        root_path = request.scope.get("root_path", "")
+        base_url = str(request.base_url).rstrip('/') + root_path
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Fetch all client profiles from passthrough
@@ -472,7 +473,8 @@ async def get_policy_data(
     """
     try:
         # Build URL for passthrough endpoint (internal call)
-        base_url = str(request.base_url).rstrip('/')
+        root_path = request.scope.get("root_path", "")
+        base_url = str(request.base_url).rstrip('/') + root_path
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Fetch all policy data from passthrough
