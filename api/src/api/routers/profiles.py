@@ -9,7 +9,8 @@ Logic:
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from pydantic import BaseModel
 
 from api.sureify_client import SureifyClient, SureifyAuthConfig
@@ -85,7 +86,10 @@ SureifyDep = Annotated[SureifyClient, Depends(get_sureify_client)]
 
 
 @router.get("/{clientId}/profile", response_model=ClientProfile)
-async def get_client_profile(clientId: str, sureify: SureifyDep):
+async def get_client_profile(
+    clientId: Annotated[str, Path(description="Client identifier", example="Marty McFly")],
+    request: Request
+):
     """
     Get client profile with comparison parameters and suitability data.
 
@@ -198,66 +202,154 @@ async def get_client_profile(clientId: str, sureify: SureifyDep):
             suitability=suitability
         )
 
-    # 3. No data in DB - fetch from Sureify using client methods
+    # 3. No data in DB - fetch from passthrough endpoints (which work!)
     try:
-        # Fetch all client profiles and find the matching one
-        client_profiles = await sureify.get_client_profiles()
-        client_data = next((p for p in client_profiles if p.clientId == clientId), None)
+        # Build URL for passthrough endpoint (internal call)
+        base_url = str(request.base_url).rstrip('/')
 
-        if not client_data:
-            raise HTTPException(status_code=404, detail=f"Client {clientId} not found in Sureify")
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Fetch all client profiles from passthrough
+            profiles_response = await client.get(f"{base_url}/passthrough/client-profiles")
+            if profiles_response.status_code != 200:
+                raise HTTPException(status_code=profiles_response.status_code,
+                                  detail="Failed to fetch client profiles from Sureify")
 
-        # Fetch suitability data
-        suitability_list = await sureify.get_suitability_data()
-        suitability_data = next((s for s in suitability_list if s.clientId == clientId), None)
+            profiles_data = profiles_response.json()
+            client_data = next((p for p in profiles_data if p.get('clientId') == clientId), None)
 
-        # Build response matching the format
+            if not client_data:
+                raise HTTPException(status_code=404, detail=f"Client {clientId} not found in Sureify")
+
+            # Fetch suitability data from passthrough
+            suitability_response = await client.get(f"{base_url}/passthrough/suitability-data")
+            suitability_list = suitability_response.json() if suitability_response.status_code == 200 else []
+            suitability_data = next((s for s in suitability_list if s.get('clientId') == clientId), None)
+
+        # Build response objects from JSON data
         parameters = None
-        if client_data.parameters:
+        params_raw = client_data.get('parameters')
+        if params_raw:
+            def get_value(field):
+                """Extract value from enum-like field or return as-is"""
+                if isinstance(field, dict) and 'value' in field:
+                    return field['value']
+                return field
+
             parameters = ComparisonParameters(
-                residesInNursingHome=client_data.parameters.residesInNursingHome.value if client_data.parameters.residesInNursingHome else None,
-                hasLongTermCareInsurance=client_data.parameters.hasLongTermCareInsurance.value if client_data.parameters.hasLongTermCareInsurance else None,
-                hasMedicareSupplemental=client_data.parameters.hasMedicareSupplemental.value if client_data.parameters.hasMedicareSupplemental else None,
-                grossIncome=client_data.parameters.grossIncome,
-                disposableIncome=client_data.parameters.disposableIncome,
-                taxBracket=client_data.parameters.taxBracket,
-                householdLiquidAssets=client_data.parameters.householdLiquidAssets,
-                monthlyLivingExpenses=client_data.parameters.monthlyLivingExpenses,
-                totalAnnuityValue=client_data.parameters.totalAnnuityValue,
-                householdNetWorth=client_data.parameters.householdNetWorth,
-                anticipateExpenseIncrease=client_data.parameters.anticipateExpenseIncrease.value if client_data.parameters.anticipateExpenseIncrease else None,
-                anticipateIncomeDecrease=client_data.parameters.anticipateIncomeDecrease.value if client_data.parameters.anticipateIncomeDecrease else None,
-                anticipateLiquidAssetDecrease=client_data.parameters.anticipateLiquidAssetDecrease.value if client_data.parameters.anticipateLiquidAssetDecrease else None,
-                financialObjectives=client_data.parameters.financialObjectives,
-                distributionPlan=client_data.parameters.distributionPlan,
-                ownedAssets=client_data.parameters.ownedAssets,
-                timeToFirstDistribution=client_data.parameters.timeToFirstDistribution,
-                expectedHoldingPeriod=client_data.parameters.expectedHoldingPeriod,
-                sourceOfFunds=client_data.parameters.sourceOfFunds,
-                employmentStatus=client_data.parameters.employmentStatus,
-                applyToMeansTestedBenefits=client_data.parameters.applyToMeansTestedBenefits.value if client_data.parameters.applyToMeansTestedBenefits else None,
+                residesInNursingHome=get_value(params_raw.get('residesInNursingHome')),
+                hasLongTermCareInsurance=get_value(params_raw.get('hasLongTermCareInsurance')),
+                hasMedicareSupplemental=get_value(params_raw.get('hasMedicareSupplemental')),
+                grossIncome=params_raw.get('grossIncome'),
+                disposableIncome=params_raw.get('disposableIncome'),
+                taxBracket=params_raw.get('taxBracket'),
+                householdLiquidAssets=params_raw.get('householdLiquidAssets'),
+                monthlyLivingExpenses=params_raw.get('monthlyLivingExpenses'),
+                totalAnnuityValue=params_raw.get('totalAnnuityValue'),
+                householdNetWorth=params_raw.get('householdNetWorth'),
+                anticipateExpenseIncrease=get_value(params_raw.get('anticipateExpenseIncrease')),
+                anticipateIncomeDecrease=get_value(params_raw.get('anticipateIncomeDecrease')),
+                anticipateLiquidAssetDecrease=get_value(params_raw.get('anticipateLiquidAssetDecrease')),
+                financialObjectives=params_raw.get('financialObjectives'),
+                distributionPlan=params_raw.get('distributionPlan'),
+                ownedAssets=params_raw.get('ownedAssets'),
+                timeToFirstDistribution=params_raw.get('timeToFirstDistribution'),
+                expectedHoldingPeriod=params_raw.get('expectedHoldingPeriod'),
+                sourceOfFunds=params_raw.get('sourceOfFunds'),
+                employmentStatus=params_raw.get('employmentStatus'),
+                applyToMeansTestedBenefits=get_value(params_raw.get('applyToMeansTestedBenefits')),
             )
 
         suitability = None
         if suitability_data:
             suitability = SuitabilityData(
-                clientObjectives=suitability_data.clientObjectives,
-                riskTolerance=suitability_data.riskTolerance,
-                timeHorizon=suitability_data.timeHorizon,
-                liquidityNeeds=suitability_data.liquidityNeeds,
-                taxConsiderations=suitability_data.taxConsiderations,
-                guaranteedIncome=suitability_data.guaranteedIncome,
-                rateExpectations=suitability_data.rateExpectations,
-                surrenderTimeline=suitability_data.surrenderTimeline,
-                livingBenefits=suitability_data.livingBenefits,
-                advisorEligibility=suitability_data.advisorEligibility,
-                score=suitability_data.score,
-                isPrefilled=suitability_data.isPrefilled,
+                clientObjectives=suitability_data.get('clientObjectives'),
+                riskTolerance=suitability_data.get('riskTolerance'),
+                timeHorizon=suitability_data.get('timeHorizon'),
+                liquidityNeeds=suitability_data.get('liquidityNeeds'),
+                taxConsiderations=suitability_data.get('taxConsiderations'),
+                guaranteedIncome=suitability_data.get('guaranteedIncome'),
+                rateExpectations=suitability_data.get('rateExpectations'),
+                surrenderTimeline=suitability_data.get('surrenderTimeline'),
+                livingBenefits=suitability_data.get('livingBenefits', []),
+                advisorEligibility=suitability_data.get('advisorEligibility'),
+                score=suitability_data.get('score', 0),
+                isPrefilled=suitability_data.get('isPrefilled', False),
+            )
+
+        # 4. SAVE TO DATABASE for future requests
+        # Save profile data
+        if parameters:
+            await pool.execute(
+                """
+                INSERT INTO client_profiles (
+                    client_id, client_name,
+                    resides_in_nursing_home, has_long_term_care_insurance, has_medicare_supplemental,
+                    gross_income, disposable_income, tax_bracket,
+                    household_liquid_assets, monthly_living_expenses, total_annuity_value, household_net_worth,
+                    anticipate_expense_increase, anticipate_income_decrease, anticipate_liquid_asset_decrease,
+                    financial_objectives, distribution_plan, owned_assets,
+                    time_to_first_distribution, expected_holding_period, source_of_funds,
+                    employment_status, apply_to_means_tested_benefits,
+                    updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, now())
+                ON CONFLICT (client_id) DO NOTHING
+                """,
+                client_data.get('clientId'),
+                client_data.get('clientName'),
+                parameters.residesInNursingHome,
+                parameters.hasLongTermCareInsurance,
+                parameters.hasMedicareSupplemental,
+                parameters.grossIncome,
+                parameters.disposableIncome,
+                parameters.taxBracket,
+                parameters.householdLiquidAssets,
+                parameters.monthlyLivingExpenses,
+                parameters.totalAnnuityValue,
+                parameters.householdNetWorth,
+                parameters.anticipateExpenseIncrease,
+                parameters.anticipateIncomeDecrease,
+                parameters.anticipateLiquidAssetDecrease,
+                parameters.financialObjectives,
+                parameters.distributionPlan,
+                parameters.ownedAssets,
+                parameters.timeToFirstDistribution,
+                parameters.expectedHoldingPeriod,
+                parameters.sourceOfFunds,
+                parameters.employmentStatus,
+                parameters.applyToMeansTestedBenefits
+            )
+
+        # Save suitability data
+        if suitability:
+            await pool.execute(
+                """
+                INSERT INTO client_suitability_data (
+                    client_id,
+                    client_objectives, risk_tolerance, time_horizon, liquidity_needs,
+                    tax_considerations, guaranteed_income, rate_expectations, surrender_timeline,
+                    living_benefits, advisor_eligibility, score, is_prefilled,
+                    updated_at
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, now())
+                ON CONFLICT (client_id) DO NOTHING
+                """,
+                client_data.get('clientId'),
+                suitability.clientObjectives,
+                suitability.riskTolerance,
+                suitability.timeHorizon,
+                suitability.liquidityNeeds,
+                suitability.taxConsiderations,
+                suitability.guaranteedIncome,
+                suitability.rateExpectations,
+                suitability.surrenderTimeline,
+                suitability.livingBenefits,
+                suitability.advisorEligibility,
+                suitability.score,
+                suitability.isPrefilled
             )
 
         return ClientProfile(
-            clientId=client_data.clientId,
-            clientName=client_data.clientName,
+            clientId=client_data.get('clientId'),
+            clientName=client_data.get('clientName'),
             parameters=parameters,
             suitability=suitability
         )
@@ -270,7 +362,7 @@ async def get_client_profile(clientId: str, sureify: SureifyDep):
 
 @router.put("/{clientId}/profile")
 async def save_client_profile(
-    clientId: str,
+    clientId: Annotated[str, Path(description="Client identifier", example="Marty McFly")],
     parameters: ComparisonParameters
 ):
     """
@@ -368,32 +460,44 @@ async def save_client_profile(
 
 
 @router.get("/{clientId}/policies/{policyId}")
-async def get_policy_data(clientId: str, policyId: str, sureify: SureifyDep):
+async def get_policy_data(
+    clientId: Annotated[str, Path(description="Client identifier", example="Marty McFly")],
+    policyId: Annotated[str, Path(description="Policy/contract identifier", example="POL-001")],
+    request: Request
+):
     """
     Get full policy data for a specific client and policy combination.
 
     Calls /passthrough/policy-data endpoint and filters for the specific policy.
     """
-    # Get all policy data from Sureify
     try:
-        policy_data_list = await sureify.get_policy_data()
+        # Build URL for passthrough endpoint (internal call)
+        base_url = str(request.base_url).rstrip('/')
 
-        # Find the specific policy matching both clientId and policyId
-        matching_policy = None
-        for policy in policy_data_list:
-            # Check if this policy matches both clientId and contractId (policyId)
-            if policy.clientId == clientId and policy.contractId == policyId:
-                matching_policy = policy
-                break
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Fetch all policy data from passthrough
+            response = await client.get(f"{base_url}/passthrough/policy-data")
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code,
+                                  detail="Failed to fetch policy data from Sureify")
 
-        if not matching_policy:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Policy {policyId} not found for client {clientId}"
-            )
+            policy_data_list = response.json()
 
-        # Return the policy as a dict
-        return matching_policy.model_dump(mode='json')
+            # Find the specific policy matching both clientId and policyId
+            matching_policy = None
+            for policy in policy_data_list:
+                # Check if this policy matches both clientId and contractId (policyId)
+                if policy.get('clientId') == clientId and policy.get('contractId') == policyId:
+                    matching_policy = policy
+                    break
+
+            if not matching_policy:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Policy {policyId} not found for client {clientId}"
+                )
+
+            return matching_policy
 
     except HTTPException:
         raise
@@ -406,7 +510,7 @@ async def get_policy_data(clientId: str, policyId: str, sureify: SureifyDep):
 
 @router.put("/{clientId}/suitability")
 async def save_suitability(
-    clientId: str,
+    clientId: Annotated[str, Path(description="Client identifier", example="Marty McFly")],
     suitability: SuitabilityData
 ):
     """
