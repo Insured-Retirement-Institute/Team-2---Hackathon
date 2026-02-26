@@ -3,6 +3,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { AlertDetailPage } from "./pages/AlertDetail";
 import { ApiSpec } from "./pages/ApiSpec";
 import { ResponsibleAIDashboard } from "./pages/ResponsibleAIDashboard";
+import { AdminDashboard } from "./pages/AdminDashboard";
 import { ChatBot } from "./components/ChatBot";
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/alerts/:alertId" element={<AlertDetailPage />} />
           <Route path="/api-spec" element={<ApiSpec />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           <Route
             path="/admin/responsible-ai"
             element={<ResponsibleAIDashboard />}

@@ -21,7 +21,8 @@ import {
 import { ParametersView } from "./ParametersView";
 import { ProductShelfModal } from "./ProductShelfModal";
 import { InteractiveComparisonCharts } from "./InteractiveComparisonCharts";
-import { fetchProductShelf, fetchVisualization } from "@/api/alert-detail";
+import { fetchProductShelf } from "@/api/alert-detail";
+import { getVisualizationProducts } from "@/api/compare";
 
 type CompareView = "parameters" | "overview";
 
@@ -88,11 +89,15 @@ export function CompareTab({
   // Load visualization data for charts
   useEffect(() => {
     if (comparisonData) {
-      const allProducts = [comparisonData.current, ...comparisonData.alternatives];
       setVizLoading(true);
-      Promise.all(allProducts.map((p) => fetchVisualization(p.name)))
-        .then((results) => {
-          setVizProducts(results);
+      getVisualizationProducts()
+        .then((allVizProducts) => {
+          // Filter to only the 4 products we're comparing
+          const allProducts = [comparisonData.current, ...comparisonData.alternatives];
+          const matched = allProducts
+            .map(p => allVizProducts.find(v => v.name === p.name))
+            .filter((v): v is VisualizationProduct => v !== undefined);
+          setVizProducts(matched);
           setVizLoading(false);
         })
         .catch((err) => {

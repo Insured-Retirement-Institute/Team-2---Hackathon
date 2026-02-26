@@ -1,12 +1,13 @@
 export type VisualizationProduct = {
-  id: string;
+  ID: string;
+  productId: string;
   name: string;
   carrier: string;
   currentRate: number;
   guaranteedMinRate: number;
   surrenderYears: number;
   initialValue: number;
-  premiumBonus?: number;
+  premiumBonus?: number | null;
   incomeScore: number;
   growthScore: number;
   liquidityScore: number;
@@ -63,12 +64,14 @@ export type PolicyData = {
 };
 
 export type ProductOption = {
+  ID?: string;
+  productId?: string;
   id?: string;
   name: string;
   carrier: string;
   rate: string;
   term?: string;
-  premiumBonus?: string;
+  premiumBonus?: string | null;
   surrenderPeriod?: string;
   surrenderCharge?: string;
   freeWithdrawal?: string;
@@ -78,9 +81,9 @@ export type ProductOption = {
   features?: string[];
   cons?: string[];
   liquidity?: string;
-  mvaPenalty?: string;
+  mvaPenalty?: string | null;
   licensingApproved?: boolean;
-  licensingDetails?: string;
+  licensingDetails?: string | null;
 };
 
 export type ComparisonData = {

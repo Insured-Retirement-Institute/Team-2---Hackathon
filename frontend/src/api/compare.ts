@@ -4,12 +4,14 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
 export interface ProductOption {
+  ID?: string;
+  productId?: string;
   id?: string;
   name: string;
   carrier: string;
   rate: string;
   term?: string;
-  premiumBonus?: string;
+  premiumBonus?: string | null;
   surrenderPeriod?: string;
   surrenderCharge?: string;
   freeWithdrawal?: string;
@@ -19,9 +21,9 @@ export interface ProductOption {
   features?: string[];
   cons?: string[];
   liquidity?: string;
-  mvaPenalty?: string;
+  mvaPenalty?: string | null;
   licensingApproved?: boolean;
-  licensingDetails?: string;
+  licensingDetails?: string | null;
 }
 
 export interface ComparisonData {
