@@ -4,9 +4,9 @@ or elsewhere) as context.
 
 **Sureify / API:** AgentThree does not call Sureify or the API directly. All product data,
 opportunities, and explainability come from **agentTwo** (the domain agent for product
-comparisons and opportunity explainability). AgentTwo uses the shared Sureify client
-(agents.sureify_client → api Sureify client), so AgentThree always gets up-to-date
-product and opportunity data via agentTwo.
+comparisons and opportunity explainability). AgentTwo uses httpx to call the API server's
+passthrough endpoints, so AgentThree always gets up-to-date product and opportunity data
+via agentTwo.
 
 **Product comparisons & explainability:** When the user asks about opportunities, "why did
 you show me this?", or product comparisons, AgentThree must call the agentTwo tools

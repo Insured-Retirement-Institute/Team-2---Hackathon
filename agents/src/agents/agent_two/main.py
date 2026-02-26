@@ -44,14 +44,20 @@ from agents.audit_writer import (
     persist_event,
     upsert_client_suitability_profile,
 )
+import httpx
+
 from agents.db_reader import get_current_database_context as fetch_db_context
 from agents.recommendations import generate_recommendations
 from agents.responsible_ai_schemas import AgentId, AgentRunEvent
-from agents.sureify_client import get_book_of_business as fetch_sureify_policies
-from agents.sureify_client import get_client_profiles as fetch_sureify_client_profiles
-from agents.sureify_client import get_notifications_for_policies as fetch_sureify_notifications
-from agents.sureify_client import get_products as fetch_sureify_products
-from agents.sureify_client import get_suitability_data as fetch_sureify_suitability_data
+
+_API_BASE = os.environ.get("API_BASE_URL", "http://localhost:8000")
+
+
+def _api_get(path: str) -> list | dict:
+    """GET helper for the API server passthrough endpoints."""
+    r = httpx.get(f"{_API_BASE}{path}", timeout=30)
+    r.raise_for_status()
+    return r.json()
 
 
 def _client_profile_characteristics(merged: dict) -> list[str]:
@@ -241,17 +247,20 @@ def _build_best_interest_and_eapp(
 
 
 def _get_sureify_context(customer_identifier: str) -> dict:
-    """Fetch Puddle Data API context: policyData, notes (if available), productOption, suitabilityData, clientProfile."""
-    policies = fetch_sureify_policies(customer_identifier)
-    policy_ids = [p.get("ID") or p.get("policyNumber") or p.get("contractId") or "" for p in policies if p]
-    policy_ids = [x for x in policy_ids if x]
-    notifications = fetch_sureify_notifications(policy_ids, user_id=customer_identifier)
-    products = fetch_sureify_products(customer_identifier)
-    suitability_data = fetch_sureify_suitability_data(customer_identifier)
-    client_profiles = fetch_sureify_client_profiles(customer_identifier)
+    """Fetch context from passthrough APIs (policy, product, suitability, client) and alerts."""
+    policies = _api_get("/passthrough/policy-data")
+    products = _api_get("/passthrough/product-options")
+    suitability_data = _api_get("/passthrough/suitability-data")
+    client_profiles = _api_get("/passthrough/client-profiles")
+    alerts = _api_get("/api/alerts")
+    notifications_by_policy: dict[str, list] = {}
+    for a in alerts:
+        pid = a.get("policyId") or a.get("policy_id") or ""
+        if pid:
+            notifications_by_policy.setdefault(pid, []).append(a)
     return {
         "sureify_policies": policies,
-        "sureify_notifications_by_policy": notifications,
+        "sureify_notifications_by_policy": notifications_by_policy,
         "sureify_products": products,
         "sureify_suitability_data": suitability_data,
         "sureify_client_profiles": client_profiles,
