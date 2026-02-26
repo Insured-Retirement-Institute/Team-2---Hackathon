@@ -79,7 +79,7 @@ spec:
                   optional: true
             # API server URL - points to internal API service in K8s cluster
             - name: API_BASE_URL
-              value: "http://hack2future:80/api"
+              value: "http://hack2future:80"
             # IRI API base URL - points to internal API service in K8s cluster
             - name: IRI_API_BASE_URL
               value: "http://hack2future:80/api"
