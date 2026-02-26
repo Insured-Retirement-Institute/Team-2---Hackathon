@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api import database
 from api.database import close_db, init_db
-from api.routers import passthrough, policies, profiles, alerts, compare, actions, products, responsible_ai
+from api.routers import passthrough, policies, profiles, alerts, compare, actions, products, responsible_ai, admin
 
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
@@ -67,3 +67,4 @@ app.include_router(compare.router)
 app.include_router(actions.router)
 app.include_router(products.router)
 app.include_router(responsible_ai.router)
+app.include_router(admin.router)
