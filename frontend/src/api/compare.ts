@@ -12,9 +12,9 @@ export interface ProductOption {
   premiumBonus?: string | null;
   surrenderPeriod?: string;
   surrenderCharge?: string;
-  freeWithdrawal: string;
-  deathBenefit: string;
-  guaranteedMinRate: string;
+  freeWithdrawal?: string;
+  deathBenefit?: string;
+  guaranteedMinRate?: string;
   riders?: string[];
   features?: string[];
   cons?: string[];
@@ -169,7 +169,7 @@ const mockVisualizationProducts: VisualizationProduct[] = [
   {
     ID: "viz-1",
     productId: "PROD-CURRENT",
-    name: "SecureChoice MYGA (Current)",
+    name: "SecureChoice MYGA",
     carrier: "Integrity Life",
     currentRate: 3.8,
     guaranteedMinRate: 1.5,
@@ -179,21 +179,20 @@ const mockVisualizationProducts: VisualizationProduct[] = [
     growthScore: 58,
     liquidityScore: 55,
     protectionScore: 72,
-    projectedRates: [
-      { year: 1, conservativeRate: 1.5, expectedRate: 3.8, optimisticRate: 4.2 },
-      { year: 2, conservativeRate: 1.5, expectedRate: 3.5, optimisticRate: 4.0 },
-      { year: 3, conservativeRate: 1.5, expectedRate: 3.2, optimisticRate: 3.8 },
-      { year: 4, conservativeRate: 1.5, expectedRate: 3.0, optimisticRate: 3.6 },
-      { year: 5, conservativeRate: 1.5, expectedRate: 2.8, optimisticRate: 3.4 },
-    ],
-    performanceData: [
-      { year: 0, value: 180000 },
-      { year: 1, value: 186840 },
-      { year: 2, value: 193380 },
-      { year: 3, value: 199560 },
-      { year: 4, value: 205548 },
-      { year: 5, value: 211303 },
-    ],
+    projectedRates: Array.from({ length: 20 }, (_, i) => ({
+      year: i + 1,
+      conservativeRate: 1.5,
+      expectedRate: Math.max(3.8 - (i * 0.1), 1.5),
+      optimisticRate: Math.max(4.2 - (i * 0.1), 2.0),
+    })),
+    performanceData: Array.from({ length: 21 }, (_, i) => {
+      const value = Math.round(180000 * Math.pow(1 + (Math.max(3.8 - (i * 0.1), 1.5) / 100), i));
+      return {
+        year: i,
+        value,
+        income: i > 0 ? Math.round(value * 0.045) : undefined,
+      };
+    }),
     features: [
       { name: "Surrender Charge", startYear: 1, endYear: 7, category: "surrender" },
       { name: "Rate Guarantee", startYear: 1, endYear: 5, category: "guarantee" },
@@ -213,25 +212,89 @@ const mockVisualizationProducts: VisualizationProduct[] = [
     growthScore: 85,
     liquidityScore: 60,
     protectionScore: 88,
-    projectedRates: [
-      { year: 1, conservativeRate: 2.5, expectedRate: 4.25, optimisticRate: 4.8 },
-      { year: 2, conservativeRate: 2.5, expectedRate: 4.0, optimisticRate: 4.6 },
-      { year: 3, conservativeRate: 2.5, expectedRate: 3.8, optimisticRate: 4.4 },
-      { year: 4, conservativeRate: 2.5, expectedRate: 3.6, optimisticRate: 4.2 },
-      { year: 5, conservativeRate: 2.5, expectedRate: 3.4, optimisticRate: 4.0 },
-    ],
-    performanceData: [
-      { year: 0, value: 180000 },
-      { year: 1, value: 193050 },
-      { year: 2, value: 200772 },
-      { year: 3, value: 208401 },
-      { year: 4, value: 215903 },
-      { year: 5, value: 223243 },
-    ],
+    projectedRates: Array.from({ length: 20 }, (_, i) => ({
+      year: i + 1,
+      conservativeRate: 2.5,
+      expectedRate: Math.max(4.25 - (i * 0.08), 2.5),
+      optimisticRate: Math.max(4.8 - (i * 0.08), 3.0),
+    })),
+    performanceData: Array.from({ length: 21 }, (_, i) => {
+      const value = Math.round(185400 * Math.pow(1 + (Math.max(4.25 - (i * 0.08), 2.5) / 100), i));
+      return {
+        year: i,
+        value,
+        income: i > 0 ? Math.round(value * 0.045) : undefined,
+      };
+    }),
     features: [
       { name: "Premium Bonus", startYear: 1, endYear: 1, category: "bonus" },
       { name: "Surrender Charge", startYear: 1, endYear: 7, category: "surrender" },
       { name: "Rate Guarantee", startYear: 1, endYear: 7, category: "guarantee" },
+    ],
+  },
+  {
+    ID: "viz-3",
+    productId: "PROD-ATHENE",
+    name: "Athene Performance Elite",
+    carrier: "Athene",
+    currentRate: 4.10,
+    guaranteedMinRate: 2.0,
+    surrenderYears: 6,
+    initialValue: 180000,
+    incomeScore: 75,
+    growthScore: 80,
+    liquidityScore: 65,
+    protectionScore: 85,
+    projectedRates: Array.from({ length: 20 }, (_, i) => ({
+      year: i + 1,
+      conservativeRate: 2.0,
+      expectedRate: Math.max(4.10 - (i * 0.08), 2.0),
+      optimisticRate: Math.max(4.6 - (i * 0.08), 2.5),
+    })),
+    performanceData: Array.from({ length: 21 }, (_, i) => {
+      const value = Math.round(180000 * Math.pow(1 + (Math.max(4.10 - (i * 0.08), 2.0) / 100), i));
+      return {
+        year: i,
+        value,
+        income: i > 0 ? Math.round(value * 0.045) : undefined,
+      };
+    }),
+    features: [
+      { name: "Surrender Charge", startYear: 1, endYear: 6, category: "surrender" },
+      { name: "Rate Guarantee", startYear: 1, endYear: 5, category: "guarantee" },
+    ],
+  },
+  {
+    ID: "viz-4",
+    productId: "PROD-NATIONWIDE",
+    name: "Nationwide Peak",
+    carrier: "Nationwide",
+    currentRate: 3.95,
+    guaranteedMinRate: 2.25,
+    surrenderYears: 5,
+    initialValue: 180000,
+    incomeScore: 72,
+    growthScore: 75,
+    liquidityScore: 80,
+    protectionScore: 78,
+    projectedRates: Array.from({ length: 20 }, (_, i) => ({
+      year: i + 1,
+      conservativeRate: 2.25,
+      expectedRate: Math.max(3.95 - (i * 0.07), 2.25),
+      optimisticRate: Math.max(4.4 - (i * 0.07), 2.75),
+    })),
+    performanceData: Array.from({ length: 21 }, (_, i) => {
+      const value = Math.round(180000 * Math.pow(1 + (Math.max(3.95 - (i * 0.07), 2.25) / 100), i));
+      return {
+        year: i,
+        value,
+        income: i > 0 ? Math.round(value * 0.045) : undefined,
+      };
+    }),
+    features: [
+      { name: "Surrender Charge", startYear: 1, endYear: 5, category: "surrender" },
+      { name: "Rate Guarantee", startYear: 1, endYear: 5, category: "guarantee" },
+      { name: "Enhanced Liquidity", startYear: 1, endYear: 5, category: "rider" },
     ],
   },
 ];
