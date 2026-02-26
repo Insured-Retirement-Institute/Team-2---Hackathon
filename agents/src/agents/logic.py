@@ -8,6 +8,7 @@ to PolicyOutput for the frontend.
 
 from __future__ import annotations
 
+from datetime import date, datetime, timezone
 from typing import Any
 
 
@@ -20,9 +21,52 @@ def _get_nested(data: dict[str, Any], *keys: str) -> Any:
     return data
 
 
-def check_replacement_opportunity(policy: dict[str, Any]) -> tuple[bool, str | None]:
+# Policies renewing within this many days get a replacement notification.
+RENEWAL_NOTIFICATION_DAYS = 30
+
+
+def get_renewal_info(policy: dict[str, Any]) -> tuple[str | None, int | None]:
+    """
+    Extract renewal/maturity date and days until renewal from policy.
+    Looks for renewalDate, maturityDate, nextPremiumDueDate, coveredUntilDate.
+    Returns (renewal_date_str, days_until_renewal); (None, None) if unknown.
+    """
+    today = date.today()
+    raw = (
+        policy.get("renewalDate")
+        or policy.get("maturityDate")
+        or policy.get("nextPremiumDueDate")
+        or policy.get("coveredUntilDate")
+    )
+    if not raw:
+        return None, None
+    if isinstance(raw, (int, float)):
+        # Could be epoch ms
+        try:
+            d = datetime.fromtimestamp(raw / 1000.0, tz=timezone.utc).date()
+        except (ValueError, OSError):
+            return str(raw), None
+        delta = (d - today).days
+        return d.isoformat(), delta if delta >= 0 else None
+    if isinstance(raw, str):
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%d-%b-%Y"):
+            try:
+                d = datetime.strptime(raw.strip()[:10], fmt).date()
+                delta = (d - today).days
+                return d.isoformat(), delta if delta >= 0 else None
+            except ValueError:
+                continue
+        return raw, None
+    return None, None
+
+
+def check_replacement_opportunity(
+    policy: dict[str, Any],
+    days_until_renewal: int | None = None,
+) -> tuple[bool, str | None]:
     """
     Determine if a replacement opportunity exists for this policy.
+    If renewal_date is in the next 30 days, generates a replacement notification.
     Returns (replacement_opportunity: bool, reason: str | None).
     """
     product_name = _get_nested(policy, "productSnapshot", "name") or ""
@@ -31,6 +75,10 @@ def check_replacement_opportunity(policy: dict[str, Any]) -> tuple[bool, str | N
 
     if status != "inforce":
         return False, None
+
+    # Renewal/maturity in next 30 days → replacement opportunity (CD/annuity renewal)
+    if days_until_renewal is not None and 1 <= days_until_renewal <= RENEWAL_NOTIFICATION_DAYS:
+        return True, "Policy maturing in next 30 days; consider replacement options"
 
     # Heuristic: fixed or older product types may have replacement options
     if "fixed" in product_name.lower() or "term" in product_name.lower():
@@ -133,16 +181,19 @@ def recommend_schedule_meeting(
 def apply_business_logic(policy: dict[str, Any]) -> dict[str, Any]:
     """
     Apply all business rules to a single policy dict and return a dict
-    with the added fields: replacement_opportunity, replacement_reason,
-    data_quality_issues, data_quality_severity, income_activation_eligible,
-    income_activation_reason, schedule_meeting, schedule_meeting_reason.
+    with the added fields: renewal_date, days_until_renewal, replacement_opportunity,
+    replacement_reason, data_quality_issues, data_quality_severity,
+    income_activation_eligible, income_activation_reason, schedule_meeting, schedule_meeting_reason.
     """
-    repl, repl_reason = check_replacement_opportunity(policy)
+    renewal_date_str, days_until_renewal = get_renewal_info(policy)
+    repl, repl_reason = check_replacement_opportunity(policy, days_until_renewal)
     dq_issues, dq_severity = check_data_quality(policy)
     inc_eligible, inc_reason = check_income_activation_eligible(policy)
     schedule, schedule_reason = recommend_schedule_meeting(repl, dq_issues, inc_eligible)
 
     return {
+        "renewal_date": renewal_date_str,
+        "days_until_renewal": days_until_renewal,
         "replacement_opportunity": repl,
         "replacement_reason": repl_reason,
         "data_quality_issues": dq_issues,

@@ -3,6 +3,11 @@
 # the agent's explanation of its choices (why these recommendations) and all data
 # needed to persist a "recommendation run" for audit and display.
 #
+# Client profile persistence: When the front-end sends an updated client profile
+# (clientProfile and/or suitability in the changes JSON), agentTwo upserts that
+# profile into client_suitability_profiles (insert when new, update when existing)
+# so the database stays in sync with the latest from the front-end.
+#
 # Source: agents/agent_two_schemas.AgentTwoStorablePayload
 # Produced by: agents/agent_two.generate_product_recommendations (storable_payload field
 #              in the response; also at top-level key "storable_payload" in the JSON).
@@ -116,6 +121,24 @@ root:
       type: object
       nullable: true
       description: If IRI compare was run, the ComparisonResult from IRI API.
+    electronic_application_payload:
+      type: object
+      nullable: true
+      description: |
+        Submission-ready JSON for electronic application (e-apply). Contains run_id,
+        client_id, merged_profile (merged suitability + goals used for submission),
+        and selected_products (list of recommended products with id, name, carrier, attributes).
+        Built after recommendations; use this payload to submit to an e-apply flow.
+      properties:
+        run_id: { type: string, format: uuid, description: Unique id for this recommendation run }
+        client_id: { type: string, description: Client identifier }
+        merged_profile:
+          type: object
+          description: Merged suitability + goals/profile used for submission (same as merged_profile_summary).
+        selected_products:
+          type: array
+          description: Products selected for submission (each item has product_id, name, carrier, rate, etc.)
+          items: { type: object }
 
 # --- Example row (conceptual) for agent_two_recommendation_runs ---
 # id              | run_id   | created_at | client_id   | payload (JSONB)

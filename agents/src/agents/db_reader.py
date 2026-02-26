@@ -8,6 +8,10 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 # Optional: only needed when DATABASE_URL or RDS* are set
 try:
     import psycopg2
@@ -17,21 +21,29 @@ except ImportError:
     RealDictCursor = None  # type: ignore
 
 
-def _get_connection_params() -> dict[str, str] | None:
+def _get_connection_params() -> dict[str, Any] | None:
     url = os.environ.get("DATABASE_URL")
     if url and url.strip() and url != "postgresql://":
         return {"dsn": url}
-    host = os.environ.get("RDSHOST")
-    user = os.environ.get("RDS_USER")
-    password = os.environ.get("RDS_PASSWORD")
-    dbname = os.environ.get("RDS_DB", "postgres")
+    # Prefer libpq-style PG* (so all agents + API can share env)
+    host = os.environ.get("PGHOST") or os.environ.get("RDSHOST")
+    user = os.environ.get("PGUSER") or os.environ.get("RDS_USER")
+    password = os.environ.get("PGPASSWORD") or os.environ.get("RDS_PASSWORD")
+    dbname = os.environ.get("PGDATABASE") or os.environ.get("RDS_DB", "postgres")
+    port_str = os.environ.get("PGPORT") or os.environ.get("RDS_PORT", "5432")
     if host and user and password:
+        try:
+            port = int(port_str)
+        except ValueError:
+            port = 5432
         return {
             "host": host,
             "user": user,
             "password": password,
             "dbname": dbname,
+            "port": port,
         }
+    logger.debug("Database not configured (no DATABASE_URL or RDS* env vars)")
     return None
 
 
@@ -44,8 +56,11 @@ def get_all_clients() -> list[dict[str, Any]]:
         with psycopg2.connect(**params) as conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("SELECT client_account_number, client_name, process_dt FROM clients ORDER BY client_name")
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_all_clients: fetched %d rows", len(rows))
+                return rows
     except Exception:
+        logger.exception("get_all_clients: database query failed")
         return []
 
 
@@ -69,8 +84,11 @@ def get_all_client_suitability_profiles() -> list[dict[str, Any]]:
                     FROM client_suitability_profiles
                     """
                 )
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_all_client_suitability_profiles: fetched %d rows", len(rows))
+                return rows
     except Exception:
+        logger.exception("get_all_client_suitability_profiles: database query failed")
         return []
 
 
@@ -89,8 +107,11 @@ def get_contract_summary(client_id: str | None = None) -> list[dict[str, Any]]:
                     )
                 else:
                     cur.execute("SELECT * FROM contract_summary LIMIT 500")
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_contract_summary: fetched %d rows (client_id=%s)", len(rows), client_id)
+                return rows
     except Exception:
+        logger.exception("get_contract_summary: database query failed (client_id=%s)", client_id)
         return []
 
 
@@ -113,8 +134,11 @@ def get_all_products() -> list[dict[str, Any]]:
                     ORDER BY current_fixed_rate DESC NULLS LAST
                     """
                 )
-                return [dict(r) for r in cur.fetchall()]
+                rows = [dict(r) for r in cur.fetchall()]
+                logger.debug("get_all_products: fetched %d rows", len(rows))
+                return rows
     except Exception:
+        logger.exception("get_all_products: database query failed")
         return []
 
 

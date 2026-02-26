@@ -70,6 +70,14 @@ class PolicyOutput(BaseModel):
         None,
         description="Reason(s) to schedule a meeting (e.g. replacement; data quality; income activation)",
     )
+    renewal_date: str | None = Field(
+        None,
+        description="Renewal or maturity date (ISO date or human-readable e.g. '15 Days'); used for CD/annuity renewal notifications",
+    )
+    days_until_renewal: int | None = Field(
+        None,
+        description="Days until renewal/maturity; policies renewing in next 30 days get a replacement notification",
+    )
 
 
 class BookOfBusinessOutput(BaseModel):

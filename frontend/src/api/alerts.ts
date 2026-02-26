@@ -1,10 +1,7 @@
 import type { RenewalAlert, DashboardStats } from "@/types/alerts";
 import { logRequest, logResponse } from "./logger";
 import { mockAlerts } from "./mock/alerts";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
-
+import { config } from "@/config";
 /**
  * Fetch all renewal alerts
  * GET /api/alerts
@@ -12,7 +9,7 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 export async function fetchAlerts(): Promise<RenewalAlert[]> {
   logRequest("GET /api/alerts");
   
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse("GET /api/alerts (mock)", mockAlerts);
@@ -21,7 +18,7 @@ export async function fetchAlerts(): Promise<RenewalAlert[]> {
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts`);
+  const res = await fetch(`${config.apiBaseUrl}/alerts`);
   if (!res.ok) throw new Error(`Failed to fetch alerts: ${res.statusText}`);
   const r = await res.json();
   logResponse("GET /api/alerts", r);
@@ -35,7 +32,7 @@ export async function fetchAlerts(): Promise<RenewalAlert[]> {
 export async function fetchDashboardStats(): Promise<DashboardStats> {
   logRequest("GET /api/dashboard/stats");
   
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         const stats: DashboardStats = {
@@ -53,7 +50,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/dashboard/stats`);
+  const res = await fetch(`${config.apiBaseUrl}/dashboard/stats`);
   if (!res.ok)
     throw new Error(`Failed to fetch dashboard stats: ${res.statusText}`);
   const r = await res.json();
@@ -71,7 +68,7 @@ export async function snoozeAlert(
 ): Promise<void> {
   logRequest("POST /api/alerts/{alertId}/snooze", { alertId, snoozeDays });
   
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse("POST /api/alerts/{alertId}/snooze (mock)", { success: true });
@@ -80,7 +77,7 @@ export async function snoozeAlert(
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/snooze`, {
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}/snooze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ snoozeDays }),
@@ -100,7 +97,7 @@ export async function dismissAlert(
 ): Promise<void> {
   logRequest("POST /api/alerts/{alertId}/dismiss", { alertId, reason });
   
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse("POST /api/alerts/{alertId}/dismiss (mock)", { success: true });
@@ -109,7 +106,7 @@ export async function dismissAlert(
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/dismiss`, {
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}/dismiss`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ reason }),

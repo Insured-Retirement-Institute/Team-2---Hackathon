@@ -6,6 +6,7 @@ requires-python = ">=3.13"
 members = [
     "agents",
     "api",
+    "schemas",
     "team-2-hackathon",
 ]
 
@@ -18,11 +19,12 @@ dependencies = [
     { name = "psycopg2-binary" },
     { name = "pydantic" },
     { name = "python-dotenv" },
+    { name = "schemas" },
     { name = "strands-agents" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "datamodel-code-generator", extra = ["http"] },
     { name = "pytest" },
@@ -30,19 +32,20 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "datamodel-code-generator", extras = ["http"], marker = "extra == 'dev'", specifier = ">=0.25" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "psycopg2-binary", specifier = ">=2.9" },
     { name = "pydantic", specifier = ">=2.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "schemas", editable = "schemas" },
     { name = "strands-agents", specifier = ">=0.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = []
+dev = [
+    { name = "datamodel-code-generator", extras = ["http"], specifier = ">=0.25" },
+    { name = "pytest", specifier = ">=7.0" },
+]
 
 [[package]]
 name = "annotated-doc"
@@ -79,9 +82,11 @@ name = "api"
 version = "0.1.0"
 source = { editable = "api" }
 dependencies = [
+    { name = "agents" },
     { name = "asyncpg" },
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "schemas" },
     { name = "uvicorn" },
 ]
 
@@ -93,9 +98,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "agents", editable = "agents" },
     { name = "asyncpg", specifier = ">=0.31.0" },
     { name = "fastapi", specifier = ">=0.129.0" },
     { name = "httpx", specifier = ">=0.28.0" },
+    { name = "schemas", editable = "schemas" },
     { name = "uvicorn", specifier = ">=0.34.0" },
 ]
 
@@ -1130,6 +1137,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/05/04/74127fc843314818e
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fc/51/727abb13f44c1fcf6d145979e1535a35794db0f6e450a0cb46aa24732fe2/s3transfer-0.16.0-py3-none-any.whl", hash = "sha256:18e25d66fed509e3868dc1572b3f427ff947dd2c56f844a5bf09481ad3f3b2fe", size = 86830, upload-time = "2025-12-01T02:30:57.729Z" },
 ]
+
+[[package]]
+name = "schemas"
+version = "0.1.0"
+source = { editable = "schemas" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.0" }]
 
 [[package]]
 name = "six"

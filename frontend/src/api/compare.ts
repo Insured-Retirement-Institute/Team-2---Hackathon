@@ -1,7 +1,5 @@
 import { logRequest, logResponse } from "./logger";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+import { config } from "@/config";
 
 export interface ProductOption {
   ID?: string;
@@ -14,9 +12,9 @@ export interface ProductOption {
   premiumBonus?: string | null;
   surrenderPeriod?: string;
   surrenderCharge?: string;
-  freeWithdrawal?: string;
-  deathBenefit?: string;
-  guaranteedMinRate?: string;
+  freeWithdrawal: string;
+  deathBenefit: string;
+  guaranteedMinRate: string;
   riders?: string[];
   features?: string[];
   cons?: string[];
@@ -73,12 +71,14 @@ export interface VisualizationProduct {
 const mockComparison: ComparisonResult = {
   comparisonData: {
     current: {
+      id: "current-1",
       name: "SecureChoice MYGA",
       carrier: "Integrity Life",
       rate: "3.80%",
       term: "5 years",
       surrenderPeriod: "7 years",
       freeWithdrawal: "10%",
+      deathBenefit: "Return of premium",
       guaranteedMinRate: "1.50%",
       features: [
         "Established carrier relationship",
@@ -93,6 +93,7 @@ const mockComparison: ComparisonResult = {
     },
     alternatives: [
       {
+        id: "alt-1",
         name: "FlexGrowth Plus MYGA",
         carrier: "Great American",
         rate: "4.25%",
@@ -100,6 +101,7 @@ const mockComparison: ComparisonResult = {
         premiumBonus: "3.0%",
         surrenderPeriod: "7 years",
         freeWithdrawal: "10%",
+        deathBenefit: "Return of premium",
         guaranteedMinRate: "2.50%",
         licensingApproved: true,
         features: [
@@ -114,12 +116,14 @@ const mockComparison: ComparisonResult = {
         ],
       },
       {
+        id: "alt-2",
         name: "Athene Performance Elite",
         carrier: "Athene",
         rate: "4.10%",
         term: "5 years",
         surrenderPeriod: "6 years",
         freeWithdrawal: "10%",
+        deathBenefit: "Account value",
         guaranteedMinRate: "2.00%",
         licensingApproved: true,
         features: [
@@ -134,12 +138,14 @@ const mockComparison: ComparisonResult = {
         ],
       },
       {
+        id: "alt-3",
         name: "Nationwide Peak",
         carrier: "Nationwide",
         rate: "3.95%",
         term: "5 years",
         surrenderPeriod: "5 years",
         freeWithdrawal: "10%",
+        deathBenefit: "Account value",
         guaranteedMinRate: "2.25%",
         licensingApproved: false,
         licensingDetails: "Appointment required",
@@ -233,7 +239,7 @@ const mockVisualizationProducts: VisualizationProduct[] = [
 export async function runComparison(alertId: string): Promise<ComparisonResult> {
   logRequest(`POST /api/alerts/${alertId}/compare`);
 
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse(`POST /api/alerts/${alertId}/compare (mock)`, mockComparison);
@@ -242,7 +248,7 @@ export async function runComparison(alertId: string): Promise<ComparisonResult> 
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/compare`, {
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}/compare`, {
     method: "POST",
   });
   if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
@@ -257,7 +263,7 @@ export async function recompareWithProducts(
 ): Promise<ComparisonResult> {
   logRequest(`POST /api/alerts/${alertId}/compare/products`);
 
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         const result: ComparisonResult = {
@@ -273,7 +279,7 @@ export async function recompareWithProducts(
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/compare/products`, {
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}/compare/products`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ selectedProducts }),
@@ -287,7 +293,7 @@ export async function recompareWithProducts(
 export async function getVisualizationProducts(): Promise<VisualizationProduct[]> {
   logRequest("GET /passthrough/visualization-products");
 
-  if (USE_MOCKS) {
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse("GET /passthrough/visualization-products (mock)", mockVisualizationProducts);
@@ -296,7 +302,7 @@ export async function getVisualizationProducts(): Promise<VisualizationProduct[]
     });
   }
 
-  const res = await fetch(`${API_BASE_URL.replace("/api", "")}/passthrough/visualization-products`);
+  const res = await fetch(`${config.apiBaseUrl.replace("/api", "")}/passthrough/visualization-products`);
   if (!res.ok) throw new Error(`Failed: ${res.statusText}`);
   const data = await res.json();
   logResponse("GET /passthrough/visualization-products", data);

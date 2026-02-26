@@ -14,6 +14,7 @@
 \i index_options.sql
 \i riders.sql
 \i agent_two_recommendation_runs.sql
+\i agent_one_book_of_business.sql
 \i agent_run_events.sql
 
 -- Alerts and profiles

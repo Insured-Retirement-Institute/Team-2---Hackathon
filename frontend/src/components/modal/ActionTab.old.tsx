@@ -12,9 +12,6 @@ import {
   AlertTriangle,
   FileText,
   ArrowRight,
-  Info,
-  FileDown,
-  ChevronLeft,
 } from "lucide-react";
 
 interface ActionTabProps {

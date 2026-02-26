@@ -35,6 +35,10 @@ iam:
       serviceAccountName: aws-load-balancer-controller
       wellKnownPolicies:
         awsLoadBalancerController: true
+    - namespace: default
+      serviceAccountName: agents-sa
+      permissionPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
 
 addons:
   - name: aws-ebs-csi-driver

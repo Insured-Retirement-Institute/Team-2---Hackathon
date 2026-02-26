@@ -7,15 +7,13 @@ Run locally: uvicorn agents.server:app --reload --port 8000
 
 from __future__ import annotations
 
+import logging
 import os
-import sys
+import traceback
 from pathlib import Path
 from typing import Any
 
-_repo_root = Path(__file__).resolve().parent.parent
-if str(_repo_root) not in sys.path:
-    sys.path.insert(0, str(_repo_root))
-
+_repo_root = Path(__file__).resolve().parent.parent.parent.parent
 _env_file = _repo_root / ".env"
 if _env_file.exists():
     try:
@@ -24,14 +22,59 @@ if _env_file.exists():
     except ImportError:
         pass
 
-from fastapi import FastAPI, HTTPException
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
+
+# Suppress noisy health check access logs
+class HealthCheckFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not ("/health" in message and ("200" in message or "GET" in message))
+
+logging.getLogger("uvicorn.access").addFilter(HealthCheckFilter())
 
 app = FastAPI(
     title="Agents API",
     description="HTTP wrapper for agent_one, agent_two, and agent_three",
     version="0.1.0",
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Log validation errors with full details."""
+    logger.error(
+        "Validation error on %s %s: %s\nBody: %s",
+        request.method,
+        request.url.path,
+        exc.errors(),
+        exc.body,
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": str(exc.body)},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Log unhandled exceptions with full traceback."""
+    logger.error(
+        "Unhandled exception on %s %s:\n%s",
+        request.method,
+        request.url.path,
+        traceback.format_exc(),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+    )
 
 
 class HealthResponse(BaseModel):
@@ -51,6 +94,17 @@ class AgentOneResponse(BaseModel):
     format: str
 
 
+class CreateAlertsRequest(BaseModel):
+    customer_identifier: str = "Marty McFly"
+
+
+class CreateAlertsResponse(BaseModel):
+    success: bool
+    message: str
+    created: int
+    errors: list[str] | None = None
+
+
 class AgentTwoContextRequest(BaseModel):
     client_id: str = "Marty McFly"
 
@@ -67,12 +121,19 @@ class AgentTwoResponse(BaseModel):
     result: Any
 
 
+class AgentThreeConversationTurn(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+
 class AgentThreeChatRequest(BaseModel):
     screen: str = "dashboard"  # "dashboard", "product_comparison", "elsewhere"
     message: str
     client_id: str = "Marty McFly"
     changes_json: str | None = None
     alert_id: str = ""
+    location_in_experience: str | None = None
+    conversation_history: list[AgentThreeConversationTurn] | None = None
 
 
 class AgentThreeChatResponse(BaseModel):
@@ -81,6 +142,14 @@ class AgentThreeChatResponse(BaseModel):
     agent_two_invoked: bool
     agent_two_summary: str | None = None
     storable_payload: Any | None = None
+
+
+@app.on_event("startup")
+def startup_event():
+    """Log startup information."""
+    logger.info("Agents API starting up")
+    logger.info("IRI_API_BASE_URL=%s", os.environ.get("IRI_API_BASE_URL", "(not set)"))
+    logger.info("LOG_LEVEL=%s", os.environ.get("LOG_LEVEL", "INFO"))
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -104,6 +173,7 @@ def agent_one_book_of_business(request: AgentOneRequest):
     - format="iri_alerts": Returns IRI API format (alerts + dashboardStats)
     - use_llm=true: Uses Strands agent with Bedrock LLM
     """
+    logger.info("agent_one_book_of_business: customer=%s format=%s use_llm=%s", request.customer_identifier, request.format, request.use_llm)
     try:
         from agents.agent_one.main import (
             create_agent,
@@ -126,12 +196,58 @@ def agent_one_book_of_business(request: AgentOneRequest):
         import json
         return AgentOneResponse(result=json.loads(result), format=request.format)
     except Exception as e:
+        logger.exception("agent_one_book_of_business failed for %s", request.customer_identifier)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/agent-one/create-alerts", response_model=CreateAlertsResponse)
+def agent_one_create_alerts(request: CreateAlertsRequest):
+    """
+    Generate book of business and push alerts to IRI API database.
+
+    This endpoint:
+    1. Fetches policies from Sureify
+    2. Applies business logic (replacements, data quality, etc.)
+    3. POSTs the BookOfBusinessOutput to POST /api/alerts
+    4. Returns success response with created alert count
+
+    Requires IRI_API_BASE_URL environment variable to be set.
+    """
+    logger.info("agent_one_create_alerts: customer=%s", request.customer_identifier)
+    try:
+        from agents.agent_one.main import get_book_of_business_with_notifications_and_flags
+        from agents.schemas import BookOfBusinessOutput
+        from agents.iri_client import create_iri_alerts
+
+        # Generate book of business
+        json_output = get_book_of_business_with_notifications_and_flags(request.customer_identifier)
+        book = BookOfBusinessOutput.model_validate_json(json_output)
+
+        # Push to IRI API
+        result = create_iri_alerts(book)
+
+        # Check for errors
+        if isinstance(result, dict) and result.get("error"):
+            raise HTTPException(status_code=500, detail=result.get("message", "Failed to create alerts"))
+
+        # Return success response
+        return CreateAlertsResponse(
+            success=result.get("success", True),
+            message=result.get("message", "Alerts created successfully"),
+            created=result.get("created", len(book.policies)),
+            errors=result.get("errors")
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("agent_one_create_alerts failed for %s", request.customer_identifier)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/agent-two/context", response_model=AgentTwoResponse)
 def agent_two_context(request: AgentTwoContextRequest):
     """Get current database context for a client (DB + Sureify data)."""
+    logger.info("agent_two_context: client_id=%s", request.client_id)
     try:
         from agents.agent_two.main import get_current_database_context
 
@@ -139,6 +255,7 @@ def agent_two_context(request: AgentTwoContextRequest):
         import json
         return AgentTwoResponse(result=json.loads(result))
     except Exception as e:
+        logger.exception("agent_two_context failed for %s", request.client_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -150,6 +267,7 @@ def agent_two_recommendations(request: AgentTwoRecommendationsRequest):
     - changes_json: JSON with optional keys "suitability", "clientGoals", "clientProfile"
     - use_llm=true: Uses Strands agent with Bedrock LLM
     """
+    logger.info("agent_two_recommendations: client_id=%s alert_id=%s use_llm=%s", request.client_id, request.alert_id, request.use_llm)
     try:
         from agents.agent_two.main import create_agent_two, generate_product_recommendations
 
@@ -171,6 +289,7 @@ def agent_two_recommendations(request: AgentTwoRecommendationsRequest):
         import json
         return AgentTwoResponse(result=json.loads(result))
     except Exception as e:
+        logger.exception("agent_two_recommendations failed for %s", request.client_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -182,8 +301,14 @@ def agent_three_chat(request: AgentThreeChatRequest):
     - screen: Current UI screen context ("dashboard", "product_comparison", "elsewhere")
     - message: User message to the chatbot
     """
+    logger.info("agent_three_chat: screen=%s client_id=%s message=%s", request.screen, request.client_id, request.message[:100] if request.message else None)
     try:
         from agents.agent_three.main import run_chat
+        from agents.agent_three_schemas import ConversationTurn
+
+        history = None
+        if request.conversation_history:
+            history = [ConversationTurn(role=t.role, content=t.content) for t in request.conversation_history]
 
         response = run_chat(
             screen_state=request.screen,
@@ -191,6 +316,8 @@ def agent_three_chat(request: AgentThreeChatRequest):
             client_id=request.client_id,
             changes_json=request.changes_json,
             alert_id=request.alert_id,
+            location_in_experience=request.location_in_experience,
+            conversation_history=history,
         )
         return AgentThreeChatResponse(
             reply=response.reply,
@@ -200,6 +327,7 @@ def agent_three_chat(request: AgentThreeChatRequest):
             storable_payload=response.storable_payload.model_dump() if response.storable_payload else None,
         )
     except Exception as e:
+        logger.exception("agent_three_chat failed for screen=%s client=%s", request.screen, request.client_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 

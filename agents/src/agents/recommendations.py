@@ -9,6 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from agents.logging_config import get_logger
+
+logger = get_logger(__name__)
+
 from agents.agent_two_schemas import (
     ChoiceExplanation,
     ProductRecommendation,
@@ -19,7 +23,9 @@ from agents.agent_two_schemas import (
 
 
 def _sureify_product_to_canonical(p: dict[str, Any]) -> dict[str, Any]:
-    """Normalize Sureify Product (from /puddle/products) to canonical shape for ProductRecommendation."""
+    """Normalize Sureify product to canonical shape for ProductRecommendation. Accepts Puddle ProductOption (from /passthrough/product-options) or legacy shape with attributes."""
+    if p.get("product_id"):
+        return p
     attrs = p.get("attributes") or []
     attr_map = {}
     for a in attrs:
@@ -42,6 +48,10 @@ def _sureify_product_to_canonical(p: dict[str, Any]) -> dict[str, Any]:
         "risk_profile": risk_profile,
         "attributes_map": attr_map,
         "states": p.get("states"),
+        "term": None,
+        "surrenderPeriod": None,
+        "freeWithdrawal": None,
+        "guaranteedMinRate": None,
     }
 
 
@@ -141,9 +151,9 @@ def _build_choice_explanation(
         input_sections.append("clientGoals")
     if changes.client_profile:
         input_sections.append("clientProfile")
-    catalog = "Sureify /puddle/products" if use_sureify else "database products table"
+    catalog = "available product catalog" if use_sureify else "product catalog"
     summary = (
-        f"AgentTwo produced {recommendation_count} recommendation(s) from {catalog}, "
+        f"Opportunity Generator produced {recommendation_count} opportunities presented from the {catalog}, "
         f"contextualized using: {', '.join(criteria)}. "
         f"Input sections received: {', '.join(input_sections) or 'none'}."
     )
@@ -237,6 +247,7 @@ def generate_recommendations(
     Build merged profile from DB + changes, then recommend products from the catalog.
     Optionally include IRI comparison result if run_iri_comparison was called.
     """
+    logger.info("generate_recommendations: client_id=%s alert_id=%s", client_id, alert_id)
     clients = db_context.get("clients") or []
     profiles = db_context.get("client_suitability_profiles") or []
     products = db_context.get("products") or []
@@ -295,10 +306,10 @@ def generate_recommendations(
                     name=canon["name"],
                     carrier=canon["carrier"],
                     rate=rate_str,
-                    term=None,
-                    surrenderPeriod=None,
-                    freeWithdrawal=None,
-                    guaranteedMinRate=None,
+                    term=canon.get("term"),
+                    surrenderPeriod=canon.get("surrenderPeriod"),
+                    freeWithdrawal=canon.get("freeWithdrawal"),
+                    guaranteedMinRate=canon.get("guaranteedMinRate"),
                     risk_profile=canon.get("risk_profile"),
                     suitable_for=None,
                     key_benefits=None,
@@ -338,6 +349,7 @@ def generate_recommendations(
 
     recs.sort(key=rate_sort_key, reverse=True)
     recs = recs[:max_recommendations]
+    logger.info("generate_recommendations: produced %d recommendations (source=%s)", len(recs), "sureify" if use_sureify else "db")
 
     explanation = _build_choice_explanation(
         use_sureify, merged_suit, merged_goals, changes, len(recs)

@@ -22,9 +22,7 @@ import {
   getMockComparisonData,
   getMockProductShelf,
 } from "./mock/alert-detail";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+import { config } from "@/config";
 
 /**
  * Fetch alert detail with policy data
@@ -32,8 +30,8 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
  */
 export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
   logRequest("GET /api/alerts/{alertId}", { alertId });
-  
-  if (USE_MOCKS) {
+
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         const alert = mockAlerts.find((a) => a.id === alertId) ?? mockAlerts[0];
@@ -55,7 +53,7 @@ export async function fetchAlertDetail(alertId: string): Promise<AlertDetail> {
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}`);
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}`);
   if (!res.ok)
     throw new Error(`Failed to fetch alert detail: ${res.statusText}`);
   const r = await res.json();
@@ -71,8 +69,8 @@ export async function fetchClientProfile(
   clientId: string,
 ): Promise<ClientProfile> {
   logRequest("GET /api/clients/{clientId}/profile", { clientId });
-  
-  if (USE_MOCKS) {
+
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         const r = {
@@ -86,7 +84,7 @@ export async function fetchClientProfile(
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`);
+  const res = await fetch(`${config.apiBaseUrl}/clients/${clientId}/profile`);
   if (!res.ok)
     throw new Error(`Failed to fetch client profile: ${res.statusText}`);
   const r = await res.json();
@@ -103,8 +101,8 @@ export async function saveClientProfile(
   parameters: ComparisonParameters,
 ): Promise<void> {
   logRequest("PUT /api/clients/{clientId}/profile", { clientId, parameters });
-  
-  if (USE_MOCKS) {
+
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse("PUT /api/clients/{clientId}/profile (mock)", { success: true });
@@ -113,7 +111,7 @@ export async function saveClientProfile(
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/clients/${clientId}/profile`, {
+  const res = await fetch(`${config.apiBaseUrl}/clients/${clientId}/profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parameters),
@@ -183,8 +181,8 @@ export async function saveSuitability(
   data: SuitabilityData,
 ): Promise<void> {
   logRequest("PUT /api/alerts/{alertId}/suitability", { alertId, data });
-  
-  if (USE_MOCKS) {
+
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         logResponse("PUT /api/alerts/{alertId}/suitability (mock)", { success: true });
@@ -193,7 +191,7 @@ export async function saveSuitability(
     });
   }
 
-  const res = await fetch(`${API_BASE_URL}/alerts/${alertId}/suitability`, {
+  const res = await fetch(`${config.apiBaseUrl}/alerts/${alertId}/suitability`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -395,8 +393,8 @@ export async function fetchVisualization(
  */
 export async function fetchProductShelf(): Promise<ProductOption[]> {
   logRequest("GET /passthrough/product-options");
-  
-  if (USE_MOCKS) {
+
+  if (config.useMocks) {
     return new Promise((resolve) => {
       setTimeout(() => {
         const r = getMockProductShelf();

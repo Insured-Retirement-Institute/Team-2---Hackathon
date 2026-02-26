@@ -58,15 +58,41 @@ class ClientProfileChanges(BaseModel):
     applyToMeansTestedBenefits: str | None = None
 
 
+# ---- Customer selection (from front-end after customer chooses from opportunities) ----
+class CustomerSelection(BaseModel):
+    """
+    Customer's selection from the opportunities presented. Sent by the front-end as JSON
+    when the customer has chosen one or more products (e.g. for e-app submission).
+    """
+    selected_product_ids: list[str] = Field(
+        default_factory=list,
+        alias="selectedProductIds",
+        description="Product IDs the customer selected from the opportunities presented",
+    )
+    notes: str | None = Field(
+        None,
+        description="Optional free-text notes or reason for selection (e.g. from advisor)",
+    )
+    selected_at: str | None = Field(
+        None,
+        alias="selectedAt",
+        description="ISO 8601 timestamp when the customer made the selection",
+    )
+
+    model_config = {"populate_by_name": True}
+
+
 # ---- Front-end input: single JSON with optional sections ----
 class ProfileChangesInput(BaseModel):
     """
     JSON from front-end with changes to suitability, client goals, and/or client profile.
+    Optionally includes customerSelection when the customer has chosen from the opportunities presented.
     Only include keys that have changed; agentTwo merges with current DB state.
     """
     suitability: SuitabilityChanges | None = None
     client_goals: ClientGoalsChanges | None = Field(None, alias="clientGoals")
     client_profile: ClientProfileChanges | None = Field(None, alias="clientProfile")
+    customer_selection: CustomerSelection | None = Field(None, alias="customerSelection")
 
     model_config = {"populate_by_name": True}
 
@@ -122,6 +148,74 @@ class ChoiceExplanation(BaseModel):
     )
 
 
+# ---- Best Interest Combined Framework (summary for compliance / e-app) ----
+class BestInterestSummary(BaseModel):
+    """Summary aligned to Best Interest Combined Framework for disclosure and documentation."""
+    prudential_standards: str = Field(
+        ...,
+        description="Reasonable diligence on customer situation, products, comparative analysis; recommendation in best interest",
+    )
+    conflict_management: str = Field(
+        ...,
+        description="Material conflicts identified; disclosure/elimination; compensation reviewed",
+    )
+    transparency: str = Field(
+        ...,
+        description="Disclosure of conflicts, compensation, alternatives considered, product risks and features",
+    )
+    documentation: str = Field(
+        ...,
+        description="Customer info, analysis, basis for recommendation, alternatives, conflicts and mitigation, records retention",
+    )
+    ongoing_duty: str = Field(
+        ...,
+        description="Monitor accounts, review circumstances, update recommendations, periodic compliance reviews",
+    )
+
+
+# ---- Final output for electronic application (e-app) ----
+class FinalEAppOutput(BaseModel):
+    """Single document for e-app submission: run metadata, Best Interest summary, recommendations with explainability, and e-apply payload."""
+    run_id: str = Field(..., description="Recommendation run identifier")
+    created_at: str = Field(..., description="ISO 8601 timestamp")
+    client_id: str = Field(..., description="Client identifier")
+    best_interest_summary: BestInterestSummary = Field(
+        ...,
+        description="Best Interest Combined Framework summary for this recommendation",
+    )
+    recommendations_with_explainability: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Each recommended product with match_reason and key attributes (why selected)",
+    )
+    reasons_to_switch: ReasonsToSwitch | None = Field(
+        None,
+        description="Pros and cons for switching (disclosure to customer)",
+    )
+    electronic_application_payload: ElectronicApplicationPayload = Field(
+        ...,
+        description="Submission-ready merged profile and selected products for e-apply",
+    )
+    customer_acknowledgment_placeholder: str = Field(
+        default="Customer acknowledgment of recommendations and conflicts to be obtained at point of sale.",
+        description="Placeholder for signed acknowledgment (obtained in e-app flow)",
+    )
+
+
+# ---- Electronic application: submission-ready JSON for e-apply ----
+class ElectronicApplicationPayload(BaseModel):
+    """Submission-ready payload for electronic application (run_id, client, merged profile, selected products)."""
+    run_id: str = Field(..., description="Unique id for this recommendation run")
+    client_id: str = Field(..., description="Client identifier")
+    merged_profile: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Merged suitability + goals/profile used for submission",
+    )
+    selected_products: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Products selected for submission (id, name, carrier, key attributes)",
+    )
+
+
 # ---- Storable payload: full JSON to persist in the database ----
 class AgentTwoStorablePayload(BaseModel):
     """
@@ -155,6 +249,18 @@ class AgentTwoStorablePayload(BaseModel):
         None,
         description="If IRI compare was run, the ComparisonResult (optional)",
     )
+    electronic_application_payload: ElectronicApplicationPayload | None = Field(
+        None,
+        description="Submission-ready JSON for electronic application (e-apply)",
+    )
+    best_interest_summary: BestInterestSummary | None = Field(
+        None,
+        description="Best Interest Combined Framework summary (Prudential, Conflict, Transparency, Documentation, Ongoing Duty)",
+    )
+    final_eapp_output: FinalEAppOutput | None = Field(
+        None,
+        description="Final output document for e-app submission (Best Interest + recommendations + e-apply payload)",
+    )
 
 
 # ---- Full response for generate_product_recommendations ----
@@ -179,4 +285,16 @@ class ProductRecommendationsOutput(BaseModel):
     )
     iri_comparison_result: dict[str, Any] | None = Field(
         None, description="If IRI compare was run, the ComparisonResult"
+    )
+    electronic_application_payload: ElectronicApplicationPayload | None = Field(
+        None,
+        description="Submission-ready JSON for electronic application (e-apply)",
+    )
+    best_interest_summary: BestInterestSummary | None = Field(
+        None,
+        description="Best Interest Combined Framework summary (Prudential, Conflict, Transparency, Documentation, Ongoing Duty)",
+    )
+    final_eapp_output: FinalEAppOutput | None = Field(
+        None,
+        description="Final output document for e-app submission (Best Interest + recommendations + e-apply payload)",
     )
