@@ -177,6 +177,59 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /clientAsset:
+    get:
+      summary: List all client non-annuity assets
+      description: |
+        Returns non-annuity financial holdings for all clients the caller is
+        authorized to view. Each record describes a single asset the client holds
+        outside of their annuity portfolio — certificates of deposit, retirement
+        accounts (401k, IRA), savings and money market accounts, brokerage
+        accounts, and pension entitlements. Records are linked to client profiles
+        by clientId.
+      operationId: getClientAssets
+      tags: [Clients]
+      parameters:
+        - $ref: '#/components/parameters/persona'
+        - $ref: '#/components/parameters/userId'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clientAssets]
+                properties:
+                  clientAssets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ClientAsset'
+              example:
+                clientAssets:
+                  - ID: "Y2xpZW50LWFzc2V0LTE"
+                    clientId: "CLT-2024-00100"
+                    assetType: "CD"
+                    description: "12-month CD at First National Bank"
+                    currentValue: "$85,000"
+                    interestRate: "2.10%"
+                    maturityDate: "04/15/2026"
+                    institution: "First National Bank"
+                    taxQualified: false
+                    liquidityStatus: "locked"
+                  - ID: "Y2xpZW50LWFzc2V0LTI"
+                    clientId: "CLT-2024-00100"
+                    assetType: "401k"
+                    description: "401(k) from former employer"
+                    currentValue: "$220,000"
+                    interestRate: null
+                    maturityDate: null
+                    institution: "Fidelity"
+                    taxQualified: true
+                    liquidityStatus: "restricted"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /clientProfile:
     get:
       summary: List all client profiles
@@ -281,7 +334,13 @@ components:
   schemas:
     PolicyData:
       type: object
-      description: A snapshot of an annuity policy including contract values, interest rates, renewal status, and associated features.
+      description: |
+        A snapshot of an in-force annuity policy. Each record represents one
+        contract a client holds with a carrier and includes the current
+        accumulated value, the rate being credited today, the rate and date of
+        the next renewal period, surrender and withdrawal provisions, and the
+        full set of features, benefits, riders, and limitations attached to
+        the contract. Policies are linked to client profiles by clientId.
       required:
         - ID
         - clientId
@@ -326,69 +385,128 @@ components:
           example: "SecureChoice Multi-Year Guarantee Annuity"
         issueDate:
           type: string
-          description: Date the contract was issued.
+          description: Date the contract was originally issued, in MM/DD/YYYY format. Together with the product term, this determines how far the contract is into its surrender charge schedule.
           example: "03/15/2018"
         currentValue:
           type: string
-          description: Current accumulated contract value, formatted with currency symbol.
+          description: Current accumulated contract value (principal plus all credited interest), formatted as USD with currency symbol.
           example: "$180,000"
         surrenderValue:
           type: string
-          description: Current cash surrender value after applicable charges.
+          description: |
+            The amount the client would receive if they surrendered (cashed out)
+            the contract today. This is the currentValue minus any applicable
+            surrender charges and market value adjustments. The difference
+            between currentValue and surrenderValue represents the cost of
+            exiting the contract at this point in time.
           example: "$176,400"
         currentRate:
           type: string
-          description: Interest rate currently being credited.
+          description: The annualized interest rate the carrier is currently crediting on this contract. This is the rate in effect today.
           example: "3.80%"
         renewalRate:
           type: string
-          description: Rate that will apply at the next renewal period.
+          description: |
+            The interest rate the carrier has declared for the next renewal
+            period. This is the rate that will take effect on renewalDate,
+            replacing the currentRate. Comparing renewalRate to currentRate
+            shows whether the client's credited rate is increasing, decreasing,
+            or staying the same at renewal.
           example: "1.50%"
         guaranteedMinRate:
           type: string
-          description: Contractual guaranteed minimum interest rate.
+          description: |
+            The contractual floor rate — the lowest interest rate the carrier
+            can ever credit on this contract, regardless of market conditions.
+            This rate is guaranteed for the life of the contract.
           example: "1.50%"
         renewalDate:
           type: string
-          description: Date of the next rate renewal.
+          description: |
+            The date (MM/DD/YYYY) when the current rate guarantee period ends
+            and the renewalRate takes effect. After this date the contract
+            enters a new rate period.
           example: "03/15/2026"
         isMinRateRenewal:
           type: boolean
-          description: Whether the renewal rate equals the guaranteed minimum.
+          description: |
+            True when the renewalRate equals the guaranteedMinRate — meaning
+            the carrier is renewing the contract at the lowest rate the contract
+            allows. False when the renewal rate is above the contractual floor.
         suitabilityStatus:
           type: string
-          description: Current state of the suitability review for this policy.
+          description: |
+            State of the regulatory suitability review for this policy.
+            "complete": all required suitability information has been gathered
+            and reviewed. "incomplete": suitability review has been started but
+            required information is still missing. "not-started": no suitability
+            review has been initiated for this policy. A completed suitability
+            review is a regulatory prerequisite before any exchange or
+            replacement transaction can proceed.
           enum: [complete, incomplete, not-started]
         eligibilityStatus:
           type: string
-          description: Whether the policy is eligible for renewal or exchange activity.
+          description: |
+            Whether this policy is eligible for exchange or replacement activity.
+            "eligible": the policy can be exchanged or replaced under current
+            rules. "restricted": the policy has conditions that limit exchange
+            activity (e.g., outstanding loans, pending transactions, or
+            regulatory holds). "ineligible": the policy cannot be exchanged
+            or replaced at this time.
           enum: [eligible, restricted, ineligible]
         features:
           $ref: '#/components/schemas/PolicyFeaturesData'
 
     PolicyFeaturesData:
       type: object
-      description: Feature, benefit, rider, and limitation details associated with a policy, plus summary contract provisions.
+      description: |
+        Contract-level provisions and the itemized features, benefits, riders,
+        and limitations attached to a policy. The top-level fields
+        (surrenderCharge, withdrawalAllowance, mvaPenalty, rateGuarantee)
+        summarize the key contract provisions as formatted strings. The arrays
+        (features, benefits, riders, limitations) provide the full itemized
+        detail.
       properties:
         surrenderCharge:
           type: string
           nullable: true
-          description: Current surrender charge percentage and schedule position.
+          description: |
+            The penalty percentage that would be deducted from the contract
+            value if the policy is surrendered (fully cashed out) today,
+            along with the current position in the declining schedule.
+            Surrender charges typically start high and decline annually to
+            zero over the surrender period. Null when the surrender charge
+            period has expired and no penalty applies.
           example: "2.5% (Year 7 of 10)"
         withdrawalAllowance:
           type: string
           nullable: true
-          description: Penalty-free withdrawal provision.
+          description: |
+            The portion of the contract value the client may withdraw each
+            year without incurring a surrender charge. Withdrawals within
+            this allowance do not trigger penalties even during the surrender
+            charge period.
           example: "10% annually penalty-free"
         mvaPenalty:
           type: string
           nullable: true
-          description: Current market value adjustment impact if surrendered today.
+          description: |
+            The market value adjustment (MVA) that would apply if the policy
+            were surrendered today. An MVA is a contract provision that adjusts
+            the surrender value up or down based on changes in interest rates
+            since the contract was issued. A negative MVA reduces the surrender
+            value; a positive MVA increases it. Null when the contract does not
+            include an MVA provision or the surrender charge period has expired.
           example: "-3.8% if surrendered today"
         rateGuarantee:
           type: string
           nullable: true
-          description: Remaining duration of the current rate guarantee period.
+          description: |
+            The remaining time until the current credited rate expires and a
+            new rate is declared. During the guarantee period, the carrier
+            cannot change the credited rate. Null when the original rate
+            guarantee period has expired and the contract is in a renewal
+            period.
           example: "5 years remaining"
         features:
           type: array
@@ -422,19 +540,33 @@ components:
           example: "Nursing Home Waiver"
         description:
           type: string
-          description: Explanation of the feature and its terms.
+          description: Explanation of the feature, its terms, and conditions.
           example: "Surrender charges waived after 90-day qualifying stay"
         included:
           type: boolean
-          description: Whether this feature is active on the policy.
+          description: Whether this feature is currently active and in effect on the policy.
         type:
           type: string
-          description: Classification of the feature.
+          description: |
+            Classification of the item. "feature": a standard contract
+            provision included at no additional cost (e.g., tax-deferred growth,
+            nursing home waiver). "benefit": a contractual guarantee provided
+            by the policy (e.g., guaranteed minimum rate, death benefit).
+            "rider": an optional add-on provision that may carry additional
+            cost or conditions (e.g., guaranteed lifetime withdrawal benefit,
+            enhanced death benefit). "limitation": a contractual restriction
+            or penalty that constrains the policyholder (e.g., market value
+            adjustment, early withdrawal penalty, surrender charge schedule).
           enum: [feature, benefit, rider, limitation]
 
     ProductOption:
       type: object
-      description: An available annuity product with rate, term, surrender schedule, benefit provisions, and the advisor's licensing status.
+      description: |
+        An annuity product currently available for new business. Each record
+        describes the product's credited rate, rate guarantee term, surrender
+        schedule, withdrawal provisions, death benefit structure, available
+        riders and features, and the requesting advisor's licensing and
+        appointment status with the issuing carrier.
       required:
         - ID
         - productId
@@ -464,42 +596,77 @@ components:
           example: "Great American"
         rate:
           type: string
-          description: Current credited interest rate.
+          description: The annualized interest rate credited to new contracts issued under this product today.
           example: "4.25%"
         term:
           type: string
-          description: Rate guarantee term length.
+          description: |
+            The length of the initial rate guarantee period. During this
+            period the credited rate is locked in and cannot be reduced by
+            the carrier. At the end of the term the carrier declares a new
+            rate (subject to the guaranteedMinRate floor).
           example: "7 years"
         premiumBonus:
           type: string
           nullable: true
-          description: First-year premium bonus percentage, if offered.
+          description: |
+            A one-time bonus the carrier adds to the contract value when the
+            initial premium is deposited, expressed as a percentage of the
+            premium. Premium bonuses typically vest gradually over the
+            surrender period — if the contract is surrendered early, the
+            unvested portion of the bonus is forfeited. Null if the product
+            does not offer a premium bonus.
           example: "3.0%"
         surrenderPeriod:
           type: string
-          description: Number of years the surrender charge schedule applies.
+          description: |
+            The number of years from contract issue during which surrender
+            charges apply. During this period, fully cashing out the contract
+            incurs a penalty. After the surrender period expires, the full
+            accumulated value is available without charge.
           example: "7"
         surrenderCharge:
           type: string
           nullable: true
-          description: Current surrender charge schedule.
+          description: |
+            The surrender charge schedule for this product, showing the
+            initial charge percentage and how it declines over time. Surrender
+            charges are deducted from the contract value if the policy is
+            fully surrendered during the surrender period.
           example: "7% (declining 1% annually)"
         freeWithdrawal:
           type: string
-          description: Annual penalty-free withdrawal percentage.
+          description: |
+            The percentage of the contract value the holder may withdraw each
+            year without triggering a surrender charge, even during the
+            surrender period.
           example: "10%"
         deathBenefit:
           type: string
-          description: Type of death benefit provided.
+          description: |
+            The death benefit provision of the product. "Standard" means
+            beneficiaries receive the accumulated contract value at time of
+            death. "Enhanced" means beneficiaries receive the greater of the
+            accumulated value or a formula-based amount (such as return of
+            premium plus credited interest), providing a floor on the death
+            benefit.
           example: "Enhanced -- return of premium plus interest"
         guaranteedMinRate:
           type: string
-          description: Contractual guaranteed minimum interest rate.
+          description: |
+            The contractual floor rate for this product — the lowest rate the
+            carrier can ever credit, regardless of market conditions. This
+            guarantee applies for the life of the contract, including all
+            renewal periods after the initial term.
           example: "2.50%"
         riders:
           type: array
           nullable: true
-          description: Optional riders available or attached.
+          description: |
+            Optional rider provisions available with this product. Riders are
+            add-on contract features that provide additional guarantees or
+            protections beyond the base contract (e.g., guaranteed lifetime
+            income, nursing home charge waivers, enhanced death benefits).
           items:
             type: string
           example:
@@ -508,7 +675,7 @@ components:
         features:
           type: array
           nullable: true
-          description: Included product features.
+          description: Standard product features included in the base contract at no additional cost.
           items:
             type: string
           example:
@@ -517,21 +684,40 @@ components:
         liquidity:
           type: string
           nullable: true
-          description: Summary of the product's liquidity provisions.
+          description: |
+            Summary of the product's liquidity provisions — how and when the
+            contract holder can access funds, including the free withdrawal
+            allowance during the surrender period and full access after the
+            surrender period ends.
           example: "10% annual free withdrawal; full liquidity after surrender period"
         mvaPenalty:
           type: string
           nullable: true
-          description: Whether the product is subject to a market value adjustment.
+          description: |
+            Whether this product includes a market value adjustment (MVA)
+            provision. An MVA adjusts the surrender value based on changes in
+            prevailing interest rates since the contract was issued. When
+            rates have risen since issue, the MVA reduces the surrender value;
+            when rates have fallen, it may increase the surrender value. Null
+            if the product does not include an MVA provision.
           example: "Subject to MVA during surrender period"
         licensingApproved:
           type: boolean
           nullable: true
-          description: Whether the requesting advisor is licensed and appointed to sell this product.
+          description: |
+            Whether the requesting advisor currently holds the required
+            insurance licenses and carrier appointment to sell this product.
+            False means the advisor cannot submit business for this product
+            until licensing and appointment are completed.
         licensingDetails:
           type: string
           nullable: true
-          description: Additional licensing status details or required actions.
+          description: |
+            Additional context about the advisor's licensing status for this
+            product. When licensingApproved is false, this field typically
+            describes what action is needed to obtain approval (e.g., carrier
+            appointment application, state licensing requirement). Null when
+            no additional detail is available.
           example: "Appointment with carrier required -- apply at carrier portal"
 
     ClientProfile:
@@ -561,24 +747,31 @@ components:
     ComparisonParameters:
       type: object
       description: |
-        Financial situation, anticipated changes, objectives, and planning
-        parameters for a client. All fields are optional and represented as
-        strings for display flexibility.
+        A client's financial profile: current income and assets, household
+        balance sheet, tax situation, insurance coverages, employment status,
+        anticipated changes to their financial position, stated objectives,
+        and distribution planning parameters. All monetary values are
+        represented as unformatted numeric strings (e.g., "250000") unless
+        otherwise noted. All fields are nullable.
       properties:
         residesInNursingHome:
           type: string
           nullable: true
-          description: Whether the client currently resides in a nursing home.
+          description: |
+            Whether the client currently resides in a nursing home or
+            long-term care facility. Many annuity contracts include nursing
+            home waiver provisions that alter surrender charge terms for
+            policyholders in qualifying care facilities.
           enum: ["yes", "no"]
         hasLongTermCareInsurance:
           type: string
           nullable: true
-          description: Whether the client has long-term care insurance.
+          description: Whether the client has a separate long-term care insurance policy covering extended care costs.
           enum: ["yes", "no"]
         hasMedicareSupplemental:
           type: string
           nullable: true
-          description: Whether the client has Medicare supplemental coverage.
+          description: Whether the client has a Medicare supplemental (Medigap) policy covering costs not paid by Medicare.
           enum: ["yes", "no"]
         grossIncome:
           type: string
@@ -598,37 +791,56 @@ components:
         householdLiquidAssets:
           type: string
           nullable: true
-          description: Total liquid assets (cash, savings, money market).
+          description: |
+            Total household liquid assets — cash, savings, money market
+            accounts, and other holdings that can be converted to cash
+            quickly without significant loss of value. Does not include
+            retirement accounts, real estate, or annuity contract values.
           example: "250000"
         monthlyLivingExpenses:
           type: string
           nullable: true
-          description: Average monthly living expenses.
+          description: Average total monthly household living expenses including housing, food, healthcare, insurance, and discretionary spending.
           example: "4500"
         totalAnnuityValue:
           type: string
           nullable: true
-          description: Total value of all annuity contracts held.
+          description: |
+            The combined current value of all annuity contracts the client
+            holds, across all carriers. This is the sum of the currentValue
+            fields from the client's policyData records.
           example: "180000"
         householdNetWorth:
           type: string
           nullable: true
-          description: Total household net worth.
+          description: |
+            Total household net worth — all assets (real estate, investments,
+            retirement accounts, liquid assets, annuities) minus all
+            liabilities (mortgages, loans, debts).
           example: "650000"
         anticipateExpenseIncrease:
           type: string
           nullable: true
-          description: Whether the client anticipates a significant expense increase.
+          description: |
+            Whether the client anticipates a significant increase in living
+            expenses in the foreseeable future (e.g., medical costs, dependent
+            care, planned major purchases).
           enum: ["yes", "no"]
         anticipateIncomeDecrease:
           type: string
           nullable: true
-          description: Whether the client anticipates an income decrease (e.g., retirement).
+          description: |
+            Whether the client anticipates a decrease in income in the
+            foreseeable future (e.g., upcoming retirement, reduction in
+            work hours, loss of a spouse's income).
           enum: ["yes", "no"]
         anticipateLiquidAssetDecrease:
           type: string
           nullable: true
-          description: Whether the client anticipates a decrease in liquid assets.
+          description: |
+            Whether the client anticipates a significant decrease in liquid
+            assets in the foreseeable future (e.g., planned large expenditure,
+            gifting, debt payoff).
           enum: ["yes", "no"]
         financialObjectives:
           type: string
@@ -638,47 +850,83 @@ components:
         distributionPlan:
           type: string
           nullable: true
-          description: Planned distribution or withdrawal strategy.
+          description: |
+            The client's planned strategy for taking distributions
+            (withdrawals) from their annuity holdings — when they plan to
+            start, how frequently, and in what form (systematic, lump sum,
+            RMD-only, etc.).
           example: "Systematic withdrawals beginning at age 67"
         ownedAssets:
           type: string
           nullable: true
-          description: Summary of major owned assets.
+          description: |
+            A free-text summary of the client's major asset holdings outside
+            of liquid assets, including real estate, retirement accounts,
+            existing annuities, and other investments. This is a self-reported
+            overview, not an exhaustive inventory.
           example: "Primary residence (paid off), 401(k), Roth IRA, existing fixed annuity"
         timeToFirstDistribution:
           type: string
           nullable: true
-          description: Expected time until the first distribution from the annuity.
+          description: |
+            How long the client expects to wait before taking the first
+            withdrawal from their annuity. "Immediate" indicates the client
+            needs to begin withdrawals now or very soon.
           example: "5 years"
         expectedHoldingPeriod:
           type: string
           nullable: true
-          description: Expected total holding period for the annuity.
+          description: |
+            The total length of time the client expects to keep their annuity
+            contract in force before fully surrendering or annuitizing.
           example: "10+ years"
         sourceOfFunds:
           type: string
           nullable: true
-          description: Source of funds for the annuity purchase.
+          description: |
+            Where the money for the annuity purchase originates. Common
+            sources include 1035 exchanges from existing annuity or life
+            insurance contracts, rollovers from employer retirement plans,
+            savings, CD maturities, inheritance, or asset sales. The source
+            determines the applicable tax treatment and transfer mechanism.
           example: "1035 exchange from existing annuity and savings account"
         employmentStatus:
           type: string
           nullable: true
-          description: Current employment status and retirement plans.
+          description: |
+            The client's current employment situation and, if applicable,
+            their retirement timeline. Includes whether they are currently
+            working, retired, semi-retired, or self-employed, and when they
+            plan to stop working.
           example: "Employed full-time, plans to retire in 5 years"
         applyToMeansTestedBenefits:
           type: string
           nullable: true
-          description: Whether the client expects to apply for means-tested government benefits.
+          description: |
+            Whether the client expects to apply for government benefits that
+            are subject to means testing (e.g., Medicaid, Supplemental
+            Security Income). Annuity holdings and income can affect
+            eligibility for means-tested programs depending on the state
+            and program rules.
           enum: ["yes", "no"]
         dateOfBirth:
           type: string
           nullable: true
-          description: Client's date of birth in MM/DD/YYYY format.
+          description: |
+            The client's date of birth in MM/DD/YYYY format. Age is relevant
+            to IRS early withdrawal penalties (which apply before age 59 1/2),
+            required minimum distribution (RMD) rules (which begin at age 73),
+            and maximum issue age limits on certain products.
           example: "04/12/1960"
 
     SuitabilityInlineData:
       type: object
-      description: Suitability assessment fields embedded in a client profile response.
+      description: |
+        Suitability assessment data gathered during the client intake process.
+        These fields capture the client's investment profile, preferences, and
+        constraints as determined through the suitability review — a regulatory
+        requirement before any annuity transaction. This data is present when
+        the corresponding policy's suitabilityStatus is "complete".
       required:
         - clientObjectives
         - riskTolerance
@@ -692,30 +940,152 @@ components:
       properties:
         clientObjectives:
           type: string
-          description: Summary of the client's stated financial objectives.
+          description: The client's stated financial goals and objectives in their own words — what they want to achieve with their investments and retirement planning.
         riskTolerance:
           type: string
-          description: Client's self-assessed risk tolerance level.
+          description: |
+            The client's self-assessed comfort level with investment risk,
+            ranging from "Conservative" (prioritizes principal protection)
+            through "Moderate" to "Moderately Aggressive" (willing to accept
+            some variability for higher potential returns).
         timeHorizon:
           type: string
-          description: Expected investment time horizon.
+          description: |
+            The length of time the client expects to keep funds invested
+            before needing to access them. Expressed as a range (e.g.,
+            "3-5 years", "10-15 years", "15+ years").
         liquidityNeeds:
           type: string
-          description: Assessment of the client's need for accessible funds.
+          description: |
+            An assessment of the client's need for accessible funds outside
+            of their annuity holdings, including the size of their emergency
+            reserves and any anticipated near-term cash needs.
         taxConsiderations:
           type: string
-          description: Relevant tax situation and planning considerations.
+          description: |
+            A summary of the client's current tax situation and how it may
+            change — their current tax bracket, expected future bracket
+            (e.g., if retiring), and the relative value of tax deferral
+            given their circumstances.
         guaranteedIncome:
           type: string
-          description: Client's desired guaranteed income provisions.
+          description: |
+            The client's stated preferences around guaranteed income — whether
+            they need a guaranteed income stream, how much per month, when
+            it should start, and what it needs to cover (e.g., supplementing
+            Social Security, replacing salary).
         rateExpectations:
           type: string
-          description: Client's rate and return expectations or preferences.
+          description: |
+            The client's preferences regarding interest rates and returns —
+            whether they prioritize the highest current rate, a longer rate
+            guarantee period, a minimum floor rate, or a specific rate
+            improvement threshold over their current holdings.
         surrenderTimeline:
           type: string
-          description: Whether or when the client anticipates surrendering the contract.
+          description: |
+            Whether and when the client anticipates needing to surrender
+            (cash out) any annuity contracts. Indicates willingness to
+            commit to a new surrender period.
         livingBenefits:
           type: array
-          description: Living benefit features important to the client.
+          description: |
+            Insurance benefit provisions that are important to the client
+            and that pay out while the policyholder is still living (as
+            opposed to death benefits). Examples include nursing home
+            waivers (surrender charges waived during qualifying care stays),
+            terminal illness benefits (early access to funds upon terminal
+            diagnosis), guaranteed lifetime withdrawal benefits (income
+            payments guaranteed for life), and disability waivers.
           items:
             type: string
+
+    ClientAsset:
+      type: object
+      description: |
+        A non-annuity financial asset held by a client. Covers the full range of
+        holdings a client may have outside their annuity book: fixed-term
+        instruments (CDs), deposit accounts (savings, money market), employer-
+        sponsored and individual retirement accounts (401k, traditional IRA,
+        Roth IRA), taxable investment accounts (brokerage), and defined-benefit
+        entitlements (pension). Assets are linked to client profiles by clientId.
+      required:
+        - ID
+        - clientId
+        - assetType
+        - description
+        - currentValue
+        - institution
+        - taxQualified
+        - liquidityStatus
+      properties:
+        ID:
+          type: string
+          description: Internal record identifier (base64-encoded UUID).
+        clientId:
+          type: string
+          description: Business identifier for the client who owns this asset.
+          example: "CLT-2024-00100"
+        assetType:
+          type: string
+          description: |
+            Classification of the asset. CD: certificate of deposit with a fixed
+            term and rate. money-market: money market deposit or fund account.
+            savings: bank savings or high-yield savings account. 401k: employer-
+            sponsored defined-contribution retirement plan. ira-traditional:
+            individual retirement account funded with pre-tax contributions.
+            ira-roth: individual retirement account funded with after-tax
+            contributions (qualified withdrawals are tax-free). brokerage:
+            taxable investment/brokerage account. pension: defined-benefit
+            pension or pension distribution entitlement.
+          enum: [CD, money-market, savings, 401k, ira-traditional, ira-roth, brokerage, pension]
+        description:
+          type: string
+          description: Human-readable summary of the asset including term length, institution, or account origin where relevant.
+          example: "12-month CD at First National Bank"
+        currentValue:
+          type: string
+          description: Current account balance or market value, formatted as USD with currency symbol.
+          example: "$85,000"
+        interestRate:
+          type: string
+          nullable: true
+          description: |
+            The annual interest rate or yield currently credited to the asset.
+            Present for rate-bearing instruments (CDs, savings, money market).
+            Null for assets where a single credited rate does not apply (retirement
+            accounts, brokerage, pension).
+          example: "2.10%"
+        maturityDate:
+          type: string
+          nullable: true
+          description: |
+            The date the asset's current term ends, in MM/DD/YYYY format. Applies
+            to fixed-term instruments such as CDs. On or after this date, the
+            principal is no longer locked and the holder must decide whether to
+            renew, withdraw, or reallocate the funds. Null for assets with no
+            fixed term.
+          example: "04/15/2026"
+        institution:
+          type: string
+          description: The bank, brokerage, or financial institution where the asset is held or administered.
+          example: "First National Bank"
+        taxQualified:
+          type: boolean
+          description: |
+            True if the asset is held in a tax-advantaged account (401k,
+            traditional IRA, Roth IRA, qualified pension). False for after-tax
+            accounts (savings, CDs, money market, brokerage). Tax qualification
+            determines the applicable transfer mechanism and tax treatment when
+            funds are moved between financial products.
+        liquidityStatus:
+          type: string
+          description: |
+            Indicates how readily the funds can be accessed. "liquid": funds can
+            be withdrawn or transferred without penalty or restriction.
+            "locked": funds are committed for a fixed term and early withdrawal
+            would incur a penalty (e.g., a CD before maturity). "restricted":
+            funds are subject to regulatory, plan, or custodial restrictions on
+            withdrawal or transfer (e.g., an active 401k with a current or
+            former employer that requires a qualifying event for distribution).
+          enum: [liquid, locked, restricted]
